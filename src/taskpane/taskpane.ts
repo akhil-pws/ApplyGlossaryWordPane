@@ -50,6 +50,9 @@ function enableButtons() {
 export async function run() {
   try {
     await Word.run(async (context) => {
+      document.getElementById("run")?.setAttribute("disabled", "true");
+      document.getElementById('loader').style.display='block';
+
       const body = context.document.body;
 
       const searchPromises = layTerms.map(term => {
@@ -58,7 +61,9 @@ export async function run() {
         return searchResults;
       });
 
+
       await context.sync();
+
 
       searchPromises.forEach(searchResults => {
         searchResults.items.forEach(item => {
@@ -68,6 +73,8 @@ export async function run() {
       // document.getElementById('glossarycheck').style.display='block';
       document.getElementById('Clear').style.display='block';
       document.getElementById('run').style.display='none';
+      document.getElementById('loader').style.display='none';
+
       isGlossaryMarked = true; // Set the flag when glossary is marked
 
       await context.sync();
