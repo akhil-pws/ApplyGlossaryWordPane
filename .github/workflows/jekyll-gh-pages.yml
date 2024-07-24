@@ -45,6 +45,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    run: |
+      # Build the project, then
+      # deploy to Azure Web App.
+      npm install npm@8.7.0
+      npm install --force
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
