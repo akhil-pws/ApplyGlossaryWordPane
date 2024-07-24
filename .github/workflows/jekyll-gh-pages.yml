@@ -38,6 +38,7 @@ jobs:
 
       - name: Install Node.js dependencies
         run: npm install --force
+             npm run start:web -- --document https://akhil-pws.github.io/ApplyGlossaryWordPane/src/taskpane/taskpane.html
 
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
