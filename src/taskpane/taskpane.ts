@@ -53,7 +53,7 @@ export async function run() {
       const body = context.document.body;
 
       const searchPromises = layTerms.map(term => {
-        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+        const searchResults = body.search(term.ClinicalTerm, { matchCase: true, matchWholeWord: true });
         searchResults.load("items");
         return searchResults;
       });
