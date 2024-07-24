@@ -27,12 +27,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.1 # or the version you need
-          bundler-cache: true # caches as well as installs dependencies using bundler
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -44,12 +38,7 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        
-      - name: Build with Jekyll
-        run: |
-          bundle install
-          bundle exec jekyll build -d ./_site
-        
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
