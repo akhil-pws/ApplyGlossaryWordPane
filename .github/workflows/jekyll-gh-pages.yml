@@ -1,4 +1,3 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
 name: Deploy Jekyll with GitHub Pages dependencies preinstalled
 
 on:
@@ -28,13 +27,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.1 # or the version you need
+          bundler-cache: true # caches as well as installs dependencies using bundler
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18' # specify your desired Node.js version
+
+      - name: Install Node.js dependencies
+        run: npm install
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        
       - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
+        run: |
+          bundle install
+          bundle exec jekyll build -d ./_site
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
@@ -45,11 +60,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
-    run: |
-      # Build the project, then
-      # deploy to Azure Web App.
-      npm install npm@8.7.0
-      npm install --force
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
