@@ -293,8 +293,6 @@ async function fetchGlossaryData() {
     }
     
     const data = await response.json();
-    document.getElementById('loader').style.display='none';
-    document.getElementById('run').style.display='block';
     layTerms = data.Data.GlossaryTemplateData;
    
       // alert('Glossary data loaded successfully.');
