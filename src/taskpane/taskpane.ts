@@ -93,6 +93,8 @@ export async function run() {
 async function clearGlossary() {
   try {
     await Word.run(async (context) => {
+      document.getElementById("Clear")?.setAttribute("disabled", "true");
+      document.getElementById('loader').style.display='block';
       const body = context.document.body;
 
       const searchPromises = layTerms.map(term => {
@@ -108,7 +110,10 @@ async function clearGlossary() {
           item.font.highlightColor = 'white'; // Reset highlight color
         });
       });
+      document.getElementById("Clear")?.removeAttribute("disabled");
       document.getElementById('Clear').style.display='none';
+      document.getElementById('loader').style.display='none';
+
       document.getElementById('run').style.display='block';
       await context.sync();
       
