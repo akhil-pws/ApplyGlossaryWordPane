@@ -50,7 +50,7 @@ function enableButtons() {
 export async function run() {
   try {
     await Word.run(async (context) => {
-      document.getElementById("run")?.setAttribute("disabled", "true");
+      document.getElementById('run').style.display='none';
       document.getElementById('loader').style.display='block';
 
       const body = context.document.body;
@@ -70,11 +70,9 @@ export async function run() {
         });
       });
       // document.getElementById('glossarycheck').style.display='block';
-      document.getElementById("run")?.removeAttribute("disabled");
 
-      document.getElementById('Clear').style.display='block';
-      document.getElementById('run').style.display='none';
       document.getElementById('loader').style.display='none';
+      document.getElementById('Clear').style.display='block';
 
       isGlossaryMarked = true; // Set the flag when glossary is marked
 
@@ -93,7 +91,7 @@ export async function run() {
 async function clearGlossary() {
   try {
     await Word.run(async (context) => {
-      document.getElementById("Clear")?.setAttribute("disabled", "true");
+      document.getElementById('Clear').style.display='none';
       document.getElementById('loader').style.display='block';
       const body = context.document.body;
 
@@ -110,10 +108,7 @@ async function clearGlossary() {
           item.font.highlightColor = 'white'; // Reset highlight color
         });
       });
-      document.getElementById("Clear")?.removeAttribute("disabled");
-      document.getElementById('Clear').style.display='none';
       document.getElementById('loader').style.display='none';
-
       document.getElementById('run').style.display='block';
       await context.sync();
       
