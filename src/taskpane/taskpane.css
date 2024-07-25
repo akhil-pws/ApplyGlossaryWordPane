@@ -42,7 +42,7 @@ ul {
   margin-bottom: 2rem; //* Add space between buttons and the boxes */
 }
 
-#loaderDiv{
+#loader{
   display: flex;
   justify-content: center;
   margin-top: 2rem;
