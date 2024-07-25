@@ -260,7 +260,6 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
           // Remove the highlight color (set to white or no highlight)
           item.font.highlightColor = 'white';
         });
-
         await context.sync();
 
         console.log(`Replaced '${clinicalTerm}' with '${layTerm}' and removed highlight in the document.`);
