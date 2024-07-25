@@ -70,6 +70,8 @@ export async function run() {
         });
       });
       // document.getElementById('glossarycheck').style.display='block';
+      document.getElementById("run")?.removeAttribute("disabled");
+
       document.getElementById('Clear').style.display='block';
       document.getElementById('run').style.display='none';
       document.getElementById('loader').style.display='none';
