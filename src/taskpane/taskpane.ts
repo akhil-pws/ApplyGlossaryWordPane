@@ -62,9 +62,6 @@ export async function run() {
       });
 
 
-      await context.sync();
-
-
       searchPromises.forEach(searchResults => {
         searchResults.items.forEach(item => {
           item.font.highlightColor = "yellow";
