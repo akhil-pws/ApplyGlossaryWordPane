@@ -51,37 +51,40 @@ export async function run() {
   try {
     await Word.run(async (context) => {
       document.getElementById("run")?.setAttribute("disabled", "true");
-      document.getElementById('loader').style.display='block';
+      document.getElementById('loader').style.display = 'block';
 
       const body = context.document.body;
 
-      const searchPromises = layTerms.map(term => {
+      // Create an array of promises for searching and loading results
+      const searchPromises = layTerms.map(async (term) => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: true, matchWholeWord: true });
         searchResults.load("items");
-        return searchResults;
-      });
+        await context.sync(); // Synchronize to load search results
 
-
-      searchPromises.forEach(searchResults => {
+        // Highlight each found item
         searchResults.items.forEach(item => {
           item.font.highlightColor = "yellow";
         });
       });
-      // document.getElementById('glossarycheck').style.display='block';
-      document.getElementById('Clear').style.display='block';
-      document.getElementById('run').style.display='none';
-      document.getElementById('loader').style.display='none';
+
+      // Await all search promises to complete
+      await Promise.all(searchPromises);
+
+      // Update UI elements
+      document.getElementById('Clear').style.display = 'block';
+      document.getElementById('run').style.display = 'none';
+      document.getElementById('loader').style.display = 'none';
 
       isGlossaryMarked = true; // Set the flag when glossary is marked
 
-      await context.sync();
+      await context.sync(); // Final sync to apply changes
     });
 
-    // Optional: Notify user of completion
+    // Notify user of completion
     console.log('Glossary applied successfully');
   } catch (error) {
     console.error('Error applying glossary:', error);
-    // Optional: Notify user of error
+    // Notify user of error
     console.log('Error applying glossary. Please try again.');
   }
 }
