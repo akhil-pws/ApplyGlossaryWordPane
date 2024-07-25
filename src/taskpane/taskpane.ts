@@ -92,6 +92,8 @@ async function clearGlossary() {
   try {
     await Word.run(async (context) => {
       document.getElementById('Clear').style.display='none';
+      document.getElementById('run').style.display='none';
+
       document.getElementById('loader').style.display='block';
       const body = context.document.body;
 
