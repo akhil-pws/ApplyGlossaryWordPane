@@ -42,6 +42,10 @@ ul {
   margin-bottom: 2rem; //* Add space between buttons and the boxes */
 }
 
+#loader{
+  display: flex;
+  justify-content: center;
+}
 
 .box {
   border: 1px solid #ddd;
