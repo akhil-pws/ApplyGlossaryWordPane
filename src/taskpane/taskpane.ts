@@ -51,40 +51,39 @@ export async function run() {
   try {
     await Word.run(async (context) => {
       document.getElementById("run")?.setAttribute("disabled", "true");
-      document.getElementById('loader').style.display = 'block';
+      document.getElementById('loader').style.display='block';
 
       const body = context.document.body;
 
-      // Create an array of promises for searching and loading results
-      const searchPromises = layTerms.map(async (term) => {
+      const searchPromises = layTerms.map(term => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: true, matchWholeWord: true });
         searchResults.load("items");
-        await context.sync(); // Synchronize to load search results
+        return searchResults;
+      });
+      await context.sync();
 
-        // Highlight each found item
+
+
+      searchPromises.forEach(searchResults => {
         searchResults.items.forEach(item => {
           item.font.highlightColor = "yellow";
         });
       });
-
-      // Await all search promises to complete
-      await Promise.all(searchPromises);
-
-      // Update UI elements
-      document.getElementById('Clear').style.display = 'block';
-      document.getElementById('run').style.display = 'none';
-      document.getElementById('loader').style.display = 'none';
+      // document.getElementById('glossarycheck').style.display='block';
+      document.getElementById('Clear').style.display='block';
+      document.getElementById('run').style.display='none';
+      document.getElementById('loader').style.display='none';
 
       isGlossaryMarked = true; // Set the flag when glossary is marked
 
-      await context.sync(); // Final sync to apply changes
+      await context.sync();
     });
 
-    // Notify user of completion
+    // Optional: Notify user of completion
     console.log('Glossary applied successfully');
   } catch (error) {
     console.error('Error applying glossary:', error);
-    // Notify user of error
+    // Optional: Notify user of error
     console.log('Error applying glossary. Please try again.');
   }
 }
