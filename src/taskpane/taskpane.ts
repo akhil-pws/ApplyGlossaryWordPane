@@ -10,18 +10,18 @@
 
 let layTerms
 let isGlossaryMarked = false;
-const jwt='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJOYW1lIjoiYWtoaWxybyIsIk5hbWVJZGVudGlmaWVyIjoiMTQwOCIsIlVzZXJJRCI6IjE0MDgiLCJVc2VyTmFtZSI6ImFraGlscm8iLCJFbWFpbCI6ImFraGlsLmFAcGFjZXdpc2RvbS5jb20iLCJDbGllbnRJRCI6IjEwMDU5IiwiVEFBdXRoX0RCTmFtZSI6IlRBX0F1dGhfUGFjZURldiIsIkVycm9yTXNnIjoiXCJcIiIsIklzVmFsaWQiOiJUcnVlIiwiQXBwbGljYXRpb25Db2RlIjoiTElOSyIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IlVzZXIiLCJBbm9ueW1pemF0aW9uX0RCTmFtZSI6IiIsIkJFQUNPTl9EQk5hbWUiOiIiLCJMSU5LX0RCTmFtZSI6IkxpbmtfTU1TIiwiUmVnaXN0cnlfREJOYW1lIjoiIiwiZXhwIjoxNzIyOTQyNDQ4LCJpc3MiOiJodHRwOi8vVHJpYWxBc3N1cmUuY29tIiwiYXVkIjoiaHR0cDovL1RyaWFsQXNzdXJlLmNvbSJ9.k-s_qBxCj-ArIIicYm_FRWv-332_0loUKLGuoPfmosw'
+const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJOYW1lIjoiYWtoaWxybyIsIk5hbWVJZGVudGlmaWVyIjoiMTQwOCIsIlVzZXJJRCI6IjE0MDgiLCJVc2VyTmFtZSI6ImFraGlscm8iLCJFbWFpbCI6ImFraGlsLmFAcGFjZXdpc2RvbS5jb20iLCJDbGllbnRJRCI6IjEwMDU5IiwiVEFBdXRoX0RCTmFtZSI6IlRBX0F1dGhfUGFjZURldiIsIkVycm9yTXNnIjoiXCJcIiIsIklzVmFsaWQiOiJUcnVlIiwiQXBwbGljYXRpb25Db2RlIjoiTElOSyIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IlVzZXIiLCJBbm9ueW1pemF0aW9uX0RCTmFtZSI6IiIsIkJFQUNPTl9EQk5hbWUiOiIiLCJMSU5LX0RCTmFtZSI6IkxpbmtfTU1TIiwiUmVnaXN0cnlfREJOYW1lIjoiIiwiZXhwIjoxNzIyOTQyNDQ4LCJpc3MiOiJodHRwOi8vVHJpYWxBc3N1cmUuY29tIiwiYXVkIjoiaHR0cDovL1RyaWFsQXNzdXJlLmNvbSJ9.k-s_qBxCj-ArIIicYm_FRWv-332_0loUKLGuoPfmosw'
 
 /* global document, Office, Word */
 
-Office.onReady(async(info) => {
+Office.onReady(async (info) => {
   if (info.host === Office.HostType.Word) {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("run").onclick = run;
     // document.getElementById("glossarycheck").onclick = checkGlossary;
     document.getElementById("Clear").onclick = clearGlossary;
-    
+
     Office.context.document.addHandlerAsync(
       Office.EventType.DocumentSelectionChanged,
       handleSelectionChange
@@ -50,8 +50,8 @@ function enableButtons() {
 export async function run() {
   try {
     await Word.run(async (context) => {
-      document.getElementById('run').style.display='none';
-      document.getElementById('loader').style.display='block';
+      document.getElementById('run').style.display = 'none';
+      document.getElementById('loader').style.display = 'block';
 
       const body = context.document.body;
 
@@ -70,8 +70,8 @@ export async function run() {
       });
       // document.getElementById('glossarycheck').style.display='block';
 
-      document.getElementById('loader').style.display='none';
-      document.getElementById('Clear').style.display='block';
+      document.getElementById('loader').style.display = 'none';
+      document.getElementById('Clear').style.display = 'block';
 
       isGlossaryMarked = true; // Set the flag when glossary is marked
 
@@ -90,30 +90,33 @@ export async function run() {
 async function clearGlossary() {
   try {
     await Word.run(async (context) => {
-      document.getElementById('Clear').style.display='none';
-      document.getElementById('run').style.display='none';
+      if (layTerms) {
 
-      document.getElementById('loader').style.display='block';
-      const body = context.document.body;
+        document.getElementById('Clear').style.display = 'none';
+        document.getElementById('run').style.display = 'none';
 
-      const searchPromises = layTerms.map(term => {
-        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
-        searchResults.load("items");
-        return searchResults;
-      });
+        document.getElementById('loader').style.display = 'block';
+        const body = context.document.body;
 
-
-      searchPromises.forEach(searchResults => {
-        searchResults.items.forEach(item => {
-          item.font.highlightColor = 'white'; // Reset highlight color
+        const searchPromises = layTerms.map(term => {
+          const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+          searchResults.load("items");
+          return searchResults;
         });
-      });
-      document.getElementById('loader').style.display='none';
-      document.getElementById('run').style.display='block';
-      
-      
-      isGlossaryMarked = false;  // Clear the flag when glossary is cleared
-      clearHighlightedText(); // Clear the highlighted text boxes
+
+
+        searchPromises.forEach(searchResults => {
+          searchResults.items.forEach(item => {
+            item.font.highlightColor = 'white'; // Reset highlight color
+          });
+        });
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('run').style.display = 'block';
+
+
+        isGlossaryMarked = false;  // Clear the flag when glossary is cleared
+        clearHighlightedText();
+      }// Clear the highlighted text boxes
     });
 
     console.log('Glossary cleared successfully');
@@ -259,8 +262,8 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
 
 
 async function fetchGlossaryData() {
-  document.getElementById('run').style.display='none';
-  document.getElementById('Clear').style.display='none';
+  document.getElementById('run').style.display = 'none';
+  document.getElementById('Clear').style.display = 'none';
 
   disableButtons(); // Disable buttons before making the API call
 
@@ -275,11 +278,11 @@ async function fetchGlossaryData() {
     if (!response.ok) {
       throw new Error('Network response was not ok.');
     }
-    
+
     const data = await response.json();
     layTerms = data.Data.GlossaryTemplateData;
-   
-      // alert('Glossary data loaded successfully.');
+
+    // alert('Glossary data loaded successfully.');
   } catch (error) {
     console.error('Error fetching glossary data:', error);
     // Optionally show an error message to the user
