@@ -31,14 +31,19 @@ Office.onReady(async (info) => {
 
 async function fetchGlossaryData() {
   try {
-    const response = await fetch('https://your-api-url', {
-      method: 'GET',
+    const response = await fetch('https://plsdevapp.azurewebsites.net/api/glossary-template/id/3', {
+      method: 'GET', // or 'POST', depending on your API
       headers: {
         'Authorization': `Bearer ${jwt}`
+
       }
     });
+    if (!response.ok) {
+      throw new Error('Network response was not ok.');
+    }
+    
     const data = await response.json();
-    layTerms = data.terms;
+    layTerms = data.Data.GlossaryTemplateData;
   } catch (error) {
     console.error('Error fetching glossary data:', error);
   }
