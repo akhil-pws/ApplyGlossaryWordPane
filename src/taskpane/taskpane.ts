@@ -35,7 +35,6 @@ async function fetchGlossaryData() {
       method: 'GET', // or 'POST', depending on your API
       headers: {
         'Authorization': `Bearer ${jwt}`
-
       }
     });
     if (!response.ok) {
