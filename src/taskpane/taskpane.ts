@@ -60,7 +60,6 @@ export async function run() {
         searchResults.load("items");
         return searchResults;
       });
-      await context.sync();
 
 
 
@@ -103,7 +102,6 @@ async function clearGlossary() {
         return searchResults;
       });
 
-      await context.sync();
 
       searchPromises.forEach(searchResults => {
         searchResults.items.forEach(item => {
@@ -112,7 +110,6 @@ async function clearGlossary() {
       });
       document.getElementById('loader').style.display='none';
       document.getElementById('run').style.display='block';
-      await context.sync();
       
       
       isGlossaryMarked = false;  // Clear the flag when glossary is cleared
@@ -138,10 +135,6 @@ export async function checkGlossary() {
       const selection = context.document.getSelection();
       selection.load("text, font.highlightColor");
 
-      await context.sync();
-
-
-
       if (selection.text) {
         const searchPromises = layTerms.map(term => {
           const searchResults = selection.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
@@ -149,19 +142,13 @@ export async function checkGlossary() {
           return searchResults;
         });
 
-        await context.sync();
         const selectedWords = []
         searchPromises.forEach(searchResults => {
           searchResults.items.forEach(item => {
             selectedWords.push(item.text);
           });
         });
-        displayHighlightedText(selectedWords)
-
-        await context.sync();
-
-
-
+        displayHighlightedText(selectedWords);
 
         // const highlightColor = selection.font.highlightColor;
 
@@ -243,7 +230,6 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
 
       // Load the selection's text
       selection.load('text');
-      await context.sync();
 
       // Check if the selected text contains the clinicalTerm
       if (selection.text.includes(clinicalTerm)) {
@@ -251,7 +237,6 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
         const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: true });
         searchResults.load('items');
 
-        await context.sync();
 
         // Replace each occurrence of the clinicalTerm with the layTerm
         searchResults.items.forEach(item => {
