@@ -27,7 +27,6 @@ Office.onReady(async(info) => {
       Office.EventType.DocumentSelectionChanged,
       handleSelectionChange
     );
-    await replaceTags();
 
     await fetchGlossaryData();
     await clearGlossary();
@@ -307,6 +306,35 @@ async function replaceTags() {
   }
 }
 
+function showSuggestion(suggestion, callback) {
+  // Create a suggestion box (this could be a dropdown, modal, etc.)
+  const suggestionBox = document.createElement('div');
+  suggestionBox.innerText = suggestion;
+  suggestionBox.style.position = 'fixed';
+  suggestionBox.style.top = '50px';  // Position it within your add-in's UI
+  suggestionBox.style.left = '50px'; // Adjust position based on your needs
+  suggestionBox.style.backgroundColor = '#f0f0f0';
+  suggestionBox.style.border = '1px solid #ccc';
+  suggestionBox.style.padding = '10px';
+  suggestionBox.style.cursor = 'pointer';
+
+  // Event listener for selecting the suggestion
+  suggestionBox.addEventListener('click', () => {
+    callback(true); // User selected the suggestion
+    document.body.removeChild(suggestionBox); // Clean up the UI
+  });
+
+  // Append the suggestion box to the document body
+  document.body.appendChild(suggestionBox);
+}
+
+
+
+document.addEventListener('keydown', async (event) => {
+  if (event.key === '#') {
+    await replaceTags();
+  }
+});
 
 async function fetchGlossaryData() {
   document.getElementById('run').style.display='none';
