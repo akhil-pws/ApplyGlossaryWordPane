@@ -3,6 +3,8 @@
  * See LICENSE in the project root for license information.
  */
 
+import { data } from "./data";
+
 // const layTerms=data.map(entry => ({
 //   LayTerm: entry.LayTerm, // or entry.ClinicalTerm based on what you want to search
 //   ClinicalTerm: entry.ClinicalTerm // Store the original term for reference
@@ -25,6 +27,7 @@ Office.onReady(async(info) => {
       Office.EventType.DocumentSelectionChanged,
       handleSelectionChange
     );
+    await replaceTags();
 
     await fetchGlossaryData();
     await clearGlossary();
@@ -268,6 +271,39 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
     });
   } catch (error) {
     console.error('Error replacing term:', error);
+  }
+}
+
+
+async function replaceTags() {
+  try {
+    await Word.run(async (context) => {
+      const mentiondata = data; // Ensure that `data` is correctly defined and available.
+
+      const selection = context.document.getSelection();
+      await context.sync();
+
+      if (selection.text && selection.text.endsWith("#")) {
+        // Suggestion logic based on the Displayname
+        const suggestion = mentiondata.Displayname;
+
+        // Show the suggestion to the user (you'll need to implement this UI part)
+        showSuggestion(suggestion, async (userSelected) => {
+          if (userSelected) {
+            // Replace the `#` with mentiondata.Editorvalue
+            const editorValue = mentiondata.Editorvalue;
+
+            // Replace the selected text with the Editorvalue
+            selection.insertText(editorValue, Word.InsertLocation.replace);
+            await context.sync();
+          }
+        });
+      } else {
+        console.log('No `#` detected or no text selected.');
+      }
+    });
+  } catch (error) {
+    console.error('Error displaying mention suggestion:', error);
   }
 }
 
