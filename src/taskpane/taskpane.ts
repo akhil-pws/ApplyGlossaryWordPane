@@ -191,15 +191,15 @@ async function fetchDocument() {
     const data = await response.json();
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('header').innerHTML = `
-    <button class="btn btn-dark me-2" id="mention">Suggestions</button>
+    <button class="btn btn-dark" id="mention">Suggestions</button>
             <button class="btn btn-dark " id="aitag">AI Text Panel</button>
 
-    <
+        <button class="btn btn-dark " id="glossary">Glossary</button>
+
 `
-    // <button class="btn btn-dark me-2" id="applyglossary">Glossary</button>
 
     document.getElementById('mention').addEventListener('click', displayMentions);
-    // document.getElementById('applyglossary').addEventListener('click', fetchGlossary);
+    document.getElementById('glossary').addEventListener('click', fetchGlossary);
 
     document.getElementById('aitag').addEventListener('click', displayAiTagList);
 
@@ -383,36 +383,311 @@ function selectResponse(tagIndex, chatIndex) {
 
 
 async function fetchGlossary() {
-  document.getElementById('app-body').innerHTML = `
+  if (layTerms.length === 0) {
+
+    document.getElementById('app-body').innerHTML = `
   <div id="button-container">
 
           <div class="loader" id="loader"></div>
 
         <div id="highlighted-text"></div>`
 
-  try {
-    const response = await fetch('https://plsdevapp.azurewebsites.net/api/glossary-template/id/3', {
-      method: 'GET', // or 'POST', depending on your API
-      headers: {
-        'Authorization': `Bearer ${jwt}`
-
+    try {
+      const response = await fetch('https://plsdevapp.azurewebsites.net/api/glossary-template/id/3', {
+        method: 'GET', // or 'POST', depending on your API
+        headers: {
+          'Authorization': `Bearer ${jwt}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok.');
       }
-    });
-    if (!response.ok) {
-      throw new Error('Network response was not ok.');
+
+      const data = await response.json();
+      layTerms = data.Data.GlossaryTemplateData;
+      loadGlossary()
+      // alert('Glossary data loaded successfully.');
+    } catch (error) {
+      console.error('Error fetching glossary data:', error);
+      // Optionally show an error message to the user
+      // alert('Error fetching glossary data.');
     }
 
-    const data = await response.json();
-    layTerms = data.Data.GlossaryTemplateData;
-
-    // alert('Glossary data loaded successfully.');
-  } catch (error) {
-    console.error('Error fetching glossary data:', error);
-    // Optionally show an error message to the user
-    // alert('Error fetching glossary data.');
+  } else {
+    loadGlossary()
   }
 
 
+}
+
+
+function loadGlossary() {
+  document.getElementById('app-body').innerHTML = `
+        <div id="button-container">
+          <button class="btn btn-secondary me-2 mark-glossary btn-sm" id="applyglossary">Apply Glossary</button>
+        </div>
+  `
+  document.getElementById('applyglossary').addEventListener('click', applyglossary);
+
+
+}
+
+
+
+export async function applyglossary() {
+  document.getElementById('app-body').innerHTML = `
+  <div id="button-container">
+
+          <div class="loader" id="loader"></div>
+
+        <div id="highlighted-text"></div>`
+        
+  try {
+    await Word.run(async (context) => {
+
+
+      const body = context.document.body;
+
+      const searchPromises = layTerms.map(term => {
+        const searchResults = body.search(term.ClinicalTerm, { matchCase: true, matchWholeWord: true });
+        searchResults.load("items");
+        return searchResults;
+      });
+      await context.sync();
+
+
+
+      searchPromises.forEach(searchResults => {
+        searchResults.items.forEach(item => {
+          item.font.highlightColor = "yellow";
+        });
+      });
+      // document.getElementById('glossarycheck').style.display='block';
+
+      document.getElementById('app-body').innerHTML = `
+      <div id="button-container">
+        <button class="btn btn-secondary me-2 clear-glossary btn-sm" id="clearGlossary">Clear Glossary</button>
+      </div>
+
+      <div id="highlighted-text"></div>
+      
+`  
+
+
+
+
+      // document.getElementById('loader').style.display='none';
+      // document.getElementById('Clear').style.display='block';
+
+      // Set the flag when glossary is marked
+
+      await context.sync();
+      document.getElementById('clearGlossary').addEventListener('click', clearGlossary);
+      Office.context.document.addHandlerAsync(
+        Office.EventType.DocumentSelectionChanged,
+        handleSelectionChange
+      );
+
+  
+    });
+
+    // Optional: Notify user of completion
+    console.log('Glossary applied successfully');
+  } catch (error) {
+    console.error('Error applying glossary:', error);
+    // Optional: Notify user of error
+    console.log('Error applying glossary. Please try again.');
+  }
+}
+
+
+async function handleSelectionChange() {
+    await checkGlossary();
+}
+
+export async function checkGlossary() {
+  try {
+    await Word.run(async (context) => {
+      const selection = context.document.getSelection();
+      selection.load("text, font.highlightColor");
+
+      await context.sync();
+
+
+
+      if (selection.text) {
+        const searchPromises = layTerms.map(term => {
+          const searchResults = selection.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+          searchResults.load("items");
+          return searchResults;
+        });
+
+        await context.sync();
+        const selectedWords = []
+        searchPromises.forEach(searchResults => {
+          searchResults.items.forEach(item => {
+            selectedWords.push(item.text);
+          });
+        });
+        displayHighlightedText(selectedWords)
+
+        await context.sync();
+
+
+
+
+        // const highlightColor = selection.font.highlightColor;
+
+        // if (highlightColor === "red") {
+        //   displayHighlightedText(selection.text);
+        // } else {
+        //   console.log('Selected text is not highlighted.');
+        // }
+      } else {
+        console.log('No text is selected.');
+      }
+    });
+  } catch (error) {
+    console.error('Error displaying glossary:', error);
+  }
+}
+
+
+
+function displayHighlightedText(words: string[]) {
+  const displayElement = document.getElementById('highlighted-text');
+
+  if (displayElement) {
+    displayElement.innerHTML = ''; // Clear previous content
+
+    // Group lay terms by their clinical term
+    const groupedTerms: { [clinicalTerm: string]: string[] } = {};
+
+    words.forEach(word => {
+      layTerms.forEach(term => {
+        if (term.ClinicalTerm === word) {
+          if (!groupedTerms[term.ClinicalTerm]) {
+            groupedTerms[term.ClinicalTerm] = [];
+          }
+          if (!groupedTerms[term.ClinicalTerm].includes(term.LayTerm)) {
+            groupedTerms[term.ClinicalTerm].push(term.LayTerm);
+          }
+        }
+      });
+    });
+
+    // Create a box for each clinical term
+    Object.keys(groupedTerms).forEach(clinicalTerm => {
+      // Create the main box for the clinical term
+      const mainBox = document.createElement('div');
+      mainBox.className = 'box'; // Add box class for styling
+
+      // Create a heading for the clinical term
+      const heading = document.createElement('h3');
+      heading.textContent = clinicalTerm;
+      mainBox.appendChild(heading);
+
+      // Create sub-boxes for each lay term
+      groupedTerms[clinicalTerm].forEach(layTerm => {
+        const subBox = document.createElement('div');
+        subBox.className = 'sub-box'; // Add class for sub-box styling
+        subBox.textContent = layTerm;
+
+        // Add click event listener to replace ClinicalTerm with LayTerm
+        subBox.addEventListener('click', async () => {
+          await replaceClinicalTerm(clinicalTerm, layTerm);
+
+          // Remove the main box containing the clicked sub-box
+          mainBox.remove();
+        });
+
+        mainBox.appendChild(subBox);
+      });
+
+      displayElement.appendChild(mainBox);
+    });
+  }
+}
+
+
+async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
+  try {
+    await Word.run(async (context) => {
+      // Get the current selection
+      const selection = context.document.getSelection();
+
+      // Load the selection's text
+      selection.load('text');
+      await context.sync();
+
+      // Check if the selected text contains the clinicalTerm
+      if (selection.text.includes(clinicalTerm)) {
+        // Search for the clinicalTerm in the document
+        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: true });
+        searchResults.load('items');
+
+        await context.sync();
+
+        // Replace each occurrence of the clinicalTerm with the layTerm
+        searchResults.items.forEach(item => {
+          item.insertText(layTerm, 'replace');
+
+          // Remove the highlight color (set to white or no highlight)
+          item.font.highlightColor = 'white';
+        });
+        await context.sync();
+
+        console.log(`Replaced '${clinicalTerm}' with '${layTerm}' and removed highlight in the document.`);
+      } else {
+        console.log(`Selected text does not contain '${clinicalTerm}'.`);
+      }
+    });
+  } catch (error) {
+    console.error('Error replacing term:', error);
+  }
+}
+
+
+async function clearGlossary() {
+  try {
+    await Word.run(async (context) => {
+      document.getElementById('app-body').innerHTML = `
+      <div id="button-container">
+    
+              <div class="loader" id="loader"></div>
+    
+            <div id="highlighted-text"></div>`
+      const body = context.document.body;
+
+      const searchPromises = layTerms.map(term => {
+        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+        searchResults.load("items");
+        return searchResults;
+      });
+
+      await context.sync();
+
+      searchPromises.forEach(searchResults => {
+        searchResults.items.forEach(item => {
+          item.font.highlightColor = 'white'; // Reset highlight color
+        });
+      });
+      document.getElementById('app-body').innerHTML = `
+      <div id="button-container">
+        <button class="btn btn-secondary me-2 mark-glossary btn-sm" id="applyglossary">Apply Glossary</button>
+      </div>
+`
+      await context.sync();
+      document.getElementById('applyglossary').addEventListener('click', applyglossary);
+
+     
+    });
+    
+
+    console.log('Glossary cleared successfully');
+  } catch (error) {
+    console.error('Error clearing glossary:', error);
+  }
 }
 
 
