@@ -9,6 +9,8 @@ let documentID = ''
 let aiTagList = [];
 let initialised = true;
 let availableKeys = [];
+let glossaryName=''
+
 let layTerms = [];
 
 /* global document, Office, Word */
@@ -405,6 +407,7 @@ async function fetchGlossary() {
 
       const data = await response.json();
       layTerms = data.Data.GlossaryTemplateData;
+      glossaryName=data.Data.Name
       loadGlossary()
       // alert('Glossary data loaded successfully.');
     } catch (error) {
@@ -584,7 +587,7 @@ function displayHighlightedText(words: string[]) {
 
       // Create a heading for the clinical term
       const heading = document.createElement('h3');
-      heading.textContent = clinicalTerm;
+      heading.textContent = `${clinicalTerm}(${glossaryName})`;
       mainBox.appendChild(heading);
 
       // Create sub-boxes for each lay term
