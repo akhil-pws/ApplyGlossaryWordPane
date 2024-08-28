@@ -405,11 +405,11 @@ function displayMentions() {
     <div class="container mt-3">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title">Search Mentions</h5>
+          <h5 class="card-title">Search Suggestions</h5>
         </div>
         <div class="card-body">
           <div class="form-group">
-            <input type="text" id="search-box" class="form-control" placeholder="Search mentions..." />
+            <input type="text" id="search-box" class="form-control" placeholder="Search Suggestions..." />
           </div>
           <ul id="suggestion-list" class="list-group mt-2"></ul>
         </div>
