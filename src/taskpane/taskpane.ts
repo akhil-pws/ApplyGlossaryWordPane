@@ -587,7 +587,7 @@ function displayHighlightedText(words: string[]) {
 
       // Create a heading for the clinical term
       const heading = document.createElement('h3');
-      heading.textContent = `${clinicalTerm}(${glossaryName})`;
+      heading.textContent = `${clinicalTerm} (${glossaryName})`;
       mainBox.appendChild(heading);
 
       // Create sub-boxes for each lay term
