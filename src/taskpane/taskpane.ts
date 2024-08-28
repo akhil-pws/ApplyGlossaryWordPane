@@ -3,6 +3,7 @@
  * See LICENSE in the project root for license information.
  */
 
+import { data } from "./data";
 let jwt = '';
 let documentID = ''
 let aiTagList = [];
@@ -49,8 +50,8 @@ async function retrieveDocumentProperties() {
         documentID = property.value;
         login()
       } else {
-        documentID='1268'
-        login();
+        console.log(`Custom property "documentID" not found.`);
+        return null;
       }
     });
   } catch (error) {
@@ -109,7 +110,12 @@ async function handleLogin(event) {
   const organization = document.getElementById('organization').value;
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
+  document.getElementById('app-body').innerHTML = `
+  <div id="button-container">
 
+          <div class="loader" id="loader"></div>
+          </div
+`
   try {
     const response = await fetch('https://plsdevapp.azurewebsites.net/api/user/login', {
       method: 'POST',
@@ -124,26 +130,36 @@ async function handleLogin(event) {
     });
 
     if (!response.ok) {
+      loadLoginPage()
       throw new Error('Network response was not ok.');
     }
 
     const data = await response.json();
-    console.log('Login successful:', data);
-    jwt = data.Data.Token;
-    sessionStorage.setItem('token', jwt)
+    if (data.Status === true && data['Data']) {
+      if (data['Data'].ResponseStatus) {
+        jwt = data.Data.Token;
+        sessionStorage.setItem('token', jwt)
 
-    window.location.hash = '#/dashboard';
+        window.location.hash = '#/dashboard';
+
+      } else {
+        loadLoginPage()
+      }
+    } else {
+      loadLoginPage()
+    }
+
 
     // Handle successful login (e.g., navigate to the next page or show a success message)
 
   } catch (error) {
+    loadLoginPage()
     console.error('Error during login:', error);
     // Handle login error (e.g., show an error message)
   }
 }
 
 function displayMenu() {
-  document.getElementById('app-body').innerHTML = ``
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument();
 
@@ -173,13 +189,14 @@ async function fetchDocument() {
 
 
     const data = await response.json();
+    document.getElementById('app-body').innerHTML = ``
     document.getElementById('header').innerHTML = `
     <button class="btn btn-dark me-2" id="mention">Suggestions</button>
             <button class="btn btn-dark " id="aitag">AI Text Panel</button>
 
     <
 `
-// <button class="btn btn-dark me-2" id="applyglossary">Glossary</button>
+    // <button class="btn btn-dark me-2" id="applyglossary">Glossary</button>
 
     document.getElementById('mention').addEventListener('click', displayMentions);
     // document.getElementById('applyglossary').addEventListener('click', fetchGlossary);
@@ -235,7 +252,7 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
 
   if (tag.FilteredReportHeadAIHistoryList.length > 0) {
     // Generate the HTML
-    const html = tag.FilteredReportHeadAIHistoryList.map((chat: any, j: number) => 
+    const html = tag.FilteredReportHeadAIHistoryList.map((chat: any, j: number) =>
       `<div class="row chatbox">
         <div class="col-md-12 mt-2 p-2">
           <span class="ms-3">
@@ -405,11 +422,11 @@ function displayMentions() {
     <div class="container mt-3">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title">Search Suggestions</h5>
+          <h5 class="card-title">Search Mentions</h5>
         </div>
         <div class="card-body">
           <div class="form-group">
-            <input type="text" id="search-box" class="form-control" placeholder="Search Suggestions..." />
+            <input type="text" id="search-box" class="form-control" placeholder="Search mentions..." />
           </div>
           <ul id="suggestion-list" class="list-group mt-2"></ul>
         </div>
