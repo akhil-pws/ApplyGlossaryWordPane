@@ -9,9 +9,13 @@ let documentID = ''
 let aiTagList = [];
 let initialised = true;
 let availableKeys = [];
-let glossaryName=''
-
+let glossaryName = ''
+let isGlossaryActive: boolean = false;
+let imageList = [];
+let GroupName: string = '';
 let layTerms = [];
+let dataList: any = []
+let isTagUpdating: boolean = false;
 
 /* global document, Office, Word */
 
@@ -167,14 +171,6 @@ function displayMenu() {
 
 }
 
-function redirectAI() {
-  initialised = true;
-  window.location.hash = '#/aitag'
-  // Call function to display the AI Tag List on the UI
-
-}
-
-
 async function fetchDocument() {
   try {
     const response = await fetch(`https://plsdevapp.azurewebsites.net/api/report/id/${documentID}`, {
@@ -193,22 +189,30 @@ async function fetchDocument() {
     const data = await response.json();
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('header').innerHTML = `
-    <button class="btn btn-dark" id="mention">Suggestions</button>
-            <button class="btn btn-dark " id="aitag">AI Text Panel</button>
+    <div class="d-flex justify-content-around">
+    <button class="btn btn-sm btn-dark " id="mention">Suggestions</button>
+            <button class="btn btn-sm  btn-dark " id="aitag">AI Text Panel</button>
 
-        <button class="btn btn-dark " id="glossary">Glossary</button>
+        <button class="btn btn-sm btn-dark " id="glossary">Glossary</button>
+</div>
 
 `
+    // <button class="btn  btn-dark me-2" id="imagebtn">Image</button>
+
 
     document.getElementById('mention').addEventListener('click', displayMentions);
     document.getElementById('glossary').addEventListener('click', fetchGlossary);
 
     document.getElementById('aitag').addEventListener('click', displayAiTagList);
+    // document.getElementById('imagebtn').addEventListener('click', fetchGeneralImages);
+
 
 
 
     // Extracting the relevant AI group from the response
+    dataList = data['Data'];
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
+    GroupName = aiGroup ? aiGroup.Name : '';
     aiTagList = aiGroup ? aiGroup.GroupKey : [];
 
     availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT');
@@ -234,7 +238,13 @@ async function fetchAIHistory(tag) {
     }
 
     const data = await response.json();
-    tag.FilteredReportHeadAIHistoryList = data['Data'] || [];
+    tag.ReportHeadAIHistoryList = data['Data'] || [];
+    tag.FilteredReportHeadAIHistoryList = [];
+    tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
+      historyList.Response = removeQuotes(historyList.Response);
+      tag.FilteredReportHeadAIHistoryList.unshift(historyList);
+
+    });
     return tag.FilteredReportHeadAIHistoryList;
 
   } catch (error) {
@@ -271,8 +281,8 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
             <input class="form-check-input c-pointer" type="radio" name="flexRadioDefault-${index}"
               id="flexRadioDefault1-${index}-${j}" ${chat.Selected === 1 ? 'checked' : ''}>
           </span>
-          <span class="ms-2 w-75">
-            <div class="form-control h-34 d-flex align-items-center dynamic-height ai-reply ${chat.Selected === 1 ? 'ai-selected-reply' : 'bg-light'}">
+          <span class="ms-2 w-75" id="selected-response-parent-${index}">
+            <div class="form-control h-34 d-flex align-items-center dynamic-height ai-reply ${chat.Selected === 1 ? 'ai-selected-reply' : 'bg-light'}" id='selected-response-${index}${j}'>
               ${chat.Response}
             </div>
           </span>
@@ -280,6 +290,8 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
             <i class="fa fa-copy text-secondary c-pointer" title="Copy Response" id="copyResponse-${index}-${j}"></i>
           </span>
         </div>
+
+
       </div>`
     ).join('');
 
@@ -288,13 +300,83 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
       tag.FilteredReportHeadAIHistoryList.forEach((chat: any, j: number) => {
         document.getElementById(`copyPrompt-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Prompt));
         document.getElementById(`copyResponse-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Response));
-        document.getElementById(`flexRadioDefault1-${index}-${j}`)?.addEventListener('change', () => onRadioChange(index, j));
+        document.getElementById(`flexRadioDefault1-${index}-${j}`)?.addEventListener('change', () => onRadioChange(tag, index, j));
+
       });
     }, 0);
 
     return html;
   } else {
     return '<div>No AI history available.</div>';
+  }
+}
+
+
+async function sendPrompt(tag, prompt,index) {
+  if (prompt !== '' && !isTagUpdating) {
+    isTagUpdating = true;
+    const payload = {
+      ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
+      DocumentID: dataList.NCTID,
+      DocumentType: dataList.DocumentType,
+      TextSetting: dataList.TextSetting,
+      DocumentTemplate: dataList.ReportTemplate,
+      ReportHeadGroupKeyID:
+        tag.FilteredReportHeadAIHistoryList[0].ReportHeadGroupKeyID,
+      Container: dataList.Container,
+      GroupName: GroupName,
+      Prompt: prompt,
+      PromptType: 1,
+      Response: '',
+      Selected: 0,
+      ID: 0
+    };
+
+    try {
+      const response = await fetch('https://plsdevapp.azurewebsites.net/api/report/ai-history/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok.');
+      }
+      const data = await response.json();
+      if (data['Data'] && data['Data'] !== 'false') {
+
+        tag.ReportHeadAIHistoryList = JSON.parse(
+          JSON.stringify(data['Data'])
+        );
+        tag.FilteredReportHeadAIHistoryList = [];
+        // tag.ReportHeadAIHistoryList.reverse();
+        tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
+          historyList.Response = removeQuotes(historyList.Response);
+          tag.FilteredReportHeadAIHistoryList.unshift(historyList);
+        });
+
+        const collapseId = `flush-collapseOne-${index}`;
+        const accordianBox=document.getElementById(collapseId);
+
+
+        isTagUpdating = false;
+      } else {
+        isTagUpdating = false;
+      }
+
+      // alert('Glossary data loaded successfully.');
+    } catch (error) {
+      isTagUpdating = false
+      console.error('Error sending ai prompt:', error);
+      // Optionally show an error message to the user
+      // alert('Error fetching glossary data.');
+    }
+
+
+  } else {
+    console.error('No empty prompt allowed')
   }
 }
 
@@ -312,9 +394,22 @@ function copyText(text: string) {
 
 
 async function displayAiTagList() {
-
+  if (isGlossaryActive) {
+    await clearGlossary()
+  }
   const container = document.getElementById('app-body');
-  container.innerHTML = ''; // Clear any previous content
+  container.innerHTML = `
+  <div class="d-flex justify-content-end p-1">
+     <button class="btn btn-primary btn-sm c-pointer text-white me-2 mb-2" id="applyAITag">
+        <i class="fa fa-robot text-light"></i>
+        Apply
+    </button>
+    </div>
+
+    <div class="card-container"  id="card-container">
+    </div>
+  `; // Clear any previous content
+  const Cardcontainer = document.getElementById('card-container');
 
   for (let i = 0; i < aiTagList.length; i++) {
     const tag = aiTagList[i];
@@ -326,7 +421,20 @@ async function displayAiTagList() {
 
     const radioButtonsHTML = await generateRadioButtons(tag, i);
 
-    accordionItem.innerHTML = `
+    accordionItem.innerHTML = accordianContent(headerId,collapseId,tag,radioButtonsHTML,i);
+
+    Cardcontainer.appendChild(accordionItem);
+    document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
+      const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
+
+      sendPrompt(tag, textareaValue,i)
+    });
+  }
+
+
+
+  function accordianContent(headerId,collapseId,tag,radioButtonsHTML,i){
+    const body=`
       <h2 class="accordion-header" id="${headerId}">
         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
           data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
@@ -334,15 +442,27 @@ async function displayAiTagList() {
         </button>
       </h2>
       <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
-        <div class="accordion-body">
-          ${radioButtonsHTML}
-        
+        <div class="accordion-body chatbox">
+            ${radioButtonsHTML}
+          
+            <div class="col-md-12 d-flex align-items-center justify-content-end">
+              <textarea class="form-control" rows="3" id="chatbox-${i}"
+              placeholder="Type here"></textarea>
+              <div class="d-flex align-self-end">
+                <button type="submit" class="btn btn-primary ms-2 text-white"
+                id="sendPrompt-${i}">
+                  <i class="fa fa-paper-plane text-white"></i>
+                </button>
+            </div>
+          </div>
         </div>
       </div>
-    `;
+    `
 
-    container.appendChild(accordionItem);
+    return body
   }
+
+  document.getElementById('applyAITag').addEventListener('click', applyAITag);
 
   // Add event listeners after rendering
   addAccordionListeners();
@@ -373,10 +493,94 @@ function addCopyListeners() {
   });
 }
 
-function onRadioChange(tagIndex, chatIndex) {
-  // Handle the radio button change logic here
-  console.log(`Radio button changed for tagIndex ${tagIndex}, chatIndex ${chatIndex}`);
+
+async function applyAITag() {
+  await Word.run(async (context) => {
+    const body = context.document.body;
+
+    for (let i = 0; i < aiTagList.length; i++) {
+      const tag = aiTagList[i];
+      tag.EditorValue = removeQuotes(tag.EditorValue)
+      // Search for all instances of tag.DisplayName in the document
+      const searchResults = body.search(`#${tag.DisplayName}#`, { matchCase: true, matchWholeWord: true });
+
+      // Load the search results
+      context.load(searchResults, 'items');
+
+      await context.sync();
+
+      // Replace each found instance with tag.Response
+      searchResults.items.forEach(item => {
+        item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+      });
+    }
+
+    await context.sync(); // Sync changes with the Word document
+  });
 }
+
+
+
+async function onRadioChange(tag, tagIndex, chatIndex) {
+  if (!isTagUpdating) {
+    isTagUpdating = true;
+
+    const chat = tag.FilteredReportHeadAIHistoryList[chatIndex];
+    let payload = JSON.parse(JSON.stringify(chat));
+    payload.Container = dataList.Container;
+    payload.Selected = 1;
+
+    try {
+      const response = await fetch('https://plsdevapp.azurewebsites.net/api/report/ai-history/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok.');
+      }
+
+      const data = await response.json();
+
+      if (data['Data']) {
+        tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
+        tag.FilteredReportHeadAIHistoryList = [];
+
+        tag.ReportHeadAIHistoryList.forEach((historyList) => {
+          historyList.Response = removeQuotes(historyList.Response);
+          tag.FilteredReportHeadAIHistoryList.unshift(historyList);
+        });
+
+        // Use querySelectorAll to remove 'ai-selected-reply' from all elements
+        const allSelectedDivs = document.querySelectorAll('.ai-selected-reply');
+        allSelectedDivs.forEach(div => {
+          div.classList.remove('ai-selected-reply');
+          div.classList.add('bg-light');
+        });
+
+        const selectElement = document.getElementById(`selected-response-${tagIndex}${chatIndex}`);
+        if (selectElement) {
+          selectElement.classList.remove('bg-light');
+          selectElement.classList.add('ai-selected-reply');
+        }
+
+        tag.UserValue = chat.Response;
+        tag.EditorValue = chat.Response;
+        tag.text = chat.Response;
+      }
+
+    } catch (error) {
+      console.error('Error updating AI data:', error);
+    } finally {
+      isTagUpdating = false;
+    }
+  }
+}
+
 
 function selectResponse(tagIndex, chatIndex) {
   // Handle the response selection logic here
@@ -385,41 +589,44 @@ function selectResponse(tagIndex, chatIndex) {
 
 
 async function fetchGlossary() {
-  if (layTerms.length === 0) {
+  if (!isTagUpdating) {
 
-    document.getElementById('app-body').innerHTML = `
+
+    if (layTerms.length === 0) {
+
+      document.getElementById('app-body').innerHTML = `
   <div id="button-container">
 
           <div class="loader" id="loader"></div>
 
         <div id="highlighted-text"></div>`
 
-    try {
-      const response = await fetch('https://plsdevapp.azurewebsites.net/api/glossary-template/id/3', {
-        method: 'GET', // or 'POST', depending on your API
-        headers: {
-          'Authorization': `Bearer ${jwt}`
+      try {
+        const response = await fetch('https://plsdevapp.azurewebsites.net/api/glossary-template/id/3', {
+          method: 'GET', // or 'POST', depending on your API
+          headers: {
+            'Authorization': `Bearer ${jwt}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error('Network response was not ok.');
         }
-      });
-      if (!response.ok) {
-        throw new Error('Network response was not ok.');
+
+        const data = await response.json();
+        layTerms = data.Data.GlossaryTemplateData;
+        glossaryName = data.Data.Name
+        loadGlossary()
+        // alert('Glossary data loaded successfully.');
+      } catch (error) {
+        console.error('Error fetching glossary data:', error);
+        // Optionally show an error message to the user
+        // alert('Error fetching glossary data.');
       }
 
-      const data = await response.json();
-      layTerms = data.Data.GlossaryTemplateData;
-      glossaryName=data.Data.Name
+    } else {
       loadGlossary()
-      // alert('Glossary data loaded successfully.');
-    } catch (error) {
-      console.error('Error fetching glossary data:', error);
-      // Optionally show an error message to the user
-      // alert('Error fetching glossary data.');
     }
-
-  } else {
-    loadGlossary()
   }
-
 
 }
 
@@ -444,7 +651,7 @@ export async function applyglossary() {
           <div class="loader" id="loader"></div>
 
         <div id="highlighted-text"></div>`
-        
+
   try {
     await Word.run(async (context) => {
 
@@ -466,7 +673,7 @@ export async function applyglossary() {
         });
       });
       // document.getElementById('glossarycheck').style.display='block';
-
+      isGlossaryActive = true;
       document.getElementById('app-body').innerHTML = `
       <div id="button-container">
         <button class="btn btn-secondary me-2 clear-glossary btn-sm" id="clearGlossary">Clear Glossary</button>
@@ -474,7 +681,7 @@ export async function applyglossary() {
 
       <div id="highlighted-text"></div>
       
-`  
+`
 
 
 
@@ -491,7 +698,7 @@ export async function applyglossary() {
         handleSelectionChange
       );
 
-  
+
     });
 
     // Optional: Notify user of completion
@@ -505,7 +712,7 @@ export async function applyglossary() {
 
 
 async function handleSelectionChange() {
-    await checkGlossary();
+  await checkGlossary();
 }
 
 export async function checkGlossary() {
@@ -681,11 +888,12 @@ async function clearGlossary() {
       </div>
 `
       await context.sync();
+      isGlossaryActive = false
       document.getElementById('applyglossary').addEventListener('click', applyglossary);
 
-     
+
     });
-    
+
 
     console.log('Glossary cleared successfully');
   } catch (error) {
@@ -695,49 +903,265 @@ async function clearGlossary() {
 
 
 
-function displayMentions() {
-  const htmlBody = `
-    <div class="container mt-3">
+async function displayMentions() {
+  if (!isTagUpdating) { // Check if isTagUpdating is false
+    if (isGlossaryActive) {
+      await clearGlossary();
+    }
+    const htmlBody = `
+      <div class="container mt-3">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title">Search Suggestions</h5>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <input type="text" id="search-box" class="form-control" placeholder="Search Suggestions..." autocomplete="off" />
+            </div>
+            <ul id="suggestion-list" class="list-group mt-2"></ul>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('app-body').innerHTML = htmlBody;
+    const searchBox = document.getElementById('search-box');
+    const suggestionList = document.getElementById('suggestion-list');
+
+    // Function to filter and display suggestions
+    function updateSuggestions() {
+      const searchTerm = searchBox.value.toLowerCase();
+      suggestionList.innerHTML = '';
+
+      // Filter mention list based on search term
+      const filteredMentions = availableKeys.filter(mention =>
+        mention.DisplayName.toLowerCase().includes(searchTerm)
+      );
+
+      // Render filtered suggestions
+      filteredMentions.forEach(mention => {
+        const listItem = document.createElement('li');
+        listItem.className = 'list-group-item list-group-item-action';
+        listItem.textContent = mention.DisplayName;
+        listItem.onclick = () => {
+          // Replace # with the selected value (adjust as needed)
+          replaceMention(mention.EditorValue, mention.ComponentKeyDataType);
+          // Clear suggestions after selection
+        };
+        suggestionList.appendChild(listItem);
+      });
+    }
+
+    // Add input event listener to the search box
+    searchBox.addEventListener('input', updateSuggestions);
+  }
+}
+
+
+
+export async function replaceMention(word: string, type: any) {
+  return Word.run(async (context) => {
+    try {
+      const selection = context.document.getSelection();
+      await context.sync();
+
+      if (!selection) {
+        throw new Error('Selection is invalid or not found.');
+      }
+
+      if (type === 'TABLE') {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(word, 'text/html');
+        const tableElement = doc.querySelector('table');
+
+        if (!tableElement) {
+          throw new Error('No table found in the provided HTML.');
+        }
+
+        const rows = Array.from(tableElement.querySelectorAll('tr'));
+
+        if (rows.length === 0) {
+          throw new Error('The table does not contain any rows.');
+        }
+
+        const maxCols = Math.max(...rows.map(row => {
+          return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+            return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+          }, 0);
+        }));
+
+        const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
+        await context.sync();
+
+        if (!paragraph) {
+          throw new Error('Failed to insert the paragraph.');
+        }
+
+        const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+        await context.sync();
+
+        if (!table) {
+          throw new Error('Failed to insert the table.');
+        }
+
+        const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+        rows.forEach((row, rowIndex) => {
+          const cells = Array.from(row.querySelectorAll('td, th'));
+          let cellIndex = 0;
+
+          cells.forEach((cell) => {
+            while (rowspanTracker[cellIndex] > 0) {
+              rowspanTracker[cellIndex]--;
+              cellIndex++;
+            }
+
+            const cellText = Array.from(cell.childNodes)
+              .map(node => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                  return node.textContent?.trim() || '';
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                  return (node as HTMLElement).innerText.trim();
+                }
+                return '';
+              })
+              .filter(text => text.length > 0)
+              .join(' ');
+
+            const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+            const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+
+            // Ensure cellIndex is within bounds
+            if (cellIndex >= maxCols) {
+              // Adjust cellIndex to fit within table dimensions
+              cellIndex = maxCols - 1;
+            }
+
+            // Set cell value
+            try {
+              table.getCell(rowIndex, cellIndex).value = cellText;
+
+              // Clear cells that span columns
+              for (let i = 1; i < colspan; i++) {
+                if (cellIndex + i < maxCols) {
+                  table.getCell(rowIndex, cellIndex + i).value = "";
+                }
+              }
+
+              // Update rowspanTracker
+              if (rowspan > 1) {
+                for (let i = 0; i < colspan; i++) {
+                  if (cellIndex + i < maxCols) {
+                    rowspanTracker[cellIndex + i] = rowspan - 1;
+                  }
+                }
+              }
+
+              // Advance cellIndex by colspan
+              cellIndex += colspan;
+              if (cellIndex >= maxCols) {
+                // Adjust cellIndex if it exceeds the table width
+                cellIndex = maxCols - 1;
+              }
+            } catch (cellError) {
+              console.error('Error setting cell value:', cellError);
+            }
+          });
+        });
+      } else {
+        selection.insertParagraph(word, Word.InsertLocation.before);
+      }
+
+      await context.sync();
+    } catch (error) {
+      console.error('Detailed error:', error);
+    }
+  });
+}
+
+
+function removeQuotes(value: string): string {
+  return value
+    ? value
+      .replace(/^"|"$/g, '')
+      .replace(/\\n/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\\r/g, '')
+    : '';
+}
+
+
+async function fetchGeneralImages() {
+  if (imageList.length === 0) {
+    try {
+      const response = await fetch('https://plsdevapp.azurewebsites.net/api/image/general', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok.');
+      }
+
+      const data = await response.json();
+      imageList = data['Data'].Image;
+      imageDisplay();
+    } catch (error) {
+      console.error('Error during login:', error);
+      // Handle login error (e.g., show an error message)
+    }
+  } else {
+    imageDisplay()
+  }
+
+
+}
+
+function imageDisplay() {
+  document.getElementById('app-body').innerHTML = `
+      <div class="container mt-3">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title">Search Suggestions</h5>
+          <h5 class="card-title">Search Images</h5>
         </div>
         <div class="card-body">
           <div class="form-group">
-            <input type="text" id="search-box" class="form-control" placeholder="Search Suggestions..." />
+            <input type="text" id="search-box" class="form-control" placeholder="Search Images..." autocomplete="off" />
           </div>
-          <ul id="suggestion-list" class="list-group mt-2"></ul>
+          <ul id="image-list" class="list-group mt-2"></ul>
         </div>
       </div>
     </div>
-`
-  document.getElementById('app-body').innerHTML = htmlBody
+  `
+
   const searchBox = document.getElementById('search-box');
-  const suggestionList = document.getElementById('suggestion-list');
+  const imageBox = document.getElementById('image-list');
 
   // Function to filter and display suggestions
   function updateSuggestions() {
     const searchTerm = searchBox.value.toLowerCase();
-    suggestionList.innerHTML = '';
-
+    imageBox.innerHTML = '';
     // Filter mention list based on search term
-    const filteredMentions = availableKeys.filter(mention =>
-      mention.DisplayName.toLowerCase().includes(searchTerm)
+    const filteredImages = imageList.filter(image =>
+      image.ImageName.toLowerCase().includes(searchTerm)
     );
 
     // Render filtered suggestions
-    filteredMentions.forEach(mention => {
+    filteredImages.forEach(images => {
       const listItem = document.createElement('li');
       listItem.className = 'list-group-item list-group-item-action';
-      listItem.textContent = mention.DisplayName;
+      listItem.textContent = images.ImageName;
       listItem.onclick = () => {
+        insertImageIntoWord(images.ImageData)
         // Replace # with the selected value (adjust as needed)
-        searchBox.value = '';
-        suggestionList.innerHTML = '';
-        replaceMention(mention.EditorValue, mention.ComponentKeyDataType)
+        // searchBox.value = '';
+        // suggestionList.innerHTML = '';
+        // replaceMention(images.EditorValue, images.ComponentKeyDataType)
         // Clear suggestions after selection
       };
-      suggestionList.appendChild(listItem);
+      imageBox.appendChild(listItem);
     });
   }
 
@@ -748,64 +1172,16 @@ function displayMentions() {
 
 
 
-export async function replaceMention(word: string, type: any) {
-  return Word.run(async (context) => {
+
+async function insertImageIntoWord(base64Image) {
+  await Word.run(async (context) => {
     try {
-      // Get the current selection
       const selection = context.document.getSelection();
-
-      // Insert an empty paragraph to ensure there's a valid insertion point
-
-      if (type === 'TABLE') {
-
-        const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-
-        // Parse the HTML string to extract table data
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(word, 'text/html');
-        const tableElement = doc.querySelector('table');
-
-        if (!tableElement) {
-          throw new Error('No table found in the provided HTML.');
-        }
-
-        // Extract rows
-        const rows = Array.from(tableElement.querySelectorAll('tr'));
-
-        if (rows.length === 0) {
-          throw new Error('The table does not contain any rows.');
-        }
-
-        // Determine maximum number of columns
-        const maxCols = Math.max(...rows.map(row => row.querySelectorAll('td, th').length));
-
-        // Create a table in Word
-        const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-
-        // Fill the table with data
-        rows.forEach((row, rowIndex) => {
-          const cells = Array.from(row.querySelectorAll('td, th'));
-          cells.forEach((cell, cellIndex) => {
-            const cellText = cell.textContent?.trim() || '';
-            console.log(`Row ${rowIndex}, Column ${cellIndex}: ${cellText}`);
-
-            const cellObj = table.getCell(rowIndex, cellIndex);
-            cellObj.value = cellText
-          });
-        });
-
-        // Synchronize the document state
-
-      } else {
-        const paragraph = selection.insertParagraph(word, Word.InsertLocation.before);
-
-      }
       await context.sync();
-
-    } catch (error) {
-      console.error('Error inserting table:', error);
+      selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.before);
+      await context.sync();
+    } catch (err) {
+      console.log(err)
     }
   });
 }
-
-

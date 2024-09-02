@@ -51,13 +51,11 @@
 }
 
 .ai-reply {
-  background-color: #d8feda;
   text-align: justify;
 }
 
-.chatbox {
-  border: 1px solid #e5e5e5;
-  background-color: #e7f1f9;
+.ai-selected-reply{
+background-color: #d8feda;
 }
 
 .accordion,
@@ -78,7 +76,6 @@
 }
 
 .chatbox {
-  border: 1px solid #e5e5e5;
   background-color: #e7f1f9;
 }
 
@@ -190,3 +187,7 @@ ul {
  100% { transform: rotate(360deg); }
 }
 
+.card-container {
+overflow: auto;
+max-height: 80vh;
+}
