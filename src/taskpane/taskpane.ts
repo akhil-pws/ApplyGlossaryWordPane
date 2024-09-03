@@ -281,7 +281,7 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
             <input class="form-check-input c-pointer" type="radio" name="flexRadioDefault-${index}"
               id="flexRadioDefault1-${index}-${j}" ${chat.Selected === 1 ? 'checked' : ''}>
           </span>
-          <span class="ms-2 w-75" id="selected-response-parent-${index}">
+          <span class="ms-2 w-75">
             <div class="form-control h-34 d-flex align-items-center dynamic-height ai-reply ${chat.Selected === 1 ? 'ai-selected-reply' : 'bg-light'}" id='selected-response-${index}${j}'>
               ${chat.Response}
             </div>
@@ -312,9 +312,40 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
 }
 
 
-async function sendPrompt(tag, prompt,index) {
+function accordianContent(headerId, collapseId, tag, radioButtonsHTML, i) {
+  const body = `
+   <h2 class="accordion-header" id="${headerId}">
+  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+    data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+    ${tag.DisplayName}
+  </button>
+</h2>
+<div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
+  <div class="accordion-body chatbox" id="selected-response-parent-${i}">
+    ${radioButtonsHTML}
+  </div>
+
+  <div class="col-md-12 d-flex align-items-center justify-content-end chatbox p-3">
+    <textarea class="form-control" rows="3" id="chatbox-${i}" placeholder="Type here"></textarea>
+    <div class="d-flex align-self-end">
+      <button type="submit" class="btn btn-primary ms-2 text-white" id="sendPrompt-${i}">
+        <i class="fa fa-paper-plane text-white"></i>
+      </button>
+    </div>
+  </div>
+</div>
+  `
+
+  return body
+}
+
+
+async function sendPrompt(tag, prompt, index) {
   if (prompt !== '' && !isTagUpdating) {
+
     isTagUpdating = true;
+    const iconelement = document.getElementById(`sendPrompt-${index}`)
+    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`
     const payload = {
       ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
       DocumentID: dataList.NCTID,
@@ -358,16 +389,28 @@ async function sendPrompt(tag, prompt,index) {
         });
 
         const collapseId = `flush-collapseOne-${index}`;
-        const accordianBox=document.getElementById(collapseId);
+        const headerId = `flush-headingOne-${index}`;
+
+        const accordianBox = document.getElementById(`accordion-item-${index}`); // Replace 'yourUniqueId' with your desired ID
 
 
+        const radioButtonsHTML = await generateRadioButtons(tag, index);
+
+        accordianBox.innerHTML = accordianContent(headerId, collapseId, tag, radioButtonsHTML, index);
+
+        const iconelement = document.getElementById(`sendPrompt-${index}`)
+        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
         isTagUpdating = false;
       } else {
+        const iconelement = document.getElementById(`sendPrompt-${index}`)
+        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
         isTagUpdating = false;
       }
 
       // alert('Glossary data loaded successfully.');
     } catch (error) {
+      const iconelement = document.getElementById(`sendPrompt-${index}`)
+      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
       isTagUpdating = false
       console.error('Error sending ai prompt:', error);
       // Optionally show an error message to the user
@@ -415,52 +458,25 @@ async function displayAiTagList() {
     const tag = aiTagList[i];
     const accordionItem = document.createElement('div');
     accordionItem.classList.add('accordion-item');
+    accordionItem.id = `accordion-item-${i}`; // Replace 'yourUniqueId' with your desired ID
 
     const headerId = `flush-headingOne-${i}`;
     const collapseId = `flush-collapseOne-${i}`;
 
     const radioButtonsHTML = await generateRadioButtons(tag, i);
 
-    accordionItem.innerHTML = accordianContent(headerId,collapseId,tag,radioButtonsHTML,i);
+    accordionItem.innerHTML = accordianContent(headerId, collapseId, tag, radioButtonsHTML, i);
 
     Cardcontainer.appendChild(accordionItem);
     document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
       const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
 
-      sendPrompt(tag, textareaValue,i)
+      sendPrompt(tag, textareaValue, i)
     });
   }
 
 
 
-  function accordianContent(headerId,collapseId,tag,radioButtonsHTML,i){
-    const body=`
-      <h2 class="accordion-header" id="${headerId}">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-          data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-          ${tag.DisplayName}
-        </button>
-      </h2>
-      <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
-        <div class="accordion-body chatbox">
-            ${radioButtonsHTML}
-          
-            <div class="col-md-12 d-flex align-items-center justify-content-end">
-              <textarea class="form-control" rows="3" id="chatbox-${i}"
-              placeholder="Type here"></textarea>
-              <div class="d-flex align-self-end">
-                <button type="submit" class="btn btn-primary ms-2 text-white"
-                id="sendPrompt-${i}">
-                  <i class="fa fa-paper-plane text-white"></i>
-                </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `
-
-    return body
-  }
 
   document.getElementById('applyAITag').addEventListener('click', applyAITag);
 
@@ -524,7 +540,8 @@ async function applyAITag() {
 async function onRadioChange(tag, tagIndex, chatIndex) {
   if (!isTagUpdating) {
     isTagUpdating = true;
-
+    const iconelement = document.getElementById(`sendPrompt-${tagIndex}`)
+    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`
     const chat = tag.FilteredReportHeadAIHistoryList[chatIndex];
     let payload = JSON.parse(JSON.stringify(chat));
     payload.Container = dataList.Container;
@@ -556,7 +573,8 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
         });
 
         // Use querySelectorAll to remove 'ai-selected-reply' from all elements
-        const allSelectedDivs = document.querySelectorAll('.ai-selected-reply');
+        const selectedParent = document.getElementById(`selected-response-parent-${tagIndex}`)
+        const allSelectedDivs = selectedParent.querySelectorAll('.ai-selected-reply');
         allSelectedDivs.forEach(div => {
           div.classList.remove('ai-selected-reply');
           div.classList.add('bg-light');
@@ -568,6 +586,7 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
           selectElement.classList.add('ai-selected-reply');
         }
 
+
         tag.UserValue = chat.Response;
         tag.EditorValue = chat.Response;
         tag.text = chat.Response;
@@ -576,6 +595,8 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
     } catch (error) {
       console.error('Error updating AI data:', error);
     } finally {
+      const iconelement = document.getElementById(`sendPrompt-${tagIndex}`)
+      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
       isTagUpdating = false;
     }
   }
