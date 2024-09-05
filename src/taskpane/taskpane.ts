@@ -189,7 +189,7 @@ async function fetchDocument() {
     const data = await response.json();
     document.getElementById('app-body').innerHTML = ``
         document.getElementById('logo-header').innerHTML=`
-        <img  id="main-logo" src="../../assets/logo.png" alt="" height="60" class="logo">`
+        <img  id="main-logo" src="./assets/logo.png" alt="" height="60" class="logo">`
     document.getElementById('header').innerHTML = `
     <div class="d-flex justify-content-around">
     <button class="btn btn-dark " id="mention">Suggestions</button>
