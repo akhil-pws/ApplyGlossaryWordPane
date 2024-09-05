@@ -1,3 +1,7 @@
+html {
+  font-size: 12px;
+}
+
 .h-close-text {
   position: absolute;
   top: 210px;
@@ -190,4 +194,18 @@ ul {
 .card-container {
 overflow: auto;
 max-height: 80vh;
+}
+
+.logo {
+
+  /* The image used */
+  height: 3.3rem;
+  width: 7rem;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain
+}
+
+.logo-header{
+  background-color:rgba(255, 255, 255, 0.8);
 }
