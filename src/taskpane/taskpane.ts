@@ -455,7 +455,7 @@ async function displayAiTagList() {
     </div>
   `; // Clear any previous content
   const Cardcontainer = document.getElementById('card-container');
-    document.getElementById('applyAITag').addEventListener('click', applyAITag);
+    document.getElementById('applyAITag').addEventListener('click', applyAITagFn);
 
 
   for (let i = 0; i < aiTagList.length; i++) {
@@ -512,33 +512,45 @@ function addCopyListeners() {
   });
 }
 
+async function applyAITagFn() {
+  return Word.run(async (context) => {
+    try {
+      const body = context.document.body;
 
-async function applyAITag() {
-  await Word.run(async (context) => {
-    const body = context.document.body;
+      // Iterate over the aiTagList to search and replace
+      for (let i = 0; i < aiTagList.length; i++) {
+        const tag = aiTagList[i];
+        // Clean up the EditorValue by removing quotes
+        tag.EditorValue = removeQuotes(tag.EditorValue);
 
-    for (let i = 0; i < aiTagList.length; i++) {
-      const tag = aiTagList[i];
-      tag.EditorValue = removeQuotes(tag.EditorValue)
-      // Search for all instances of tag.DisplayName in the document
-      const searchResults = body.search(`#${tag.DisplayName}#`, { matchCase: true, matchWholeWord: true });
+        // Search for all instances of the tag.DisplayName enclosed with `#`
+        const searchResults = body.search(`#${tag.DisplayName}#`, {
+          matchCase: true,
+          matchWholeWord: true,
+        });
 
-      // Load the search results
-      context.load(searchResults, 'items');
+        // Load the search results to ensure they are available for further operations
+        context.load(searchResults, 'items');
 
+        await context.sync(); // Synchronize to fetch the search results
+
+        // Replace each found instance with tag.EditorValue
+        searchResults.items.forEach((item: any) => {
+          // Ensure the EditorValue is not empty before replacing
+          if (tag.EditorValue !== "") {
+            item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+          }
+        });
+      }
+
+      // Synchronize changes with the Word document
       await context.sync();
-
-      // Replace each found instance with tag.Response
-      searchResults.items.forEach((item:any) => {
-        if(item.EditorValue!==""){
-          item.insertText(tag.EditorValue, Word.InsertLocation.replace);
-        }
-      });
+    } catch (err) {
+      console.log("Error during tag application:", err);
     }
-
-    await context.sync(); // Sync changes with the Word document
   });
 }
+
 
 
 
@@ -1116,98 +1128,98 @@ function removeQuotes(value: string): string {
 }
 
 
-async function fetchGeneralImages() {
-  if (imageList.length === 0) {
-    try {
-      const response = await fetch('https://plsdevapp.azurewebsites.net/api/image/general', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${jwt}`
-        },
-      });
+// async function fetchGeneralImages() {
+//   if (imageList.length === 0) {
+//     try {
+//       const response = await fetch('https://plsdevapp.azurewebsites.net/api/image/general', {
+//         method: 'GET',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'Authorization': `Bearer ${jwt}`
+//         },
+//       });
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok.');
-      }
+//       if (!response.ok) {
+//         throw new Error('Network response was not ok.');
+//       }
 
-      const data = await response.json();
-      imageList = data['Data'].Image;
-      imageDisplay();
-    } catch (error) {
-      console.error('Error during login:', error);
-      // Handle login error (e.g., show an error message)
-    }
-  } else {
-    imageDisplay()
-  }
-
-
-}
-
-function imageDisplay() {
-  document.getElementById('app-body').innerHTML = `
-      <div class="container mt-3">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="card-title">Search Images</h5>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <input type="text" id="search-box" class="form-control" placeholder="Search Images..." autocomplete="off" />
-          </div>
-          <ul id="image-list" class="list-group mt-2"></ul>
-        </div>
-      </div>
-    </div>
-  `
-
-  const searchBox = document.getElementById('search-box');
-  const imageBox = document.getElementById('image-list');
-
-  // Function to filter and display suggestions
-  function updateSuggestions() {
-    const searchTerm = searchBox.value.toLowerCase();
-    imageBox.innerHTML = '';
-    // Filter mention list based on search term
-    const filteredImages = imageList.filter(image =>
-      image.ImageName.toLowerCase().includes(searchTerm)
-    );
-
-    // Render filtered suggestions
-    filteredImages.forEach(images => {
-      const listItem = document.createElement('li');
-      listItem.className = 'list-group-item list-group-item-action';
-      listItem.textContent = images.ImageName;
-      listItem.onclick = () => {
-        insertImageIntoWord(images.ImageData)
-        // Replace # with the selected value (adjust as needed)
-        // searchBox.value = '';
-        // suggestionList.innerHTML = '';
-        // replaceMention(images.EditorValue, images.ComponentKeyDataType)
-        // Clear suggestions after selection
-      };
-      imageBox.appendChild(listItem);
-    });
-  }
-
-  // Add input event listener to the search box
-  searchBox.addEventListener('input', updateSuggestions);
-}
+//       const data = await response.json();
+//       imageList = data['Data'].Image;
+//       imageDisplay();
+//     } catch (error) {
+//       console.error('Error during login:', error);
+//       // Handle login error (e.g., show an error message)
+//     }
+//   } else {
+//     imageDisplay()
+//   }
 
 
+// // }
+
+// function imageDisplay() {
+//   document.getElementById('app-body').innerHTML = `
+//       <div class="container mt-3">
+//       <div class="card">
+//         <div class="card-header">
+//           <h5 class="card-title">Search Images</h5>
+//         </div>
+//         <div class="card-body">
+//           <div class="form-group">
+//             <input type="text" id="search-box" class="form-control" placeholder="Search Images..." autocomplete="off" />
+//           </div>
+//           <ul id="image-list" class="list-group mt-2"></ul>
+//         </div>
+//       </div>
+//     </div>
+//   `
+
+//   const searchBox = document.getElementById('search-box');
+//   const imageBox = document.getElementById('image-list');
+
+//   // Function to filter and display suggestions
+//   function updateSuggestions() {
+//     const searchTerm = searchBox.value.toLowerCase();
+//     imageBox.innerHTML = '';
+//     // Filter mention list based on search term
+//     const filteredImages = imageList.filter(image =>
+//       image.ImageName.toLowerCase().includes(searchTerm)
+//     );
+
+//     // Render filtered suggestions
+//     filteredImages.forEach(images => {
+//       const listItem = document.createElement('li');
+//       listItem.className = 'list-group-item list-group-item-action';
+//       listItem.textContent = images.ImageName;
+//       listItem.onclick = () => {
+//         insertImageIntoWord(images.ImageData)
+//         // Replace # with the selected value (adjust as needed)
+//         // searchBox.value = '';
+//         // suggestionList.innerHTML = '';
+//         // replaceMention(images.EditorValue, images.ComponentKeyDataType)
+//         // Clear suggestions after selection
+//       };
+//       imageBox.appendChild(listItem);
+//     });
+//   }
+
+//   // Add input event listener to the search box
+//   searchBox.addEventListener('input', updateSuggestions);
+// }
 
 
 
-async function insertImageIntoWord(base64Image) {
-  await Word.run(async (context) => {
-    try {
-      const selection = context.document.getSelection();
-      await context.sync();
-      selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.before);
-      await context.sync();
-    } catch (err) {
-      console.log(err)
-    }
-  });
-}
+
+
+// async function insertImageIntoWord(base64Image) {
+//   await Word.run(async (context) => {
+//     try {
+//       const selection = context.document.getSelection();
+//       await context.sync();
+//       selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.before);
+//       await context.sync();
+//     } catch (err) {
+//       console.log(err)
+//     }
+//   });
+// }
