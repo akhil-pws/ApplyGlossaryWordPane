@@ -527,8 +527,8 @@ async function applyAITagFn() {
 
         // Search for all instances of the tag.DisplayName enclosed with `#`
         const searchResults = body.search(`#${tag.DisplayName}#`, {
-          matchCase: true,
-          matchWholeWord: true,
+          matchCase: false,
+          matchWholeWord: false,
         });
 
         // Load the search results to ensure they are available for further operations
