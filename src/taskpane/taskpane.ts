@@ -515,46 +515,36 @@ function addCopyListeners() {
 async function applyAITagFn() {
   return Word.run(async (context) => {
     try {
-      const body = context.document.body;
-      context.load(body, 'text');
+      // Select the entire document
+      const bodyRange = context.document.body.getRange();
+      bodyRange.select();
+      context.load(bodyRange, 'text');
+
       await context.sync();
 
-      // Iterate over the aiTagList to search and replace
+      // Get the entire document's content
+      const documentText = bodyRange.text;
+
+      // Loop through aiTagList and replace occurrences of tags
       for (let i = 0; i < aiTagList.length; i++) {
         const tag = aiTagList[i];
-        // Clean up the EditorValue by removing quotes
-        tag.EditorValue = removeQuotes(tag.EditorValue);
+        const searchTag = `#${tag.DisplayName}#`;  // Format the tag
 
-        // Search for all instances of the tag.DisplayName enclosed with `#`
-        const searchResults = body.search(`#${tag.DisplayName}#`, {
-          matchCase: true,
-          matchWholeWord: true,
-        });
-
-        // Load the search results to ensure they are available for further operations
-        context.load(searchResults, 'items');
-
-        await context.sync(); // Synchronize to fetch the search results
-
-        // Log the number of search results for debugging
-        console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
-
-        // Replace each found instance with tag.EditorValue
-        searchResults.items.forEach((item: any) => {
-          // Ensure the EditorValue is not empty before replacing
-          if (tag.EditorValue !== "") {
-            item.insertText(tag.EditorValue, Word.InsertLocation.replace);
-          }
-        });
-
-        // Additional sync after each replacement
-        await context.sync();
+        // Replace all instances of the tag with the EditorValue
+        if (documentText.includes(searchTag)) {
+          const updatedText = documentText.replace(new RegExp(searchTag, 'g'), tag.EditorValue);
+          
+          // Insert updated content into the document
+          bodyRange.insertText(updatedText, Word.InsertLocation.replace);
+        }
       }
 
-      // Final sync to apply all changes
+      // Sync changes with the document
       await context.sync();
+
+      console.log("All tags replaced successfully.");
     } catch (err) {
-      console.error("Error during tag application:", err);
+      console.error("Error during tag replacement:", err);
     }
   });
 }
