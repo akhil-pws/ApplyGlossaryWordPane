@@ -976,6 +976,10 @@ async function displayMentions() {
     // Function to filter and display suggestions
     function updateSuggestions() {
       const searchTerm = searchBox.value.toLowerCase();
+      if(searchTerm ===''){
+        suggestionList.innerHTML=``;
+        return
+      }
       suggestionList.innerHTML = '';
 
       // Filter mention list based on search term
