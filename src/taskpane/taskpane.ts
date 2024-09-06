@@ -516,6 +516,7 @@ async function applyAITagFn() {
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
+      console.log(body+'here is body');
 
       // Iterate over the aiTagList to search and replace
       for (let i = 0; i < aiTagList.length; i++) {
@@ -534,6 +535,9 @@ async function applyAITagFn() {
 
         await context.sync(); // Synchronize to fetch the search results
 
+        // Log the number of search results for debugging
+        console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
+
         // Replace each found instance with tag.EditorValue
         searchResults.items.forEach((item: any) => {
           // Ensure the EditorValue is not empty before replacing
@@ -541,12 +545,15 @@ async function applyAITagFn() {
             item.insertText(tag.EditorValue, Word.InsertLocation.replace);
           }
         });
+
+        // Additional sync after each replacement
+        await context.sync();
       }
 
-      // Synchronize changes with the Word document
+      // Final sync to apply all changes
       await context.sync();
     } catch (err) {
-      console.log("Error during tag application:", err);
+      console.error("Error during tag application:", err);
     }
   });
 }
