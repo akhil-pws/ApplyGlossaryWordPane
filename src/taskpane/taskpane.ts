@@ -516,7 +516,8 @@ async function applyAITagFn() {
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
-      console.log(body+'here is body');
+      context.load(body, 'text');
+      await context.sync();
 
       // Iterate over the aiTagList to search and replace
       for (let i = 0; i < aiTagList.length; i++) {
