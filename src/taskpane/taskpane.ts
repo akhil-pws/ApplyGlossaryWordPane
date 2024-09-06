@@ -78,7 +78,6 @@ async function login() {
   } else {
     loadLoginPage();
   }
-
 }
 
 function loadLoginPage() {
@@ -188,14 +187,15 @@ async function fetchDocument() {
 
     const data = await response.json();
     document.getElementById('app-body').innerHTML = ``
-        document.getElementById('logo-header').innerHTML=`
+    document.getElementById('logo-header').innerHTML=`
         <img  id="main-logo" src="./assets/logo.png" alt="" height="60" class="logo">`
     document.getElementById('header').innerHTML = `
+
     <div class="d-flex justify-content-around">
-    <button class="btn btn-dark " id="mention">Suggestions</button>
+    <button class="btn  btn-dark " id="mention">Suggestions</button>
             <button class="btn  btn-dark " id="aitag">AI Text Panel</button>
 
-        <button class="btn btn-dark " id="glossary">Glossary</button>
+        <button class="btn  btn-dark " id="glossary">Glossary</button>
 </div>
 
 `
@@ -455,6 +455,8 @@ async function displayAiTagList() {
     </div>
   `; // Clear any previous content
   const Cardcontainer = document.getElementById('card-container');
+    document.getElementById('applyAITag').addEventListener('click', applyAITag);
+
 
   for (let i = 0; i < aiTagList.length; i++) {
     const tag = aiTagList[i];
@@ -480,7 +482,6 @@ async function displayAiTagList() {
 
 
 
-  document.getElementById('applyAITag').addEventListener('click', applyAITag);
 
   // Add event listeners after rendering
   addAccordionListeners();
@@ -528,8 +529,10 @@ async function applyAITag() {
       await context.sync();
 
       // Replace each found instance with tag.Response
-      searchResults.items.forEach(item => {
-        item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+      searchResults.items.forEach((item:any) => {
+        if(item.EditorValue!==""){
+          item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+        }
       });
     }
 
