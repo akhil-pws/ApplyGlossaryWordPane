@@ -3,9 +3,12 @@
  * See LICENSE in the project root for license information.
  */
 
-import { data } from "./data";
+import { dataUrl, storeUrl } from "./data";
 let jwt = '';
+let baseUrl = dataUrl
+let storedUrl = storeUrl
 let documentID = ''
+let organizationName = ''
 let aiTagList = [];
 let initialised = true;
 let availableKeys = [];
@@ -16,6 +19,13 @@ let GroupName: string = '';
 let layTerms = [];
 let dataList: any = []
 let isTagUpdating: boolean = false;
+let capturedFormatting: any = {};
+let emptyFormat: boolean = false;
+let isNoFormatTextAvailable: boolean = false;
+let clientId = '0';
+let userId = 0;
+let clientList = [];
+
 
 /* global document, Office, Word */
 
@@ -52,10 +62,14 @@ async function retrieveDocumentProperties() {
 
       await context.sync();
       const property = properties.items.find(prop => prop.key === 'DocumentID');
-      if (property) {
+      const orgName = properties.items.find(prop => prop.key === 'Organization');
+      if (property && orgName) {
         documentID = property.value;
+        organizationName = orgName.value;
         login()
       } else {
+        document.getElementById('app-body').innerHTML = `
+        <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
         console.log(`Custom property "documentID" not found.`);
         return null;
       }
@@ -66,10 +80,8 @@ async function retrieveDocumentProperties() {
 
 }
 
-
 async function login() {
   // document.getElementById('header').innerHTML = ``
-
   const sessionToken = sessionStorage.getItem('token');
   console.log(sessionToken)
   if (sessionToken) {
@@ -99,8 +111,10 @@ function loadLoginPage() {
           <input type="password" class="form-control" id="password" required>
         </div>
         <div class="d-grid">
-          <button type="submit" class="btn btn-primary">Login</button>
+          <button type="submit" class="btn btn-primary bg-primary-clr">Login</button>
         </div>
+      <div id="login-error" class="mt-3 text-danger" style="display: none;"></div>
+
       </form>
     </div>
   `;
@@ -115,64 +129,160 @@ async function handleLogin(event) {
   const organization = document.getElementById('organization').value;
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
-  document.getElementById('app-body').innerHTML = `
+  if (organization.toLowerCase().trim() === organizationName.toLocaleLowerCase().trim()) {
+    document.getElementById('app-body').innerHTML = `
   <div id="button-container">
 
           <div class="loader" id="loader"></div>
           </div
 `
-  try {
-    const response = await fetch('https://plsdevapp.azurewebsites.net/api/user/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        ClientName: organization,
-        Username: username,
-        Password: password
-      })
-    });
+    try {
+      const response = await fetch(`${baseUrl}/api/user/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ClientName: organization,
+          Username: username,
+          Password: password
+        })
+      });
 
-    if (!response.ok) {
-      loadLoginPage()
-      throw new Error('Network response was not ok.');
-    }
 
-    const data = await response.json();
-    if (data.Status === true && data['Data']) {
-      if (data['Data'].ResponseStatus) {
-        jwt = data.Data.Token;
-        sessionStorage.setItem('token', jwt)
-
-        window.location.hash = '#/dashboard';
-
-      } else {
-        loadLoginPage()
+      if (!response.ok) {
+        showLoginError("An error occurred during login. Please try again.")
+        throw new Error('Network response was not ok.');
       }
-    } else {
-      loadLoginPage()
+
+      const data = await response.json();
+      if (data.Status === true && data['Data']) {
+        if (data['Data'].ResponseStatus) {
+          jwt = data.Data.Token;
+          sessionStorage.setItem('token', jwt)
+          sessionStorage.setItem('userId', data.Data.ID);
+          window.location.hash = '#/dashboard';
+
+        } else {
+          showLoginError("An error occurred during login. Please try again.")
+        }
+      } else {
+        showLoginError("An error occurred during login. Please try again.")
+      }
+
+
+      // Handle successful login (e.g., navigate to the next page or show a success message)
+
+    } catch (error) {
+      showLoginError("An error occurred during login. Please try again.")
+      console.error('Error during login:', error);
+      // Handle login error (e.g., show an error message)
     }
-
-
-    // Handle successful login (e.g., navigate to the next page or show a success message)
-
-  } catch (error) {
-    loadLoginPage()
-    console.error('Error during login:', error);
-    // Handle login error (e.g., show an error message)
+  } else {
+    showLoginError("The organization specified is not associated with this document")
   }
 }
 
+function showLoginError(message) {
+  loadLoginPage();  // Reload the form UI
+  const errorDiv = document.getElementById('login-error');
+  errorDiv.style.display = 'block';
+  errorDiv.textContent = message;
+}
+
 function displayMenu() {
+  userId = Number(sessionStorage.getItem('userId'))
   // document.getElementById('aitag').addEventListener('click', redirectAI);
-  fetchDocument();
+  fetchDocument('Init');
 
 }
 
-async function fetchDocument() {
+async function fetchDocument(action) {
   try {
-    const response = await fetch(`https://plsdevapp.azurewebsites.net/api/report/id/${documentID}`, {
+    const response = await fetch(`${baseUrl}/api/report/id/${documentID}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${jwt}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok.');
+    }
+
+    //     <div class="dropdown">
+    //     <button class="btn btn-dark dropdown-toggle" type="button" id="mention" data-bs-toggle="dropdown" aria-expanded="false">
+    //         Insert
+    //     </button>
+    //     <ul class="dropdown-menu" aria-labelledby="formatDropdown" style="z-index: 100000;">
+    //         <li><button class="dropdown-item" id="mentiontags">Search Tags</button></li>
+    //         <li><button class="dropdown-item" id="addgenaitag" d>Add Text GenAI Tag</button></li>
+    //     </ul>
+    // </div>
+
+    const data = await response.json();
+    document.getElementById('app-body').innerHTML = ``
+    document.getElementById('logo-header').innerHTML = `
+        <img  id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo"> <i class="fa fa-sign-out me-5 c-pointer" aria-hidden="true" id="logout"><span class="tooltiptext">Logout</span></i>
+`
+    document.getElementById('header').innerHTML = `
+
+    <div class="d-flex justify-content-around">
+        <button class="btn btn-dark" id="mention">Insert</button>
+        <button class="btn btn-dark" id="aitag">Refine</button>
+
+        <!-- Dropdown for Formatting -->
+        <div class="dropdown">
+            <button class="btn btn-dark dropdown-toggle" type="button" id="formatDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                Actions
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="formatDropdown" style="z-index: 100000;">
+                <li><button class="dropdown-item" id="selectFormat">Define Formatting</button></li>
+                <li><button class="dropdown-item" id="glossary" disabled>Glossary</button></li>
+                <li><button class="dropdown-item" id="removeFormatting" disabled>Remove Formatted Text</button></li>
+            </ul>
+        </div>
+    </div>
+
+`
+    // <button class="btn  btn-dark me-2" id="imagebtn">Image</button>
+
+
+    document.getElementById('mention').addEventListener('click', displayMentions);
+    document.getElementById('glossary').addEventListener('click', fetchGlossary);
+
+    document.getElementById('aitag').addEventListener('click', displayAiTagList);
+    document.getElementById('selectFormat').addEventListener('click', formatOptionsDisplay);
+    document.getElementById('removeFormatting').addEventListener('click', removeOptionsConfirmation);
+
+    document.getElementById('logout').addEventListener('click', logout);
+
+    // document.getElementById('imagebtn').addEventListener('click', fetchGeneralImages);
+
+
+
+    // Extracting the relevant AI group from the response
+    dataList = data['Data'];
+    clientId = dataList.ClientID;
+    const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
+    GroupName = aiGroup ? aiGroup.Name : '';
+    aiTagList = aiGroup ? aiGroup.GroupKey : [];
+
+    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT');
+    fetchClients();
+    if (action === 'AIpanel') {
+      displayAiTagList();
+    }
+    // Call function to display the AI Tag List on the UI
+
+  } catch (error) {
+    console.error('Error fetching glossary data:', error);
+  }
+}
+
+async function fetchClients() {
+  try {
+    const response = await fetch(`${baseUrl}/api/client/all/${userId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`
@@ -186,49 +296,307 @@ async function fetchDocument() {
 
 
     const data = await response.json();
-    document.getElementById('app-body').innerHTML = ``
-    document.getElementById('logo-header').innerHTML=`
-        <img  id="main-logo" src="./assets/logo.png" alt="" height="60" class="logo">`
-    document.getElementById('header').innerHTML = `
-
-    <div class="d-flex justify-content-around">
-    <button class="btn  btn-dark " id="mention">Suggestions</button>
-            <button class="btn  btn-dark " id="aitag">AI Text Panel</button>
-
-        <button class="btn  btn-dark " id="glossary">Glossary</button>
-</div>
-
-`
-    // <button class="btn  btn-dark me-2" id="imagebtn">Image</button>
-
-
-    document.getElementById('mention').addEventListener('click', displayMentions);
-    document.getElementById('glossary').addEventListener('click', fetchGlossary);
-
-    document.getElementById('aitag').addEventListener('click', displayAiTagList);
-    // document.getElementById('imagebtn').addEventListener('click', fetchGeneralImages);
-
-
-
-
-    // Extracting the relevant AI group from the response
-    dataList = data['Data'];
-    const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
-    GroupName = aiGroup ? aiGroup.Name : '';
-    aiTagList = aiGroup ? aiGroup.GroupKey : [];
-
-    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT');
-
-    // Call function to display the AI Tag List on the UI
-
+    clientList = data['Data'];
   } catch (error) {
-    console.error('Error fetching glossary data:', error);
   }
 }
 
+
+
+async function formatOptionsDisplay() {
+  if (!isTagUpdating) { // Check if isTagUpdating is false
+    if (isGlossaryActive) {
+      await clearGlossary();
+    }
+    const htmlBody = `
+      <div class="container mt-3">
+        <div class="card">
+          <div class="card-header">
+               <!-- Buttons for Capture and Empty Format -->
+            <div class="d-flex justify-content-end">
+              <button id="capture-format-btn" class="btn btn-primary bg-primary-clr"><i class="fa fa-border-style me-1"></i>  Capture Format</button>
+            </div>
+            <!-- <h5 class="card-title">Formatting Options</h5> -->
+          </div>
+          <div class="card-body">
+           <div>
+                <input type="checkbox" id="empty-format-checkbox" class="form-check-input mb-2">
+                <label for="empty-format-checkbox" class="form-check-label empty-format-checkbox-label">Skip ignoring and removing format-based text</label>
+              </div>
+            <!-- Section to display captured formatting -->
+            <div id="format-details">
+              <h5 class="my-3">Selected Formatting:</h5>
+              <ul id="format-list" class="list-unstyled"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+
+    document.getElementById('app-body').innerHTML = htmlBody;
+    if (Object.keys(capturedFormatting).length === 0) {
+      const formatDetails = document.getElementById("format-details");
+      formatDetails.style.display = 'none';
+      // The object is not empty
+    }
+
+    const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
+    glossaryBtn.disabled = true;
+    if (emptyFormat) {
+      clearCapturedFormatting();
+    }
+    else {
+      if (capturedFormatting.Bold === null ||
+        capturedFormatting.Underline === 'Mixed' ||
+        capturedFormatting.Size === null ||
+        capturedFormatting["Font Name"] === null ||
+        capturedFormatting["Background Color"] === '' ||
+        capturedFormatting["Text Color"] === '') {
+        const formatList = document.getElementById("format-list");
+        formatList.innerHTML = "<p>Multiple style values found. Try again</p>";
+        const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
+        removeFormatBtn.disabled = true;
+      } else {
+        const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
+        removeFormatBtn.disabled = false;
+        displayCapturedFormatting();
+      }
+    }
+    // Event listeners for the buttons
+
+    document.getElementById("capture-format-btn").addEventListener("click", captureFormatting);
+
+    const emptyFormatCheckbox = document.getElementById("empty-format-checkbox") as HTMLInputElement;
+    if (isNoFormatTextAvailable) {
+      emptyFormatCheckbox.checked = true;
+      clearCapturedFormatting();
+    }
+
+    emptyFormatCheckbox.addEventListener("change", () => {
+      if (emptyFormatCheckbox.checked) {
+        isNoFormatTextAvailable = true;
+        clearCapturedFormatting();
+      } else {
+        const CaptureBtn = document.getElementById('capture-format-btn') as HTMLButtonElement;
+        CaptureBtn.disabled = false;
+        isNoFormatTextAvailable = false;
+        emptyFormat = false;
+        const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
+        glossaryBtn.disabled = true;
+      }
+    });
+
+  }
+}
+
+
+
+function displayCapturedFormatting() {
+  emptyFormat = false;
+  const formatList = document.getElementById("format-list");
+  formatList.innerHTML = ""; // Clear the list before adding new items
+
+  for (const [key, value] of Object.entries(capturedFormatting)) {
+    if ((key === "Text Color" || key === "Background Color") && value) {
+      formatList.innerHTML += `
+        <li><strong>${key}:</strong>${value}
+          <span style="display:inline-block;width:15px;height:15px;background-color:${value};border:1px solid black;"></span>
+        </li>
+      `;
+    } else {
+      formatList.innerHTML += `<li><strong>${key}:</strong> ${value}</li>`;
+    }
+  }
+}
+
+function clearCapturedFormatting() {
+  capturedFormatting = {}; // Clear the captured formatting object
+  const formatDetails = document.getElementById("format-details");
+  formatDetails.style.display = 'none';
+  // formatList.innerHTML = `<li>No formatting selected.</li>`;
+  emptyFormat = true;
+  const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
+  glossaryBtn.disabled = false;
+  const CaptureBtn = document.getElementById('capture-format-btn') as HTMLButtonElement;
+  CaptureBtn.disabled = true;
+
+  const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
+  removeFormatBtn.disabled = true;
+
+  console.log("Captured formatting cleared.");
+}
+
+async function captureFormatting() {
+  try {
+    await Word.run(async (context) => {
+      const selection = context.document.getSelection();
+      const font = selection.font;
+      font.load(["bold", "italic", "underline", "size", "highlightColor", "name", 'color']);
+
+      await context.sync();
+
+      capturedFormatting = {
+        Bold: font.bold,
+        Italic: font.italic,
+        Underline: font.underline,
+        Size: font.size,
+        "Background Color": font.highlightColor,
+        "Font Name": font.name,
+        'Text Color': font.color
+      };
+
+
+
+      const formatDetails = document.getElementById("format-details");
+      formatDetails.style.display = 'block';
+
+      if (capturedFormatting.Bold === null ||
+        capturedFormatting.Underline === 'Mixed' ||
+        capturedFormatting.Size === null ||
+        capturedFormatting["Font Name"] === null ||
+        capturedFormatting["Background Color"] === '' ||
+        capturedFormatting["Text Color"] === ''
+
+      ) {
+        const formatList = document.getElementById("format-list");
+        formatList.innerHTML = "<p>Multiple style values found. Try again</p>";
+        const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
+        removeFormatBtn.disabled = true;
+      } else {
+        const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
+        removeFormatBtn.disabled = false;
+        displayCapturedFormatting();
+      }
+    });
+  } catch (error) {
+    console.error("Error capturing formatting:", error);
+  }
+}
+
+
+
+async function removeOptionsConfirmation() {
+  if (!isTagUpdating) {
+    if (isGlossaryActive) {
+      await clearGlossary();
+    } // Check if isTagUpdating is false
+    const htmlBody = `
+      <div class="container mt-3">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title">Are you sure you want to remove formatted text ?</h5>
+          </div>
+          <div class="card-body">
+          <div id="format-details">
+              <h5>Selected Formatting:</h5>
+              <ul id="format-list" class="list-unstyled mb-3"></ul>
+              <small class="text-secondary font-italic" id="warning-rem-fmt"></small>
+             
+            </div>
+               <!-- Buttons for Capture and Empty Format -->
+            <div class="d-flex justify-content-end mt-2">
+              <button id="change-ft-btn" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i><strong>Cancel</strong></button>
+              <button id="clear-ft-btn" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i><strong>Yes</strong></button>
+
+            </div>
+
+            
+          </div>
+        </div>
+      </div>
+    `;
+
+
+
+    document.getElementById('app-body').innerHTML = htmlBody;
+    displayCapturedFormatting();
+
+    if (capturedFormatting['Background Color'] === null &&
+      capturedFormatting['Text Color'] === '#000000') {
+      const warningEle = document.getElementById('warning-rem-fmt').innerHTML = 'Warning : The captured formatting is broad. This might result in unintended text removal throughout the document. Proceed?'
+    }
+
+    // Event listeners for the buttons
+    document.getElementById("clear-ft-btn").addEventListener("click", removeFormattedText);
+    document.getElementById("change-ft-btn").addEventListener("click", formatOptionsDisplay);
+
+  }
+}
+
+async function removeFormattedText() {
+  try {
+    await Word.run(async (context) => {
+
+      const iconelement = document.getElementById(`clear-ft-btn`);
+      iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i><strong>Yes</strong>`;
+      const clrBtn = document.getElementById('clear-ft-btn') as HTMLButtonElement;
+      clrBtn.disabled = true;
+
+      const changeBtn = document.getElementById('change-ft-btn') as HTMLButtonElement;
+      changeBtn.disabled = true;
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load("items"); // Load paragraphs from the body
+
+      await context.sync();
+
+      // Iterate through each paragraph in the document body
+      for (const paragraph of paragraphs.items) {
+        // Check if the paragraph contains text
+        if (paragraph.text.trim() !== "") {
+          const textRanges = paragraph.split([" "]); // Split paragraph into individual words/segments
+          textRanges.load("items, font");
+
+          await context.sync();
+
+          for (const range of textRanges.items) {
+            const font = range.font;
+            font.load(["bold", "italic", "underline", "size", "highlightColor", "name", "color"]);
+
+            await context.sync();
+
+            // Check if the text range matches the captured formatting
+            if (
+              font.highlightColor === capturedFormatting['Background Color'] &&
+              font.color === capturedFormatting['Text Color'] &&
+              font.bold === capturedFormatting['Bold'] &&
+              font.italic === capturedFormatting['Italic'] &&
+              font.size === capturedFormatting['Size'] &&
+              font.underline === capturedFormatting['Underline'] &&
+              font.name === capturedFormatting['Font Name']
+            ) {
+              // Clear the range whether it's a full word or part of a word
+              font.highlightColor = "#FFFFFF"; // Set new background color
+              font.color = "#000000"; // Set new text color
+              font.bold = false; // Reset bold if needed
+              font.italic = false; // Reset italic if needed
+              font.underline = "None";
+              paragraph.insertText(" ", Word.InsertLocation.replace);
+            }
+          }
+        }
+      }
+
+      await context.sync();
+      capturedFormatting = {}; // Clear the captured formatting object
+      const formatDetails = document.getElementById("format-details");
+      formatDetails.style.display = 'none';
+      // formatList.innerHTML = `<li>No formatting selected.</li>`;
+      emptyFormat = true;
+      isNoFormatTextAvailable = true;
+      const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
+      glossaryBtn.disabled = false;
+      formatOptionsDisplay()
+    });
+  } catch (error) {
+    console.error("Error removing formatted text:", error);
+  }
+}
+
+
 async function fetchAIHistory(tag) {
   try {
-    const response = await fetch(`https://plsdevapp.azurewebsites.net/api/report/ai-history/${tag.ID}`, {
+    const response = await fetch(`${baseUrl}/api/report/ai-history/${tag.ID}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`
@@ -254,9 +622,6 @@ async function fetchAIHistory(tag) {
     return [];
   }
 }
-
-
-
 
 
 async function generateRadioButtons(tag: any, index: number): Promise<string> {
@@ -314,59 +679,142 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
 }
 
 
+
+
 function accordianContent(headerId, collapseId, tag, radioButtonsHTML, i) {
+  const textColorClass = tag.IsApplied ? 'text-secondary' : '';
+
   const body = `
-   <h2 class="accordion-header" id="${headerId}">
-  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-    data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-    ${tag.DisplayName}
-  </button>
-</h2>
-<div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
-  <div class="accordion-body chatbox" id="selected-response-parent-${i}">
-    ${radioButtonsHTML}
-  </div>
-
-  <div class="col-md-12 d-flex align-items-center justify-content-end chatbox p-3">
-    <textarea class="form-control" rows="3" id="chatbox-${i}" placeholder="Type here"></textarea>
-    <div class="d-flex align-self-end">
-      <button type="submit" class="btn btn-primary ms-2 text-white" id="sendPrompt-${i}">
-        <i class="fa fa-paper-plane text-white"></i>
+    <h2 class="accordion-header" id="${headerId}">
+      <button 
+        class="accordion-button collapsed" 
+        type="button" 
+        data-bs-toggle="collapse" 
+        data-bs-target="#${collapseId}" 
+        aria-expanded="false" 
+        aria-controls="${collapseId}">
+        <span class="${textColorClass}" id="tagname-${i}">${tag.DisplayName}</span>
       </button>
-    </div>
-  </div>
-</div>
-  `
+    </h2>
+    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
+      <div class="accordion-body chatbox" id="selected-response-parent-${i}">
+        ${radioButtonsHTML}
+      </div>
 
-  return body
+      <div class="form-check form-switch mb-0 chatbox">
+              <div class="col-md-12 px-3">
+
+        <label class="form-check-label pb-3" for="doNotApply-${i}"><span class="fs-12">Do not apply<span></label>
+        <input 
+          class="form-check-input" 
+          type="checkbox" 
+          id="doNotApply-${i}" 
+          ${tag.IsApplied ? 'checked' : ''}  
+        >
+        </div>
+      </div>
+  
+      <div class="col-md-12 d-flex align-items-center justify-content-end chatbox p-3">
+        <textarea 
+          class="form-control" 
+          rows="3" 
+          id="chatbox-${i}" 
+          placeholder="Type here">
+        </textarea>
+        <div class="d-flex align-self-end">
+          <button 
+            type="submit" 
+            class="btn btn-primary bg-primary-clr ms-2 text-white" 
+            id="sendPrompt-${i}">
+            <i class="fa fa-paper-plane text-white"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return body;
+
+
 }
+
+async function onDoNotApplyChange(event, index, tag: any) {
+  tag.IsApplied = event.target.checked;
+  const isChecked = event.target.checked;
+  const tagname = document.getElementById(`tagname-${index}`);
+  const dnaBtn = document.getElementById(`doNotApply-${index}`) as HTMLInputElement;
+
+  try {
+    dnaBtn.disabled = true
+    const response = await fetch(`${baseUrl}/api/report/head/groupkey`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`
+      },
+      body: JSON.stringify(tag)
+    });
+
+    if (!response.ok) {
+      dnaBtn.disabled = false
+      throw new Error('Network response was not ok.');
+    }
+
+    const data = await response.json();
+    if (data['Data'] && data['Status'] === true) {
+      dnaBtn.disabled = false
+    }
+
+  } catch (error) {
+    dnaBtn.disabled = false
+    console.error('Error updating do not apply:', error);
+  }
+
+  if (tagname) {
+    const match = availableKeys.find(item => tag.DisplayName === item.DisplayName);
+    if (isChecked) {
+      if (match) match.IsApplied = true;
+      tagname.classList.add('text-secondary');
+    } else {
+      if (match) match.IsApplied = false;
+      tagname.classList.remove('text-secondary');
+    }
+  }
+
+}
+
+
+
 
 
 async function sendPrompt(tag, prompt, index) {
   if (prompt !== '' && !isTagUpdating) {
-
     isTagUpdating = true;
-    const iconelement = document.getElementById(`sendPrompt-${index}`)
-    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`
+
+    const iconelement = document.getElementById(`sendPrompt-${index}`);
+    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
+
     const payload = {
       ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
       DocumentID: dataList.NCTID,
       DocumentType: dataList.DocumentType,
       TextSetting: dataList.TextSetting,
       DocumentTemplate: dataList.ReportTemplate,
-      ReportHeadGroupKeyID:
-        tag.FilteredReportHeadAIHistoryList[0].ReportHeadGroupKeyID,
+      ReportHeadGroupKeyID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadGroupKeyID,
+      ThreadID: tag.ThreadID,
+      AssistantID: dataList.AssistantID,
       Container: dataList.Container,
       GroupName: GroupName,
       Prompt: prompt,
       PromptType: 1,
       Response: '',
+      VectorID: dataList.VectorID,
       Selected: 0,
       ID: 0
     };
 
     try {
-      const response = await fetch('https://plsdevapp.azurewebsites.net/api/report/ai-history/add', {
+      const response = await fetch(`${baseUrl}/api/report/ai-history/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -374,56 +822,55 @@ async function sendPrompt(tag, prompt, index) {
         },
         body: JSON.stringify(payload)
       });
+
       if (!response.ok) {
         throw new Error('Network response was not ok.');
       }
+
       const data = await response.json();
       if (data['Data'] && data['Data'] !== 'false') {
-
-        tag.ReportHeadAIHistoryList = JSON.parse(
-          JSON.stringify(data['Data'])
-        );
+        tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
         tag.FilteredReportHeadAIHistoryList = [];
-        // tag.ReportHeadAIHistoryList.reverse();
-        tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
+
+        tag.ReportHeadAIHistoryList.forEach((historyList) => {
           historyList.Response = removeQuotes(historyList.Response);
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
 
-        const collapseId = `flush-collapseOne-${index}`;
-        const headerId = `flush-headingOne-${index}`;
+        // Update only the inner content of the accordion body
+        const innerContainer = document.getElementById(`selected-response-parent-${index}`);
+        if (innerContainer) {
+          const radioButtonsHTML = await generateRadioButtons(tag, index);
+          innerContainer.innerHTML = radioButtonsHTML;
+        }
 
-        const accordianBox = document.getElementById(`accordion-item-${index}`); // Replace 'yourUniqueId' with your desired ID
+        // Reapply event listeners for the new buttons and radio options
+        tag.FilteredReportHeadAIHistoryList.forEach((chat, j) => {
+          document.getElementById(`copyPrompt-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Prompt));
+          document.getElementById(`copyResponse-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Response));
+          document.getElementById(`flexRadioDefault1-${index}-${j}`)?.addEventListener('change', () => onRadioChange(tag, index, j));
+        });
 
+        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
+        document.getElementById(`chatbox-${index}`).value = '';
 
-        const radioButtonsHTML = await generateRadioButtons(tag, index);
-
-        accordianBox.innerHTML = accordianContent(headerId, collapseId, tag, radioButtonsHTML, index);
-
-        const iconelement = document.getElementById(`sendPrompt-${index}`)
-        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
         isTagUpdating = false;
       } else {
-        const iconelement = document.getElementById(`sendPrompt-${index}`)
-        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
+        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
         isTagUpdating = false;
       }
-
-      // alert('Glossary data loaded successfully.');
     } catch (error) {
-      const iconelement = document.getElementById(`sendPrompt-${index}`)
-      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
-      isTagUpdating = false
-      console.error('Error sending ai prompt:', error);
-      // Optionally show an error message to the user
-      // alert('Error fetching glossary data.');
+      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
+      isTagUpdating = false;
+      console.error('Error sending AI prompt:', error);
     }
-
-
   } else {
-    console.error('No empty prompt allowed')
+    console.error('No empty prompt allowed');
   }
 }
+
+
+
 
 // Your existing copyText function
 function copyText(text: string) {
@@ -438,14 +885,32 @@ function copyText(text: string) {
 }
 
 
+async function logout() {
+  if (isGlossaryActive) {
+    await clearGlossary();
+  }
+  sessionStorage.clear();
+  window.location.hash = '#/new';
+  initialised = true;
+  document.getElementById('logo-header').innerHTML = ``;
+  document.getElementById('header').innerHTML = ``
+  login();
+}
+
+
 async function displayAiTagList() {
   if (isGlossaryActive) {
     await clearGlossary()
   }
   const container = document.getElementById('app-body');
   container.innerHTML = `
-  <div class="d-flex justify-content-end p-1">
-     <button class="btn btn-primary btn-sm c-pointer text-white me-2 mb-2" id="applyAITag">
+  <div class="d-flex justify-content-between">
+      <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white ms-2 mb-2" id="addgenaitag">
+        <i class="fa fa-plus text-light"></i>
+        Add
+    </button>
+
+     <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white me-2 mb-2" id="applyAITag">
         <i class="fa fa-robot text-light"></i>
         Apply
     </button>
@@ -455,8 +920,9 @@ async function displayAiTagList() {
     </div>
   `; // Clear any previous content
   const Cardcontainer = document.getElementById('card-container');
-    document.getElementById('applyAITag').addEventListener('click', applyAITagFn);
+  document.getElementById('applyAITag').addEventListener('click', applyAITagFn);
 
+  document.getElementById('addgenaitag').addEventListener('click', addGenAITags);
 
   for (let i = 0; i < aiTagList.length; i++) {
     const tag = aiTagList[i];
@@ -472,20 +938,21 @@ async function displayAiTagList() {
     accordionItem.innerHTML = accordianContent(headerId, collapseId, tag, radioButtonsHTML, i);
 
     Cardcontainer.appendChild(accordionItem);
+
+    document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
+
     document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
       const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
 
       sendPrompt(tag, textareaValue, i)
     });
+
   }
-
-
-
-
 
   // Add event listeners after rendering
   addAccordionListeners();
   addCopyListeners();
+
 }
 
 function addAccordionListeners() {
@@ -542,7 +1009,7 @@ async function applyAITagFn() {
         // Replace each found instance with tag.EditorValue
         searchResults.items.forEach((item: any) => {
           // Ensure the EditorValue is not empty before replacing
-          if (tag.EditorValue !== "") {
+          if (tag.EditorValue !== "" && !tag.IsApplied) {
             item.insertText(tag.EditorValue, Word.InsertLocation.replace);
           }
         });
@@ -571,9 +1038,12 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
     let payload = JSON.parse(JSON.stringify(chat));
     payload.Container = dataList.Container;
     payload.Selected = 1;
-
+    const matchingKey = availableKeys.find(prop => prop.DisplayName === tag.DisplayName);
+    if (matchingKey) {
+      matchingKey.EditorValue = payload.Response;
+    }
     try {
-      const response = await fetch('https://plsdevapp.azurewebsites.net/api/report/ai-history/update', {
+      const response = await fetch(`${baseUrl}/api/report/ai-history/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -637,41 +1107,15 @@ function selectResponse(tagIndex, chatIndex) {
 async function fetchGlossary() {
   if (!isTagUpdating) {
 
-
-    if (layTerms.length === 0) {
-
-      document.getElementById('app-body').innerHTML = `
+    document.getElementById('app-body').innerHTML = `
   <div id="button-container">
 
           <div class="loader" id="loader"></div>
 
         <div id="highlighted-text"></div>`
 
-      try {
-        const response = await fetch('https://plsdevapp.azurewebsites.net/api/glossary-template/id/3', {
-          method: 'GET', // or 'POST', depending on your API
-          headers: {
-            'Authorization': `Bearer ${jwt}`
-          }
-        });
-        if (!response.ok) {
-          throw new Error('Network response was not ok.');
-        }
+    loadGlossary()
 
-        const data = await response.json();
-        layTerms = data.Data.GlossaryTemplateData;
-        glossaryName = data.Data.Name
-        loadGlossary()
-        // alert('Glossary data loaded successfully.');
-      } catch (error) {
-        console.error('Error fetching glossary data:', error);
-        // Optionally show an error message to the user
-        // alert('Error fetching glossary data.');
-      }
-
-    } else {
-      loadGlossary()
-    }
   }
 
 }
@@ -703,21 +1147,80 @@ export async function applyglossary() {
 
 
       const body = context.document.body;
+      body.load("text");
+      await context.sync(); // Sync to get the text content
+
+      const bodyText = {
+        "Content": body.text.replace(/[\n\r]/g, ' ')
+      };
+      try {
+        const response = await fetch(`${baseUrl}/api/glossary-template/client-id/${dataList?.ClientID}`, {
+          method: 'POST', // or 'POST', depending on your API
+          headers: {
+            'Content-Type': 'application/json',
+
+            'Authorization': `Bearer ${jwt}`
+          },
+          body: JSON.stringify(bodyText)
+        });
+        if (!response.ok) {
+          throw new Error('Network response was not ok.');
+        }
+
+
+        const data = await response.json();
+        layTerms = data.Data
+        if (data.Data.length > 0) {
+          glossaryName = data.Data[0].GlossaryTemplate
+          loadGlossary()
+        } else {
+          document.getElementById('app-body').innerHTML = `
+       <p class="text-center">Data not available<p/>
+  `
+        }
+
+        // alert('Glossary data loaded successfully.');
+      } catch (error) {
+        console.error('Error fetching glossary data:', error);
+        // Optionally show an error message to the user
+        // alert('Error fetching glossary data.');
+      }
 
       const searchPromises = layTerms.map(term => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: true, matchWholeWord: true });
         searchResults.load("items");
+
         return searchResults;
       });
       await context.sync();
 
 
 
-      searchPromises.forEach(searchResults => {
-        searchResults.items.forEach(item => {
-          item.font.highlightColor = "yellow";
-        });
-      });
+      for (const searchResults of searchPromises) {
+
+        for (const range of searchResults.items) {
+          const font = range.font;
+          font.load(["bold", "italic", "underline", "size", "highlightColor", "name", 'color']);
+
+          await context.sync();
+
+          if (
+            font.highlightColor !== capturedFormatting['Background Color'] ||
+            font.color !== capturedFormatting['Text Color'] ||
+            font.bold !== capturedFormatting['Bold'] ||
+            font.italic !== capturedFormatting['Italic'] ||
+            font.size !== capturedFormatting['Size'] ||
+            font.underline !== capturedFormatting['Underline'] ||
+            font.name !== capturedFormatting['Font Name']
+          ) {
+            font.highlightColor = "yellow";
+          }
+
+
+        }
+
+
+      }
       // document.getElementById('glossarycheck').style.display='block';
       isGlossaryActive = true;
       document.getElementById('app-body').innerHTML = `
@@ -726,8 +1229,14 @@ export async function applyglossary() {
       </div>
 
       <div id="highlighted-text"></div>
+      <div class="d-flex justify-content-center box-loader">
+       <div class="loader" id="loader"></div></div>
       
 `
+
+      const displayElement = document.getElementById('loader');
+      displayElement.style.display = 'none';
+
 
 
 
@@ -765,6 +1274,7 @@ export async function checkGlossary() {
   try {
     await Word.run(async (context) => {
       const selection = context.document.getSelection();
+
       selection.load("text, font.highlightColor");
 
       await context.sync();
@@ -772,6 +1282,10 @@ export async function checkGlossary() {
 
 
       if (selection.text) {
+        const loader = document.getElementById('loader');
+        if (loader) {
+          loader.style.display = 'block';
+        }
         const searchPromises = layTerms.map(term => {
           const searchResults = selection.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
           searchResults.load("items");
@@ -780,11 +1294,31 @@ export async function checkGlossary() {
 
         await context.sync();
         const selectedWords = []
-        searchPromises.forEach(searchResults => {
-          searchResults.items.forEach(item => {
-            selectedWords.push(item.text);
-          });
-        });
+        for (const searchResults of searchPromises) {
+
+          for (const range of searchResults.items) {
+            const font = range.font;
+            font.load(["bold", "italic", "underline", "size", "highlightColor", "name", "color"]);
+
+            await context.sync();
+            if (
+              font.highlightColor !== capturedFormatting['Background Color'] ||
+              font.color !== capturedFormatting['Text Color'] ||
+              font.bold !== capturedFormatting['Bold'] ||
+              font.italic !== capturedFormatting['Italic'] ||
+              font.size !== capturedFormatting['Size'] ||
+              font.underline !== capturedFormatting['Underline'] ||
+              font.name !== capturedFormatting['Font Name']
+            ) {
+              selectedWords.push(range.text);
+            }
+
+          }
+        }
+        // searchPromises.forEach(searchResults => {
+        //   searchResults.items.forEach(item => {
+        //   });
+        // });
         displayHighlightedText(selectedWords)
 
         await context.sync();
@@ -811,11 +1345,13 @@ export async function checkGlossary() {
 
 
 function displayHighlightedText(words: string[]) {
+
   const displayElement = document.getElementById('highlighted-text');
 
   if (displayElement) {
     displayElement.innerHTML = ''; // Clear previous content
-
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
     // Group lay terms by their clinical term
     const groupedTerms: { [clinicalTerm: string]: string[] } = {};
 
@@ -862,14 +1398,20 @@ function displayHighlightedText(words: string[]) {
 
       displayElement.appendChild(mainBox);
     });
+    loader.style.display = 'none';
+
   }
 }
 
 
 async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
+  const displayElement = document.getElementById('loader');
+  displayElement.style.display = 'block';
   try {
+
     await Word.run(async (context) => {
       // Get the current selection
+
       const selection = context.document.getSelection();
 
       // Load the selection's text
@@ -892,13 +1434,18 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
           item.font.highlightColor = 'white';
         });
         await context.sync();
+        displayElement.style.display = 'none';
 
         console.log(`Replaced '${clinicalTerm}' with '${layTerm}' and removed highlight in the document.`);
       } else {
+        displayElement.style.display = 'none';
+
         console.log(`Selected text does not contain '${clinicalTerm}'.`);
       }
     });
   } catch (error) {
+    displayElement.style.display = 'none';
+
     console.error('Error replacing term:', error);
   }
 }
@@ -922,12 +1469,35 @@ async function clearGlossary() {
       });
 
       await context.sync();
+      for (const searchResults of searchPromises) {
 
-      searchPromises.forEach(searchResults => {
-        searchResults.items.forEach(item => {
-          item.font.highlightColor = 'white'; // Reset highlight color
-        });
-      });
+        for (const range of searchResults.items) {
+          const font = range.font;
+          font.load(["bold", "italic", "underline", "size", "highlightColor", "name", "color"]);
+
+          await context.sync();
+          if (
+            font.highlightColor !== capturedFormatting['Background Color'] ||
+            font.color !== capturedFormatting['Text Color'] ||
+            font.bold !== capturedFormatting['Bold'] ||
+            font.italic !== capturedFormatting['Italic'] ||
+            font.size !== capturedFormatting['Size'] ||
+            font.underline !== capturedFormatting['Underline'] ||
+            font.name !== capturedFormatting['Font Name']
+          ) {
+            font.highlightColor = "#FFFFFF";
+          }
+
+        }
+
+
+      }
+
+      // searchPromises.forEach(searchResults => {
+      //   searchResults.items.forEach(item => {
+      //     item.font.highlightColor = 'white'; // Reset highlight color
+      //   });
+      // });
       document.getElementById('app-body').innerHTML = `
       <div id="button-container">
         <button class="btn btn-secondary me-2 mark-glossary btn-sm" id="applyglossary">Apply Glossary</button>
@@ -950,35 +1520,38 @@ async function clearGlossary() {
 
 
 async function displayMentions() {
-  if (!isTagUpdating) { // Check if isTagUpdating is false
+  if (!isTagUpdating) {
     if (isGlossaryActive) {
       await clearGlossary();
     }
+
     const htmlBody = `
       <div class="container mt-3">
         <div class="card">
           <div class="card-header">
-            <h5 class="card-title">Search Suggestions</h5>
+            <h5 class="card-title">Search Tags</h5>
           </div>
           <div class="card-body">
             <div class="form-group">
-              <input type="text" id="search-box" class="form-control" placeholder="Search Suggestions..." autocomplete="off" />
+              <input type="text" id="search-box" class="form-control" placeholder="Search Tags..." autocomplete="off" />
             </div>
             <ul id="suggestion-list" class="list-group mt-2"></ul>
           </div>
         </div>
       </div>
     `;
+
     document.getElementById('app-body').innerHTML = htmlBody;
+
     const searchBox = document.getElementById('search-box');
     const suggestionList = document.getElementById('suggestion-list');
 
     // Function to filter and display suggestions
     function updateSuggestions() {
       const searchTerm = searchBox.value.toLowerCase();
-      if(searchTerm ===''){
-        suggestionList.innerHTML=``;
-        return
+      if (searchTerm === '') {
+        suggestionList.innerHTML = ``;
+        return;
       }
       suggestionList.innerHTML = '';
 
@@ -994,8 +1567,8 @@ async function displayMentions() {
         listItem.textContent = mention.DisplayName;
         listItem.onclick = () => {
           // Replace # with the selected value (adjust as needed)
-          replaceMention(mention.EditorValue, mention.ComponentKeyDataType);
-          // Clear suggestions after selection
+          replaceMention(mention, mention.ComponentKeyDataType);
+          suggestionList.innerHTML = ''; // Clear suggestions after selection
         };
         suggestionList.appendChild(listItem);
       });
@@ -1006,9 +1579,390 @@ async function displayMentions() {
   }
 }
 
+async function addGenAITags() {
+  if (!isTagUpdating) {
+    if (isGlossaryActive) {
+      await clearGlossary();
+    }
+
+    let selectedClient = clientList.filter((item) => item.ID === clientId);
+
+    let sponsorOptions = clientList.map(client => {
+      const isSelectedClient = selectedClient.some(selected => selected.ID === client.ID);
+      return ` 
+        <li class="dropdown-item p-2" style="cursor: pointer;">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="${client.ID}" id="sponsor${client.ID}" ${isSelectedClient ? 'checked disabled' : ''}>
+            <label class="form-check-label" for="sponsor${client.ID}">${client.Name}</label>
+          </div>
+        </li>
+      `;
+    }).join('');
+
+    const htmlBody = `
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body p-3">
+            <form id="genai-form" autocomplete="off" novalidate>
+              <!-- Name Field -->
+              <div class="mb-3">
+                <label for="name" class="form-label"><span class="text-danger">*</span> Name</label>
+                <input type="text" class="form-control" id="name" required>
+                <div class="invalid-feedback">Name is required.</div>
+              </div>
+
+              <!-- Description Field -->
+              <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <textarea class="form-control" id="description" rows="6"></textarea>
+              </div>
+
+              <!-- Prompt Field -->
+              <div class="mb-3">
+                <label for="prompt" class="form-label"><span class="text-danger">*</span> Prompt 
+                  <small class="text-secondary">(Note: Use # tag for content suggestions)</small>
+                </label>
+                <textarea class="form-control" id="prompt" rows="6"  required></textarea>
+                <div class="invalid-feedback">Prompt is required.</div>
+                <div id="mention-dropdown" class="dropdown-menu"></div>
+              </div>
+
+              <!-- Save Globally Checkbox -->
+              <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="saveGlobally">
+                <label class="form-check-label" for="saveGlobally">Save Globally</label>
+              </div>
+
+              <!-- Available to All Sponsors Checkbox -->
+              <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="isAvailableForAll" disabled>
+                <label class="form-check-label" for="isAvailableForAll">Available to All Sponsors</label>
+              </div>
+
+              <!-- Sponsor Dropdown -->
+              <div class="mb-3">
+                <label for="sponsor" class="form-label"><span class="text-danger">*</span> Sponsor</label>
+                <div class="dropdown w-100">
+                  <button 
+                    class="btn btn-white border w-100 text-start d-flex justify-content-between align-items-center dropdown-toggle" 
+                    type="button" 
+                    id="sponsorDropdown" 
+                    data-bs-toggle="dropdown" 
+                    aria-expanded="false" 
+                    disabled>
+                    <span id="sponsorDropdownLabel">Select Sponsors</span>
+                    <span class="dropdown-toggle-icon"></span>
+                  </button>
+                  <ul class="dropdown-menu w-100 p-2" aria-labelledby="sponsorDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    <li class="dropdown-item p-2" style="cursor: pointer;">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll">
+                        <label class="form-check-label" for="selectAll">Select All</label>
+                      </div>
+                    </li>
+                    ${sponsorOptions}
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="text-end mt-3">
+                <button id="cancel-btn-gen-ai" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i><strong>Cancel</strong></button>
+                <button type="submit" class="btn btn-success bg-success-clr" id="text-gen-save"><i class="fa fa-check-circle me-2"></i><strong>Save</strong></button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>`;
+
+    // Add modal HTML to the DOM
+    document.getElementById('app-body').innerHTML = htmlBody;
+
+    const promptField = document.getElementById('prompt');
+    const mentionDropdown = document.getElementById('mention-dropdown');
+
+    // Function to filter the mentions based on input
+    const filterMentions = (query) => {
+      const filtered = availableKeys.filter(item =>
+        item.DisplayName.toLowerCase().includes(query.toLowerCase())
+      );
+      return filtered;
+    };
+
+    // Function to handle selection of mention item
+    const selectMention = (editorValue) => {
+      const textarea = document.getElementById('prompt');
+      const currentValue = textarea.value;
+      const cursorPosition = textarea.selectionStart;
+
+      const textBefore = currentValue.slice(0, cursorPosition);
+      const textAfter = currentValue.slice(cursorPosition);
+
+      const lastHashPosition = textBefore.lastIndexOf('#');
+      const updatedTextBefore = textBefore.slice(0, lastHashPosition); // Removing '#' symbol
+
+      textarea.value = `${updatedTextBefore}${editorValue}${textAfter}`;
+      const newCursorPosition = updatedTextBefore.length + editorValue.length;
+      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+    };
+
+    // Handle input events on prompt field for mentions
+    promptField.addEventListener('input', (e) => {
+      const cursorPosition = promptField.selectionStart;
+      const textBeforeCursor = promptField.value.slice(0, cursorPosition);
+      const lastHashtag = textBeforeCursor.lastIndexOf('#');
+
+      if (lastHashtag !== -1) {
+        const query = textBeforeCursor.slice(lastHashtag + 1).trim();
+        if (query.length > 0) {
+          const mentions = filterMentions(query);
+
+          if (mentions.length > 0) {
+            mentionDropdown.innerHTML = mentions.map(item =>
+              `<li class="dropdown-item" data-editor-value="${item.EditorValue}">${item.DisplayName}</li>`
+            ).join('');
+
+            // Get the position of the textarea and place the dropdown above it
+            const textareaRect = promptField.getBoundingClientRect();
+            mentionDropdown.style.left = `${textareaRect.left}px`;
+            mentionDropdown.style.top = `${textareaRect.top - mentionDropdown.offsetHeight - 5}px`; // Position above the textarea
+            mentionDropdown.style.display = 'block';
+          } else {
+            mentionDropdown.style.display = 'none';
+          }
+        } else {
+          mentionDropdown.style.display = 'none';
+        }
+      } else {
+        mentionDropdown.style.display = 'none';
+      }
+    });
+
+    // Handle selecting an item from the dropdown
+    mentionDropdown.addEventListener('click', (e) => {
+      if (e.target && e.target.matches('li')) {
+        const editorValue = e.target.getAttribute('data-editor-value');
+        selectMention(editorValue);
+        mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
+      }
+    });
+
+    // Hide the dropdown if clicked outside
+    document.addEventListener('click', (e) => {
+      if (!mentionDropdown.contains(e.target) && e.target !== promptField) {
+        mentionDropdown.style.display = 'none';
+      }
+    });
+
+    const form = document.getElementById('genai-form');
+
+    const nameField = document.getElementById('name');
+    const descriptionField = document.getElementById('description');
+    const saveGloballyCheckbox = document.getElementById('saveGlobally');
+    const availableForAllCheckbox = document.getElementById('isAvailableForAll');
+    const sponsorDropdownButton = document.getElementById('sponsorDropdown');
+    const sponsorDropdownItems = document.querySelectorAll('.dropdown-item .form-check-input');
+
+    document.getElementById('cancel-btn-gen-ai').addEventListener('click', displayAiTagList);
+
+    // Check if elements exist
+    if (form && nameField && promptField && sponsorDropdownItems.length > 0) {
+      const updateDropdownLabel = () => {
+        if (availableForAllCheckbox.checked) {
+          sponsorDropdownButton.textContent = clientList.map(client => client.Name).join(", ");
+        } else {
+          const selectedOptions = Array.from(sponsorDropdownItems)
+            .filter(cb => cb.checked && cb.id !== 'selectAll')
+            .map(cb => cb.parentElement.textContent.trim());
+          sponsorDropdownButton.textContent = selectedOptions.length ? selectedOptions.join(", ") : "Select Sponsors";
+        }
+      };
+      // Form validation logic on submit
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        // Reset previous validation errors
+        form.querySelectorAll('.is-invalid').forEach(input => input.classList.remove('is-invalid'));
+
+        let valid = true;
+
+        if (!nameField.value.trim()) {
+          nameField.classList.add('is-invalid');
+          valid = false;
+        }
+
+        if (!promptField.value.trim()) {
+          promptField.classList.add('is-invalid');
+          valid = false;
+        }
+
+        if (valid) {
+          // Prepare object to pass to createTextGenTag
+          const selectedSponsors = Array.from(sponsorDropdownItems)
+            .filter(cb => cb.checked && cb.id !== 'selectAll')
+            .map(cb => {
+              const client = clientList.find(client => client.ID == cb.value);
+              return client; // Collect the entire client object
+            });
+
+          const isAvailableForAll = availableForAllCheckbox.checked;
+          const isSaveGlobally = saveGloballyCheckbox.checked;
+
+          const formData = {
+            DisplayName: nameField.value.trim(),
+            Prompt: promptField.value.trim(),
+            Description: descriptionField.value.trim(),
+            GroupKeyClient: selectedSponsors, // Array of selected sponsor objects
+            AllClient: isAvailableForAll ? 1 : 0,
+            SaveGlobally: isSaveGlobally,
+            UserDefined: '1',
+            ComponentKeyDataTypeID: '1',
+            ComponentKeyDataAccessID: '3',
+            AIFlag: 1,
+            DocumentTypeID: dataList.DocumentTypeID,
+            ReportHeadID: dataList.ID,
+            SourceTypeID: aiTagList[0].SourceTypeID,
+            ReportHeadGroupID: aiTagList[0].ReportHeadGroupID,
+            ReportHeadSourceID: aiTagList[0].ReportHeadSourceID
+          };
+
+          createTextGenTag(formData);
+        }
+      });
 
 
-export async function replaceMention(word: string, type: any) {
+      const checkAndDisableSponsors = () => {
+        sponsorDropdownItems.forEach(checkbox => {
+          if (!checkbox.disabled) {
+            checkbox.checked = true;
+            checkbox.disabled = true;
+          }
+        });
+        updateDropdownLabel();
+      };
+
+      // Function to enable sponsors without unchecking them
+      const enableSponsors = () => {
+        sponsorDropdownItems.forEach(checkbox => {
+          const isSelectedClient = selectedClient.some(selected => selected.ID === parseInt(checkbox.value));
+          if (!isSelectedClient) {
+            checkbox.disabled = false;
+          }
+        });
+        updateDropdownLabel();
+      };
+
+      // Event listener for "Save Globally" checkbox
+
+
+      // Event listener for "Available to All Sponsors" checkbox
+
+      saveGloballyCheckbox.addEventListener('change', function () {
+        if (this.checked) {
+          availableForAllCheckbox.disabled = false;
+          sponsorDropdownButton.disabled = false;
+        } else {
+          enableSponsors();
+          availableForAllCheckbox.checked = false;
+          availableForAllCheckbox.disabled = true;
+          sponsorDropdownButton.disabled = true;
+          sponsorDropdownItems.forEach(checkbox => {
+            if (!checkbox.disabled) {
+              checkbox.checked = false;
+              checkbox.disabled = false;
+            }
+          });
+          updateDropdownLabel();
+        }
+      });
+
+      // Event listener for "Available to All Sponsors" checkbox
+      availableForAllCheckbox.addEventListener('change', function () {
+        if (this.checked) {
+          checkAndDisableSponsors();
+        } else {
+          enableSponsors();
+        }
+      });
+
+      // Add event listener to prevent dropdown close on item selection
+      document.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', function (event) {
+          event.stopPropagation(); // Prevent dropdown from closing
+          const checkbox = this.querySelector('.form-check-input');
+          if (checkbox) {
+            if (!checkbox.disabled) {
+              checkbox.checked = !checkbox.checked;
+            }
+
+            if (checkbox.id === 'selectAll') {
+              const isChecked = checkbox.checked;
+              sponsorDropdownItems.forEach(cb => {
+                if (!cb.disabled) cb.checked = isChecked;
+              });
+            }
+            updateDropdownLabel();
+          }
+        });
+      });
+
+      // Initial label update
+      updateDropdownLabel();
+
+
+      // Clear validation errors when user types
+      [nameField, promptField].forEach(field => {
+        field.addEventListener('input', function () {
+          if (this.classList.contains('is-invalid') && this.value.trim()) {
+            this.classList.remove('is-invalid');
+          }
+        });
+      });
+    } else {
+      console.error('Required elements are missing or not rendered yet.');
+    }
+  }
+}
+
+
+async function createTextGenTag(payload) {
+  try {
+    const iconelement = document.getElementById(`text-gen-save`);
+    const aiTagBtn = document.getElementById('aitag');
+    const mentionBtn = document.getElementById('mention');
+    const formatDropdownBtn = document.getElementById('formatDropdown');
+    const cancelBtnGenAi = document.getElementById('cancel-btn-gen-ai');
+
+    aiTagBtn.disabled = true;
+    cancelBtnGenAi.disabled = true;
+    mentionBtn.disabled = true;
+    formatDropdownBtn.disabled = true;
+    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i><strong>Save</strong>`;
+
+    const response = await fetch(`${baseUrl}/api/report/group-key/add`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok.');
+    }
+
+    const data = await response.json();
+    if (data['Data']) {
+      fetchDocument('AIpanel');
+    }
+
+  } catch (error) {
+    console.error('Error creating text generation tag:', error);
+  }
+}
+
+export async function replaceMention(word: any, type: any) {
   return Word.run(async (context) => {
     try {
       const selection = context.document.getSelection();
@@ -1020,10 +1974,11 @@ export async function replaceMention(word: string, type: any) {
 
       if (type === 'TABLE') {
         const parser = new DOMParser();
-        const doc = parser.parseFromString(word, 'text/html');
+        const doc = parser.parseFromString(word.EditorValue, 'text/html');
         const tableElement = doc.querySelector('table');
 
         if (!tableElement) {
+          selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
           throw new Error('No table found in the provided HTML.');
         }
 
@@ -1118,7 +2073,16 @@ export async function replaceMention(word: string, type: any) {
           });
         });
       } else {
-        selection.insertParagraph(word, Word.InsertLocation.before);
+        if (word.EditorValue === '' || word.IsApplied) {
+          selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
+        } else {
+          let content = removeQuotes(word.EditorValue);
+          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+
+          lines.forEach(line => {
+            selection.insertParagraph(line, Word.InsertLocation.before);
+          });
+        }
       }
 
       await context.sync();
@@ -1139,99 +2103,6 @@ function removeQuotes(value: string): string {
     : '';
 }
 
-
-// async function fetchGeneralImages() {
-//   if (imageList.length === 0) {
-//     try {
-//       const response = await fetch('https://plsdevapp.azurewebsites.net/api/image/general', {
-//         method: 'GET',
-//         headers: {
-//           'Content-Type': 'application/json',
-//           'Authorization': `Bearer ${jwt}`
-//         },
-//       });
-
-//       if (!response.ok) {
-//         throw new Error('Network response was not ok.');
-//       }
-
-//       const data = await response.json();
-//       imageList = data['Data'].Image;
-//       imageDisplay();
-//     } catch (error) {
-//       console.error('Error during login:', error);
-//       // Handle login error (e.g., show an error message)
-//     }
-//   } else {
-//     imageDisplay()
-//   }
-
-
-// // }
-
-// function imageDisplay() {
-//   document.getElementById('app-body').innerHTML = `
-//       <div class="container mt-3">
-//       <div class="card">
-//         <div class="card-header">
-//           <h5 class="card-title">Search Images</h5>
-//         </div>
-//         <div class="card-body">
-//           <div class="form-group">
-//             <input type="text" id="search-box" class="form-control" placeholder="Search Images..." autocomplete="off" />
-//           </div>
-//           <ul id="image-list" class="list-group mt-2"></ul>
-//         </div>
-//       </div>
-//     </div>
-//   `
-
-//   const searchBox = document.getElementById('search-box');
-//   const imageBox = document.getElementById('image-list');
-
-//   // Function to filter and display suggestions
-//   function updateSuggestions() {
-//     const searchTerm = searchBox.value.toLowerCase();
-//     imageBox.innerHTML = '';
-//     // Filter mention list based on search term
-//     const filteredImages = imageList.filter(image =>
-//       image.ImageName.toLowerCase().includes(searchTerm)
-//     );
-
-//     // Render filtered suggestions
-//     filteredImages.forEach(images => {
-//       const listItem = document.createElement('li');
-//       listItem.className = 'list-group-item list-group-item-action';
-//       listItem.textContent = images.ImageName;
-//       listItem.onclick = () => {
-//         insertImageIntoWord(images.ImageData)
-//         // Replace # with the selected value (adjust as needed)
-//         // searchBox.value = '';
-//         // suggestionList.innerHTML = '';
-//         // replaceMention(images.EditorValue, images.ComponentKeyDataType)
-//         // Clear suggestions after selection
-//       };
-//       imageBox.appendChild(listItem);
-//     });
-//   }
-
-//   // Add input event listener to the search box
-//   searchBox.addEventListener('input', updateSuggestions);
-// }
-
-
-
-
-
-// async function insertImageIntoWord(base64Image) {
-//   await Word.run(async (context) => {
-//     try {
-//       const selection = context.document.getSelection();
-//       await context.sync();
-//       selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.before);
-//       await context.sync();
-//     } catch (err) {
-//       console.log(err)
-//     }
-//   });
-// }
+function newlineadd(value: string): string {
+  return value
+}
