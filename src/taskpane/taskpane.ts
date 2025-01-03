@@ -1678,33 +1678,20 @@ async function addGenAITags() {
     // Add modal HTML to the DOM
     document.getElementById('app-body').innerHTML = htmlBody;
 
-    const promptField = document.getElementById('prompt');
-    const mentionDropdown = document.getElementById('mention-dropdown');
 
-    // Function to filter the mentions based on input
+    //prompt starting
+
     const filterMentions = (query) => {
+      // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
       const filtered = availableKeys.filter(item =>
         item.DisplayName.toLowerCase().includes(query.toLowerCase())
       );
       return filtered;
     };
+    let highlightedIndex = -1;
 
-    // Function to handle selection of mention item
-    const selectMention = (editorValue) => {
-      const textarea = document.getElementById('prompt');
-      const currentValue = textarea.value;
-      const cursorPosition = textarea.selectionStart;
-
-      const textBefore = currentValue.slice(0, cursorPosition);
-      const textAfter = currentValue.slice(cursorPosition);
-
-      const lastHashPosition = textBefore.lastIndexOf('#');
-      const updatedTextBefore = textBefore.slice(0, lastHashPosition); // Removing '#' symbol
-
-      textarea.value = `${updatedTextBefore}${editorValue}${textAfter}`;
-      const newCursorPosition = updatedTextBefore.length + editorValue.length;
-      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
-    };
+    const promptField = document.getElementById('prompt');
+    const mentionDropdown = document.getElementById('mention-dropdown');
 
     // Handle input events on prompt field for mentions
     promptField.addEventListener('input', (e) => {
@@ -1736,9 +1723,72 @@ async function addGenAITags() {
       } else {
         mentionDropdown.style.display = 'none';
       }
+
     });
 
-    // Handle selecting an item from the dropdown
+    // Handle keyboard navigation in the dropdown
+    promptField.addEventListener('keydown', (e) => {
+      const items = document.querySelectorAll('#mention-dropdown .dropdown-item');
+      const totalItems = items.length;
+
+      if (e.key === 'ArrowDown') {
+        // Prevent default behavior to stop cursor from moving
+        e.preventDefault();
+
+        // Move the highlight down and wrap around to the top if at the end
+        if (highlightedIndex < totalItems - 1) {
+          highlightedIndex++;
+        } else {
+          highlightedIndex = 0; // Wrap to the first item
+        }
+        updateHighlightedItem();
+      } else if (e.key === 'ArrowUp') {
+        // Prevent default behavior to stop cursor from moving
+        e.preventDefault();
+
+        // Move the highlight up and wrap around to the bottom if at the top
+        if (highlightedIndex > 0) {
+          highlightedIndex--;
+        } else {
+          highlightedIndex = totalItems - 1; // Wrap to the last item
+        }
+        updateHighlightedItem();
+      } else if (e.key === 'Enter' && highlightedIndex !== -1) {
+        // Select the highlighted item
+        const selectedItem = items[highlightedIndex];
+        if (selectedItem) {
+          selectMention(selectedItem.getAttribute('data-editor-value'));
+          mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
+          e.preventDefault();  // Prevent form submission on Enter key
+        }
+      }
+    });
+
+    // Function to highlight the selected item
+    function updateHighlightedItem() {
+      const items = document.querySelectorAll('#mention-dropdown .dropdown-item');
+      const dropdown = document.getElementById('mention-dropdown');
+      const totalItems = items.length;
+
+      // Remove the 'active' class from all items
+      items.forEach(item => item.classList.remove('active'));
+
+      // Add the 'active' class to the currently highlighted item
+      if (highlightedIndex >= 0 && highlightedIndex < totalItems) {
+        const highlightedItem = items[highlightedIndex];
+        highlightedItem.classList.add('active');
+
+        // Ensure the highlighted item is visible within the dropdown
+        highlightedItem.scrollIntoView({
+          behavior: 'smooth',    // Smooth scroll
+          block: 'nearest'      // Scroll only if necessary
+        });
+      }
+    }
+
+
+
+    // Handle selecting an item from the dropdown via mouse click
     mentionDropdown.addEventListener('click', (e) => {
       if (e.target && e.target.matches('li')) {
         const editorValue = e.target.getAttribute('data-editor-value');
@@ -1747,12 +1797,31 @@ async function addGenAITags() {
       }
     });
 
+    // Function to insert the selected mention into the prompt field
+    const selectMention = (editorValue) => {
+      const textarea = document.getElementById('prompt');
+      const currentValue = textarea.value;
+      const cursorPosition = textarea.selectionStart;
+
+      const textBefore = currentValue.slice(0, cursorPosition);
+      const textAfter = currentValue.slice(cursorPosition);
+
+      const lastHashPosition = textBefore.lastIndexOf('#');
+      const updatedTextBefore = textBefore.slice(0, lastHashPosition); // Removing '#' symbol
+
+      textarea.value = `${updatedTextBefore}${editorValue}${textAfter}`;
+      const newCursorPosition = updatedTextBefore.length + editorValue.length;
+      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+    };
+
     // Hide the dropdown if clicked outside
     document.addEventListener('click', (e) => {
       if (!mentionDropdown.contains(e.target) && e.target !== promptField) {
         mentionDropdown.style.display = 'none';
       }
     });
+
+    //prompt end
 
     const form = document.getElementById('genai-form');
 
