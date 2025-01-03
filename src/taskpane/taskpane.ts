@@ -210,23 +210,12 @@ async function fetchDocument(action) {
       throw new Error('Network response was not ok.');
     }
 
-    //     <div class="dropdown">
-    //     <button class="btn btn-dark dropdown-toggle" type="button" id="mention" data-bs-toggle="dropdown" aria-expanded="false">
-    //         Insert
-    //     </button>
-    //     <ul class="dropdown-menu" aria-labelledby="formatDropdown" style="z-index: 100000;">
-    //         <li><button class="dropdown-item" id="mentiontags">Search Tags</button></li>
-    //         <li><button class="dropdown-item" id="addgenaitag" d>Add Text GenAI Tag</button></li>
-    //     </ul>
-    // </div>
-
     const data = await response.json();
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = `
         <img  id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo"> <i class="fa fa-sign-out me-5 c-pointer" aria-hidden="true" id="logout"><span class="tooltiptext">Logout</span></i>
 `
     document.getElementById('header').innerHTML = `
-
     <div class="d-flex justify-content-around">
         <button class="btn btn-dark" id="mention">Insert</button>
         <button class="btn btn-dark" id="aitag">Refine</button>
@@ -243,25 +232,33 @@ async function fetchDocument(action) {
             </ul>
         </div>
     </div>
-
 `
-    // <button class="btn  btn-dark me-2" id="imagebtn">Image</button>
 
+    document.getElementById('mention').addEventListener('click', () => {
+      setActiveButton('mention');
+      displayMentions();
+    });
 
-    document.getElementById('mention').addEventListener('click', displayMentions);
-    document.getElementById('glossary').addEventListener('click', fetchGlossary);
+    document.getElementById('glossary').addEventListener('click',() =>{
+      setActiveButton('formatDropdown');
+      fetchGlossary()
+    });
 
-    document.getElementById('aitag').addEventListener('click', displayAiTagList);
-    document.getElementById('selectFormat').addEventListener('click', formatOptionsDisplay);
-    document.getElementById('removeFormatting').addEventListener('click', removeOptionsConfirmation);
+    document.getElementById('aitag').addEventListener('click', () => {
+      setActiveButton('aitag');
+      displayAiTagList();
+    });
+    document.getElementById('selectFormat').addEventListener('click', () => {
+      setActiveButton('formatDropdown');
+      formatOptionsDisplay();
+    });
+    document.getElementById('removeFormatting').addEventListener('click', () => {
+      setActiveButton('formatDropdown');
+      removeOptionsConfirmation();
+    });
 
     document.getElementById('logout').addEventListener('click', logout);
 
-    // document.getElementById('imagebtn').addEventListener('click', fetchGeneralImages);
-
-
-
-    // Extracting the relevant AI group from the response
     dataList = data['Data'];
     clientId = dataList.ClientID;
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
@@ -273,11 +270,24 @@ async function fetchDocument(action) {
     if (action === 'AIpanel') {
       displayAiTagList();
     }
-    // Call function to display the AI Tag List on the UI
 
   } catch (error) {
     console.error('Error fetching glossary data:', error);
   }
+}
+
+function setActiveButton(buttonId) {
+  const buttons = ['mention', 'aitag', 'selectFormat', 'removeFormatting','formatDropdown'];
+  buttons.forEach(id => {
+    const button = document.getElementById(id);
+    if (button) {
+      if (id === buttonId) {
+        button.classList.add('active');
+      } else {
+        button.classList.remove('active');
+      }
+    }
+  });
 }
 
 async function fetchClients() {
@@ -347,12 +357,12 @@ async function formatOptionsDisplay() {
       clearCapturedFormatting();
     }
     else {
-      if (capturedFormatting.Bold === null ||
-        capturedFormatting.Underline === 'Mixed' ||
-        capturedFormatting.Size === null ||
-        capturedFormatting["Font Name"] === null ||
-        capturedFormatting["Background Color"] === '' ||
-        capturedFormatting["Text Color"] === '') {
+      if (capturedFormatting.Bold === null || capturedFormatting.Bold === undefined ||
+        capturedFormatting.Underline === 'Mixed' || capturedFormatting.Underline === undefined ||
+        capturedFormatting.Size === null || capturedFormatting.Size === undefined ||
+        capturedFormatting["Font Name"] === null || capturedFormatting["Font Name"] === undefined ||
+        capturedFormatting["Background Color"] === '' || capturedFormatting["Background Color"] === undefined ||
+        capturedFormatting["Text Color"] === '' || capturedFormatting["Text Color"] === undefined) {
         const formatList = document.getElementById("format-list");
         formatList.innerHTML = "<p>Multiple style values found. Try again</p>";
         const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
@@ -496,8 +506,8 @@ async function removeOptionsConfirmation() {
             </div>
                <!-- Buttons for Capture and Empty Format -->
             <div class="d-flex justify-content-end mt-2">
-              <button id="change-ft-btn" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i><strong>Cancel</strong></button>
-              <button id="clear-ft-btn" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i><strong>Yes</strong></button>
+              <button id="change-ft-btn" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
+              <button id="clear-ft-btn" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Yes</button>
 
             </div>
 
@@ -529,7 +539,7 @@ async function removeFormattedText() {
     await Word.run(async (context) => {
 
       const iconelement = document.getElementById(`clear-ft-btn`);
-      iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i><strong>Yes</strong>`;
+      iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Yes`;
       const clrBtn = document.getElementById('clear-ft-btn') as HTMLButtonElement;
       clrBtn.disabled = true;
 
@@ -905,13 +915,13 @@ async function displayAiTagList() {
   const container = document.getElementById('app-body');
   container.innerHTML = `
   <div class="d-flex justify-content-between">
-      <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white ms-2 mb-2" id="addgenaitag">
-        <i class="fa fa-plus text-light"></i>
+      <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white ms-2 mb-3 mt-2" id="addgenaitag">
+        <i class="fa fa-plus text-light px-1"></i>
         Add
     </button>
 
-     <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white me-2 mb-2" id="applyAITag">
-        <i class="fa fa-robot text-light"></i>
+     <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white me-2 mb-3 mt-2" id="applyAITag">
+        <i class="fa fa-robot text-light px-1"></i>
         Apply
     </button>
     </div>
@@ -1667,8 +1677,8 @@ async function addGenAITags() {
 
               <!-- Action Buttons -->
               <div class="text-end mt-3">
-                <button id="cancel-btn-gen-ai" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i><strong>Cancel</strong></button>
-                <button type="submit" class="btn btn-success bg-success-clr" id="text-gen-save"><i class="fa fa-check-circle me-2"></i><strong>Save</strong></button>
+                <button id="cancel-btn-gen-ai" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
+                <button type="submit" class="btn btn-success bg-success-clr" id="text-gen-save"><i class="fa fa-check-circle me-2"></i>Save</button>
               </div>
             </form>
           </div>
@@ -2007,7 +2017,7 @@ async function createTextGenTag(payload) {
     cancelBtnGenAi.disabled = true;
     mentionBtn.disabled = true;
     formatDropdownBtn.disabled = true;
-    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i><strong>Save</strong>`;
+    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Save`;
 
     const response = await fetch(`${baseUrl}/api/report/group-key/add`, {
       method: 'POST',

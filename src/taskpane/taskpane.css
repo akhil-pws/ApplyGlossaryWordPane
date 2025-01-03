@@ -1,29 +1,24 @@
-html {
+* {
+  font-size: 12px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.5px
+}
+
+.btn {
   font-size: 12px;
 }
 
-.h-close-text {
-  position: absolute;
-  top: 210px;
-  left: -30px;
+.btn-check:focus+.btn,
+.btn:focus {
+  box-shadow: none !important;
 }
 
-.h-close-text .icons {
-  position: absolute;
-  top: 52px;
-  color: #fff;
-  left: 4px;
-  z-index: 9999;
-  font-size: 20px;
-}
-
-.h-close-text i {
-  position: absolute;
-  top: 55px;
-  left: 7px;
-  font-size: 20px;
-  z-index: 1003;
-  color: #fff;
+.btn-check:active+.btn-dark,
+.btn-check:checked+.btn-dark,
+.btn-dark.active,
+.btn-dark:active,
+.show>.btn-dark.dropdown-toggle {
+  border-bottom: 2px solid #4098fe !important;
 }
 
 .hr {
@@ -137,7 +132,7 @@ ul {
   justify-content: center;
 }
 
-.box-loader .loader{
+.box-loader .loader {
   position: absolute;
   top: 165px;
   z-index: 1000;
@@ -157,7 +152,7 @@ ul {
 
 .box h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 12px;
   color: #0078d4;
   /* Change color to fit your theme */
 }
@@ -173,7 +168,7 @@ ul {
 
 .sub-box p {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: #333;
 }
 
@@ -236,14 +231,17 @@ ul {
 .fa-sign-out .tooltiptext {
   visibility: hidden;
   width: 80px;
-  background-color:#212529!important;
+  background-color: #212529 !important;
   color: #fff;
   text-align: center;
   border-radius: 6px;
   padding: 5px 0;
-  font-size: 12px; /* Reduced font size */
-  font-family: Arial, sans-serif; /* Font family added */
-  font-weight: 400; /* Reduced font weight */
+  font-size: 12px;
+  /* Reduced font size */
+  font-family: Arial, sans-serif;
+  /* Font family added */
+  font-weight: 400;
+  /* Reduced font weight */
 
   /* Position the tooltip */
   position: absolute;
@@ -256,7 +254,7 @@ ul {
   visibility: visible;
 }
 
-.fs-12{
+.fs-12 {
   font-size: 12px;
 }
 
@@ -305,25 +303,29 @@ ul {
   border-color: #58e0c5;
 }
 
-.empty-format-checkbox-label{
+.empty-format-checkbox-label {
   max-width: 21rem;
   margin-left: 1rem;
 }
 
 
 #sponsorDropdown {
-  white-space: nowrap; /* Prevents the text from wrapping */
-  overflow: hidden;    /* Ensures that text overflowing the container is hidden */
-  text-overflow: ellipsis; /* Adds the ellipsis when the text overflows */
+  white-space: nowrap;
+  /* Prevents the text from wrapping */
+  overflow: hidden;
+  /* Ensures that text overflowing the container is hidden */
+  text-overflow: ellipsis;
+  /* Adds the ellipsis when the text overflows */
 }
 
 #header-nav {
   position: sticky;
   top: 0;
-  z-index: 1000; /* Ensure it stays on top of other content */
+  z-index: 1000;
+  /* Ensure it stays on top of other content */
 }
 
-.card-container{
+.card-container {
   z-index: 0;
   position: relative;
 }
@@ -338,6 +340,12 @@ ul {
   width: 100%;
   max-height: 200px;
   overflow-y: auto;
-  margin-top: 5px; /* Optional spacing */
+  margin-top: 5px;
+  /* Optional spacing */
   max-width: 250px;
+}
+
+.list-group {
+  overflow: auto;
+  max-height: 300px;
 }
