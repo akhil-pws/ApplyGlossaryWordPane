@@ -1712,7 +1712,7 @@ async function addGenAITags() {
             // Get the position of the textarea and place the dropdown above it
             const textareaRect = promptField.getBoundingClientRect();
             mentionDropdown.style.left = `${textareaRect.left}px`;
-            mentionDropdown.style.top = `${textareaRect.top - mentionDropdown.offsetHeight - 5}px`; // Position above the textarea
+            mentionDropdown.style.bottom = `75px`; // Position above the textarea
             mentionDropdown.style.display = 'block';
           } else {
             mentionDropdown.style.display = 'none';

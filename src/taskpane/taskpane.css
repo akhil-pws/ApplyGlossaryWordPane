@@ -329,7 +329,7 @@ ul {
 }
 
 #mention-dropdown {
-  position: absolute;
+  position: relative;
   display: none;
   z-index: 1000;
   background-color: white;
