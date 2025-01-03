@@ -1705,9 +1705,10 @@ async function addGenAITags() {
           const mentions = filterMentions(query);
 
           if (mentions.length > 0) {
-            mentionDropdown.innerHTML = mentions.map(item =>
-              `<li class="dropdown-item" data-editor-value="${item.EditorValue}">${item.DisplayName}</li>`
-            ).join('');
+            mentionDropdown.innerHTML = mentions.map(item => {
+              const editorValue = item.EditorValue || `#${item.DisplayName}`;
+              return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.DisplayName}</li>`;
+            }).join('');
 
             // Get the position of the textarea and place the dropdown above it
             const textareaRect = promptField.getBoundingClientRect();
