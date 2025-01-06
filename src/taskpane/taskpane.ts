@@ -642,7 +642,7 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
   if (tag.FilteredReportHeadAIHistoryList.length > 0) {
     // Generate the HTML
     const html = tag.FilteredReportHeadAIHistoryList.map((chat: any, j: number) =>
-      `<div class="row chatbox">
+      `<div class="row chatbox p-0 m-0">
         <div class="col-md-12 mt-2 p-2">
           <span class="ms-3">
             <i class="fa fa-copy text-secondary c-pointer" title="Copy Response" id="copyPrompt-${index}-${j}"></i>
