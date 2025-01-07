@@ -722,7 +722,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                    id="doNotApply-${i}"
                    ${tag.IsApplied ? 'checked' : ''}>
           </div>
-          <div class="d-flex align-items-center justify-content-end chatbox p-2">
+          <div class="d-flex align-items-end justify-content-end chatbox p-2">
             <textarea class="form-control"
                       rows="3"
                       id="chatbox-${i}"
