@@ -642,7 +642,7 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
   if (tag.FilteredReportHeadAIHistoryList.length > 0) {
     // Generate the HTML
     const html = tag.FilteredReportHeadAIHistoryList.map((chat: any, j: number) =>
-      `<div class="row chatbox p-0 m-0">
+      `<div class="row chatbox m-0 p-0">
         <div class="col-md-12 mt-2 p-2">
           <span class="ms-3">
             <i class="fa fa-copy text-secondary c-pointer" title="Copy Response" id="copyPrompt-${index}-${j}"></i>
@@ -691,61 +691,52 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
 
 
 
-function accordianContent(headerId, collapseId, tag, radioButtonsHTML, i) {
+function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const textColorClass = tag.IsApplied ? 'text-secondary' : '';
-
   const body = `
-    <h2 class="accordion-header" id="${headerId}">
-      <button 
-        class="accordion-button collapsed" 
-        type="button" 
-        data-bs-toggle="collapse" 
-        data-bs-target="#${collapseId}" 
-        aria-expanded="false" 
-        aria-controls="${collapseId}">
-        <span class="${textColorClass}" id="tagname-${i}">${tag.DisplayName}</span>
-      </button>
-    </h2>
-    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
-      <div class="accordion-body chatbox" id="selected-response-parent-${i}">
-        ${radioButtonsHTML}
-      </div>
-
-      <div class="form-check form-switch mb-0 chatbox">
-              <div class="col-md-12 px-3">
-
-        <label class="form-check-label pb-3" for="doNotApply-${i}"><span class="fs-12">Do not apply<span></label>
-        <input 
-          class="form-check-input" 
-          type="checkbox" 
-          id="doNotApply-${i}" 
-          ${tag.IsApplied ? 'checked' : ''}  
-        >
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="${headerId}">
+        <button class="accordion-button collapsed ${textColorClass}"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#${collapseId}"
+                aria-expanded="false"
+                aria-controls="${collapseId}">
+          <span id="tagname-${i}">${tag.DisplayName}</span>
+        </button>
+      </h2>
+      <div id="${collapseId}"
+           class="accordion-collapse collapse"
+           aria-labelledby="${headerId}"
+           data-bs-parent="#accordionExample">
+        <div class="accordion-body p-0">
+          <div class="chatbox" id="selected-response-parent-${i}">
+            ${radioButtonsHTML}
+          </div>
+          <div class="form-check form-switch chatbox m-0">
+            <label class="form-check-label pb-3" for="doNotApply-${i}">
+              <span class="fs-12">Do not apply</span>
+            </label>
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="doNotApply-${i}"
+                   ${tag.IsApplied ? 'checked' : ''}>
+          </div>
+          <div class="d-flex align-items-center justify-content-end chatbox p-2">
+            <textarea class="form-control"
+                      rows="3"
+                      id="chatbox-${i}"
+                      placeholder="Type here"></textarea>
+            <button type="submit"
+                    class="btn btn-primary bg-primary-clr ms-2 text-white"
+                    id="sendPrompt-${i}">
+              <i class="fa fa-paper-plane text-white"></i>
+            </button>
+          </div>
         </div>
       </div>
-  
-      <div class="col-md-12 d-flex align-items-center justify-content-end chatbox p-3">
-        <textarea 
-          class="form-control" 
-          rows="3" 
-          id="chatbox-${i}" 
-          placeholder="Type here">
-        </textarea>
-        <div class="d-flex align-self-end">
-          <button 
-            type="submit" 
-            class="btn btn-primary bg-primary-clr ms-2 text-white" 
-            id="sendPrompt-${i}">
-            <i class="fa fa-paper-plane text-white"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
+    </div>`;
   return body;
-
-
 }
 
 async function onDoNotApplyChange(event, index, tag: any) {
@@ -914,13 +905,13 @@ async function displayAiTagList() {
   }
   const container = document.getElementById('app-body');
   container.innerHTML = `
-  <div class="d-flex justify-content-between">
-      <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white ms-2 mb-3 mt-2" id="addgenaitag">
+  <div class="d-flex justify-content-between px-2">
+      <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white  mb-3 mt-2 px-3 py-2" id="addgenaitag">
         <i class="fa fa-plus text-light px-1"></i>
         Add
     </button>
 
-     <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white me-2 mb-3 mt-2" id="applyAITag">
+     <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white mb-3 mt-2 px-3 py-2" id="applyAITag">
         <i class="fa fa-robot text-light px-1"></i>
         Apply
     </button>
@@ -937,7 +928,7 @@ async function displayAiTagList() {
   for (let i = 0; i < aiTagList.length; i++) {
     const tag = aiTagList[i];
     const accordionItem = document.createElement('div');
-    accordionItem.classList.add('accordion-item');
+    accordionItem.classList.add('accordion');
     accordionItem.id = `accordion-item-${i}`; // Replace 'yourUniqueId' with your desired ID
 
     const headerId = `flush-headingOne-${i}`;
@@ -945,7 +936,7 @@ async function displayAiTagList() {
 
     const radioButtonsHTML = await generateRadioButtons(tag, i);
 
-    accordionItem.innerHTML = accordianContent(headerId, collapseId, tag, radioButtonsHTML, i);
+    accordionItem.innerHTML = accordionContent(headerId, collapseId, tag, radioButtonsHTML, i);
 
     Cardcontainer.appendChild(accordionItem);
 

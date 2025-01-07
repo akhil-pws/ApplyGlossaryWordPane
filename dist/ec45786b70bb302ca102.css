@@ -1,7 +1,7 @@
 * {
   font-size: 12px;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  letter-spacing: 0.5px
+  letter-spacing: 0.5px;
 }
 
 .btn {
@@ -100,7 +100,6 @@ ul {
   display: flex;
   justify-content: center;
   padding: 2rem;
-  ;
   gap: 10px;
   margin-bottom: 2rem;
 }
@@ -108,9 +107,7 @@ ul {
 #app-body {
   display: flex;
   flex-direction: column;
-  /* Stack buttons and content vertically */
   width: 100%;
-  /* Ensure full width for the container */
 }
 
 .c-pointer {
@@ -120,11 +117,9 @@ ul {
 #button-container {
   display: flex;
   justify-content: center;
-  /* Center the buttons horizontally */
   gap: 10px;
-  /* Add space between the buttons */
   margin-top: 2rem;
-  margin-bottom: 2rem; //* Add space between buttons and the boxes */
+  margin-bottom: 2rem;
 }
 
 #loader {
@@ -145,16 +140,13 @@ ul {
   background-color: #f9f9f9;
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
   margin-bottom: 10px;
-  /* Space between main boxes */
   width: 100%;
-  /* Full width for the main box */
 }
 
 .box h3 {
   margin: 0;
   font-size: 12px;
   color: #0078d4;
-  /* Change color to fit your theme */
 }
 
 .sub-box {
@@ -162,7 +154,6 @@ ul {
   border-radius: 4px;
   padding: 5px;
   margin-top: 5px;
-  /* Space between sub-boxes */
   background-color: #ffffff;
 }
 
@@ -179,16 +170,13 @@ ul {
   width: 100px;
   height: 100px;
   -webkit-animation: spin 2s linear infinite;
-  /* Safari */
   animation: spin 2s linear infinite;
 }
-
 
 @-webkit-keyframes spin {
   0% {
     -webkit-transform: rotate(0deg);
   }
-
   100% {
     -webkit-transform: rotate(360deg);
   }
@@ -198,7 +186,6 @@ ul {
   0% {
     transform: rotate(0deg);
   }
-
   100% {
     transform: rotate(360deg);
   }
@@ -210,13 +197,10 @@ ul {
 }
 
 .logo {
-
-  /* The image used */
   height: 3.3rem;
-  /* width: 7rem; */
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain
+  background-size: contain;
 }
 
 .logo-header {
@@ -225,7 +209,6 @@ ul {
 
 .fa-sign-out {
   position: relative !important;
-
 }
 
 .fa-sign-out .tooltiptext {
@@ -237,18 +220,12 @@ ul {
   border-radius: 6px;
   padding: 5px 0;
   font-size: 12px;
-  /* Reduced font size */
   font-family: Arial, sans-serif;
-  /* Font family added */
   font-weight: 400;
-  /* Reduced font weight */
-
-  /* Position the tooltip */
   position: absolute;
   z-index: 1;
   right: 25px;
 }
-
 
 .fa-sign-out:hover .tooltiptext {
   visibility: visible;
@@ -308,21 +285,16 @@ ul {
   margin-left: 1rem;
 }
 
-
 #sponsorDropdown {
   white-space: nowrap;
-  /* Prevents the text from wrapping */
   overflow: hidden;
-  /* Ensures that text overflowing the container is hidden */
   text-overflow: ellipsis;
-  /* Adds the ellipsis when the text overflows */
 }
 
 #header-nav {
   position: sticky;
   top: 0;
   z-index: 1000;
-  /* Ensure it stays on top of other content */
 }
 
 .card-container {
@@ -341,11 +313,14 @@ ul {
   max-height: 200px;
   overflow-y: auto;
   margin-top: 5px;
-  /* Optional spacing */
   max-width: 250px;
 }
 
 .list-group {
   overflow: auto;
   max-height: 300px;
+}
+
+.form-switch {
+  padding-left: 3.5rem;
 }
