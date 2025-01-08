@@ -239,7 +239,7 @@ async function fetchDocument(action) {
       displayMentions();
     });
 
-    document.getElementById('glossary').addEventListener('click',() =>{
+    document.getElementById('glossary').addEventListener('click', () => {
       setActiveButton('formatDropdown');
       fetchGlossary()
     });
@@ -277,7 +277,7 @@ async function fetchDocument(action) {
 }
 
 function setActiveButton(buttonId) {
-  const buttons = ['mention', 'aitag', 'selectFormat', 'removeFormatting','formatDropdown'];
+  const buttons = ['mention', 'aitag', 'selectFormat', 'removeFormatting', 'formatDropdown'];
   buttons.forEach(id => {
     const button = document.getElementById(id);
     if (button) {
@@ -1707,7 +1707,9 @@ async function addGenAITags() {
 
           if (mentions.length > 0) {
             mentionDropdown.innerHTML = mentions.map(item => {
-              const editorValue = item.EditorValue || `#${item.DisplayName}`;
+              // const editorValue = item.EditorValue || `#${item.DisplayName}`;
+              const editorValue = `#${item.DisplayName}`;
+
               return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.DisplayName}</li>`;
             }).join('');
 
