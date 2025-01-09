@@ -324,3 +324,12 @@ ul {
 .form-switch {
   padding-left: 3.5rem;
 }
+
+.footer {
+  font-weight: 500;
+  background-color: #dee2e6;
+}
+
+.mh-34{
+  min-height: 33rem;
+}

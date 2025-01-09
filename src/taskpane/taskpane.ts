@@ -3,7 +3,7 @@
  * See LICENSE in the project root for license information.
  */
 
-import { dataUrl, storeUrl } from "./data";
+import { dataUrl, storeUrl, versionLink } from "./data";
 let jwt = '';
 let baseUrl = dataUrl
 let storedUrl = storeUrl
@@ -25,7 +25,8 @@ let isNoFormatTextAvailable: boolean = false;
 let clientId = '0';
 let userId = 0;
 let clientList = [];
-
+let version = versionLink;
+let currentYear = new Date().getFullYear();
 
 /* global document, Office, Word */
 
@@ -42,6 +43,7 @@ window.addEventListener('hashchange', () => {
 Office.onReady((info) => {
   if (info.host === Office.HostType.Word) {
     document.getElementById("app-body").style.display = "flex";
+    document.getElementById("footer").innerText = `© ${currentYear} - TrialAssure LINK Add-In ${version}`
     const editor = document.getElementById('editor');
 
     window.location.hash = '#/login';
@@ -1611,6 +1613,8 @@ async function addGenAITags() {
                 <label for="name" class="form-label"><span class="text-danger">*</span> Name</label>
                 <input type="text" class="form-control" id="name" required>
                 <div class="invalid-feedback">Name is required.</div>
+                <div id="submition-error" class="invalid-feedback" style="display: none;"></div>
+
               </div>
 
               <!-- Description Field -->
@@ -1666,7 +1670,6 @@ async function addGenAITags() {
                   </ul>
                 </div>
               </div>
-          <div id="submition-error" class="mt-3 text-danger" style="display: none;"></div>
 
               <!-- Action Buttons -->
               <div class="text-end mt-3">
@@ -1846,7 +1849,7 @@ async function addGenAITags() {
           if (this.classList.contains('is-invalid') && this.value.trim()) {
             this.classList.remove('is-invalid');
           }
-          if(nameField){
+          if (nameField) {
             const errorDiv = document.getElementById('submition-error');
             errorDiv.style.display = 'none';
           }
@@ -1889,7 +1892,7 @@ async function createTextGenTag(payload) {
     const data = await response.json();
     if (data['Data'] && data['Status']) {
       fetchDocument('AIpanel');
-    }else{
+    } else {
       aiTagBtn.disabled = false;
       cancelBtnGenAi.disabled = false;
       mentionBtn.disabled = false;
