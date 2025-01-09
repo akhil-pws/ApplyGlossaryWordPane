@@ -727,6 +727,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                       rows="3"
                       id="chatbox-${i}"
                       placeholder="Type here"></textarea>
+                <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
             <button type="submit"
                     class="btn btn-primary bg-primary-clr ms-2 text-white"
                     id="sendPrompt-${i}">
@@ -939,7 +940,7 @@ async function displayAiTagList() {
     accordionItem.innerHTML = accordionContent(headerId, collapseId, tag, radioButtonsHTML, i);
 
     Cardcontainer.appendChild(accordionItem);
-
+    mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
     document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
 
     document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
@@ -1665,6 +1666,7 @@ async function addGenAITags() {
                   </ul>
                 </div>
               </div>
+          <div id="submition-error" class="mt-3 text-danger" style="display: none;"></div>
 
               <!-- Action Buttons -->
               <div class="text-end mt-3">
@@ -1678,156 +1680,11 @@ async function addGenAITags() {
 
     // Add modal HTML to the DOM
     document.getElementById('app-body').innerHTML = htmlBody;
-
-
     //prompt starting
-
-    const filterMentions = (query) => {
-      // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
-      const filtered = availableKeys.filter(item =>
-        item.DisplayName.toLowerCase().includes(query.toLowerCase())
-      );
-      return filtered;
-    };
-    let highlightedIndex = -1;
-
-    const promptField = document.getElementById('prompt');
-    const mentionDropdown = document.getElementById('mention-dropdown');
-
-    // Handle input events on prompt field for mentions
-    promptField.addEventListener('input', (e) => {
-      const cursorPosition = promptField.selectionStart;
-      const textBeforeCursor = promptField.value.slice(0, cursorPosition);
-      const lastHashtag = textBeforeCursor.lastIndexOf('#');
-
-      if (lastHashtag !== -1) {
-        const query = textBeforeCursor.slice(lastHashtag + 1).trim();
-        if (query.length > 0) {
-          const mentions = filterMentions(query);
-
-          if (mentions.length > 0) {
-            mentionDropdown.innerHTML = mentions.map(item => {
-              // const editorValue = item.EditorValue || `#${item.DisplayName}`;
-              const editorValue = `#${item.DisplayName}`;
-
-              return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.DisplayName}</li>`;
-            }).join('');
-
-            // Get the position of the textarea and place the dropdown above it
-            const textareaRect = promptField.getBoundingClientRect();
-            mentionDropdown.style.left = `${textareaRect.left}px`;
-            mentionDropdown.style.bottom = `75px`; // Position above the textarea
-            mentionDropdown.style.display = 'block';
-          } else {
-            mentionDropdown.style.display = 'none';
-          }
-        } else {
-          mentionDropdown.style.display = 'none';
-        }
-      } else {
-        mentionDropdown.style.display = 'none';
-      }
-
-    });
-
-    // Handle keyboard navigation in the dropdown
-    promptField.addEventListener('keydown', (e) => {
-      const items = document.querySelectorAll('#mention-dropdown .dropdown-item');
-      const totalItems = items.length;
-
-      if (e.key === 'ArrowDown') {
-        // Prevent default behavior to stop cursor from moving
-        e.preventDefault();
-
-        // Move the highlight down and wrap around to the top if at the end
-        if (highlightedIndex < totalItems - 1) {
-          highlightedIndex++;
-        } else {
-          highlightedIndex = 0; // Wrap to the first item
-        }
-        updateHighlightedItem();
-      } else if (e.key === 'ArrowUp') {
-        // Prevent default behavior to stop cursor from moving
-        e.preventDefault();
-
-        // Move the highlight up and wrap around to the bottom if at the top
-        if (highlightedIndex > 0) {
-          highlightedIndex--;
-        } else {
-          highlightedIndex = totalItems - 1; // Wrap to the last item
-        }
-        updateHighlightedItem();
-      } else if (e.key === 'Enter' && highlightedIndex !== -1) {
-        // Select the highlighted item
-        const selectedItem = items[highlightedIndex];
-        if (selectedItem) {
-          selectMention(selectedItem.getAttribute('data-editor-value'));
-          mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
-          e.preventDefault();  // Prevent form submission on Enter key
-        }
-      }
-    });
-
-    // Function to highlight the selected item
-    function updateHighlightedItem() {
-      const items = document.querySelectorAll('#mention-dropdown .dropdown-item');
-      const dropdown = document.getElementById('mention-dropdown');
-      const totalItems = items.length;
-
-      // Remove the 'active' class from all items
-      items.forEach(item => item.classList.remove('active'));
-
-      // Add the 'active' class to the currently highlighted item
-      if (highlightedIndex >= 0 && highlightedIndex < totalItems) {
-        const highlightedItem = items[highlightedIndex];
-        highlightedItem.classList.add('active');
-
-        // Ensure the highlighted item is visible within the dropdown
-        highlightedItem.scrollIntoView({
-          behavior: 'smooth',    // Smooth scroll
-          block: 'nearest'      // Scroll only if necessary
-        });
-      }
-    }
-
-
-
-    // Handle selecting an item from the dropdown via mouse click
-    mentionDropdown.addEventListener('click', (e) => {
-      if (e.target && e.target.matches('li')) {
-        const editorValue = e.target.getAttribute('data-editor-value');
-        selectMention(editorValue);
-        mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
-      }
-    });
-
-    // Function to insert the selected mention into the prompt field
-    const selectMention = (editorValue) => {
-      const textarea = document.getElementById('prompt');
-      const currentValue = textarea.value;
-      const cursorPosition = textarea.selectionStart;
-
-      const textBefore = currentValue.slice(0, cursorPosition);
-      const textAfter = currentValue.slice(cursorPosition);
-
-      const lastHashPosition = textBefore.lastIndexOf('#');
-      const updatedTextBefore = textBefore.slice(0, lastHashPosition); // Removing '#' symbol
-
-      textarea.value = `${updatedTextBefore}${editorValue}${textAfter}`;
-      const newCursorPosition = updatedTextBefore.length + editorValue.length;
-      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
-    };
-
-    // Hide the dropdown if clicked outside
-    document.addEventListener('click', (e) => {
-      if (!mentionDropdown.contains(e.target) && e.target !== promptField) {
-        mentionDropdown.style.display = 'none';
-      }
-    });
-
+    mentionDropdownFn('prompt', 'mention-dropdown', 'add');
     //prompt end
-
     const form = document.getElementById('genai-form');
+    const promptField = document.getElementById('prompt');
 
     const nameField = document.getElementById('name');
     const descriptionField = document.getElementById('description');
@@ -1859,12 +1716,12 @@ async function addGenAITags() {
 
         let valid = true;
 
-        if (!nameField.value.trim()) {
+        if (!(nameField as HTMLInputElement).value.trim()) {
           nameField.classList.add('is-invalid');
           valid = false;
         }
 
-        if (!promptField.value.trim()) {
+        if (!(promptField as HTMLInputElement).value.trim()) {
           promptField.classList.add('is-invalid');
           valid = false;
         }
@@ -1989,6 +1846,10 @@ async function addGenAITags() {
           if (this.classList.contains('is-invalid') && this.value.trim()) {
             this.classList.remove('is-invalid');
           }
+          if(nameField){
+            const errorDiv = document.getElementById('submition-error');
+            errorDiv.style.display = 'none';
+          }
         });
       });
     } else {
@@ -2026,8 +1887,15 @@ async function createTextGenTag(payload) {
     }
 
     const data = await response.json();
-    if (data['Data']) {
+    if (data['Data'] && data['Status']) {
       fetchDocument('AIpanel');
+    }else{
+      aiTagBtn.disabled = false;
+      cancelBtnGenAi.disabled = false;
+      mentionBtn.disabled = false;
+      formatDropdownBtn.disabled = false;
+      iconelement.innerHTML = `<i class="fa fa-check-circle me-2"></i>Save`;
+      showAddTagError(data['Data'])
     }
 
   } catch (error) {
@@ -2035,6 +1903,157 @@ async function createTextGenTag(payload) {
   }
 }
 
+
+function mentionDropdownFn(textareaId, DropdownId, action) {
+  const filterMentions = (query) => {
+    // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
+    const filtered = availableKeys.filter(item =>
+      item.DisplayName.toLowerCase().includes(query.toLowerCase())
+    );
+    return filtered;
+  };
+  let highlightedIndex = -1;
+
+  const promptField = document.getElementById(`${textareaId}`);
+  const mentionDropdown = document.getElementById(`${DropdownId}`);
+  if (promptField) {
+
+    // Handle input events on prompt field for mentions
+    promptField.addEventListener('input', (e) => {
+      const cursorPosition = promptField.selectionStart;
+      const textBeforeCursor = promptField.value.slice(0, cursorPosition);
+      const lastHashtag = textBeforeCursor.lastIndexOf('#');
+
+      if (lastHashtag !== -1) {
+        const query = textBeforeCursor.slice(lastHashtag + 1).trim();
+        if (query.length > 0) {
+          const mentions = filterMentions(query);
+
+          if (mentions.length > 0) {
+            mentionDropdown.innerHTML = mentions.map(item => {
+              let editorValue = '';
+              if (action === 'add') {
+                editorValue = `#${item.DisplayName}`;
+              } else {
+                editorValue = item.EditorValue || `#${item.DisplayName}`;
+              }
+
+              return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.DisplayName}</li>`;
+            }).join('');
+
+            // Get the position of the textarea and place the dropdown above it
+            const textareaRect = promptField.getBoundingClientRect();
+            mentionDropdown.style.left = `${textareaRect.left}px`;
+            mentionDropdown.style.bottom = `75px`; // Position above the textarea
+            mentionDropdown.style.display = 'block';
+          } else {
+            mentionDropdown.style.display = 'none';
+          }
+        } else {
+          mentionDropdown.style.display = 'none';
+        }
+      } else {
+        mentionDropdown.style.display = 'none';
+      }
+
+    });
+
+    // Handle keyboard navigation in the dropdown
+    promptField.addEventListener('keydown', (e) => {
+      const items = document.querySelectorAll(`#${DropdownId} .dropdown-item`);
+      const totalItems = items.length;
+
+      if (e.key === 'ArrowDown') {
+        // Prevent default behavior to stop cursor from moving
+        e.preventDefault();
+
+        // Move the highlight down and wrap around to the top if at the end
+        if (highlightedIndex < totalItems - 1) {
+          highlightedIndex++;
+        } else {
+          highlightedIndex = 0; // Wrap to the first item
+        }
+        updateHighlightedItem(`${DropdownId}`);
+      } else if (e.key === 'ArrowUp') {
+        // Prevent default behavior to stop cursor from moving
+        e.preventDefault();
+
+        // Move the highlight up and wrap around to the bottom if at the top
+        if (highlightedIndex > 0) {
+          highlightedIndex--;
+        } else {
+          highlightedIndex = totalItems - 1; // Wrap to the last item
+        }
+        updateHighlightedItem(`${DropdownId}`);
+      } else if (e.key === 'Enter' && highlightedIndex !== -1) {
+        // Select the highlighted item
+        const selectedItem = items[highlightedIndex];
+        if (selectedItem) {
+          selectMention(selectedItem.getAttribute('data-editor-value'));
+          mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
+          e.preventDefault();  // Prevent form submission on Enter key
+        }
+      }
+    });
+
+    // Function to highlight the selected item
+    function updateHighlightedItem(id) {
+      const items = document.querySelectorAll(`#${id} .dropdown-item`);
+      const dropdown = document.getElementById(`${id}`);
+      const totalItems = items.length;
+
+      // Remove the 'active' class from all items
+      items.forEach(item => item.classList.remove('active'));
+
+      // Add the 'active' class to the currently highlighted item
+      if (highlightedIndex >= 0 && highlightedIndex < totalItems) {
+        const highlightedItem = items[highlightedIndex];
+        highlightedItem.classList.add('active');
+
+        // Ensure the highlighted item is visible within the dropdown
+        highlightedItem.scrollIntoView({
+          behavior: 'smooth',    // Smooth scroll
+          block: 'nearest'      // Scroll only if necessary
+        });
+      }
+    }
+
+
+
+    // Handle selecting an item from the dropdown via mouse click
+    mentionDropdown.addEventListener('click', (e) => {
+      if (e.target && e.target.matches('li')) {
+        const editorValue = e.target.getAttribute('data-editor-value');
+        selectMention(editorValue);
+        mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
+      }
+    });
+
+    // Function to insert the selected mention into the prompt field
+    const selectMention = (editorValue) => {
+      const textarea = document.getElementById(`${textareaId}`);
+      const currentValue = textarea.value;
+      const cursorPosition = textarea.selectionStart;
+
+      const textBefore = currentValue.slice(0, cursorPosition);
+      const textAfter = currentValue.slice(cursorPosition);
+
+      const lastHashPosition = textBefore.lastIndexOf('#');
+      const updatedTextBefore = textBefore.slice(0, lastHashPosition); // Removing '#' symbol
+
+      textarea.value = `${updatedTextBefore}${editorValue}${textAfter}`;
+      const newCursorPosition = updatedTextBefore.length + editorValue.length;
+      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+    };
+
+    // Hide the dropdown if clicked outside
+    document.addEventListener('click', (e) => {
+      if (!mentionDropdown.contains(e.target) && e.target !== promptField) {
+        mentionDropdown.style.display = 'none';
+      }
+    });
+  }
+}
 export async function replaceMention(word: any, type: any) {
   return Word.run(async (context) => {
     try {
@@ -2176,6 +2195,8 @@ function removeQuotes(value: string): string {
     : '';
 }
 
-function newlineadd(value: string): string {
-  return value
+function showAddTagError(message) {
+  const errorDiv = document.getElementById('submition-error');
+  errorDiv.style.display = 'block';
+  errorDiv.textContent = message;
 }
