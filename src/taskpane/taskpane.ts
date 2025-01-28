@@ -1191,7 +1191,7 @@ export async function applyglossary() {
       }
 
       const searchPromises = layTerms.map(term => {
-        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load("items");
 
         return searchResults;
