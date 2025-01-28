@@ -1191,7 +1191,7 @@ export async function applyglossary() {
       }
 
       const searchPromises = layTerms.map(term => {
-        const searchResults = body.search(term.ClinicalTerm, { matchCase: true, matchWholeWord: true });
+        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
         searchResults.load("items");
 
         return searchResults;
@@ -1361,7 +1361,7 @@ function displayHighlightedText(words: string[]) {
 
     words.forEach(word => {
       layTerms.forEach(term => {
-        if (term.ClinicalTerm === word) {
+        if (term.ClinicalTerm.toLowerCase() === word.toLowerCase()) {
           if (!groupedTerms[term.ClinicalTerm]) {
             groupedTerms[term.ClinicalTerm] = [];
           }
@@ -1421,9 +1421,8 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
       // Load the selection's text
       selection.load('text');
       await context.sync();
-
       // Check if the selected text contains the clinicalTerm
-      if (selection.text.includes(clinicalTerm)) {
+      if (selection.text.toLowerCase().includes(clinicalTerm.toLowerCase())) {
         // Search for the clinicalTerm in the document
         const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: true });
         searchResults.load('items');
