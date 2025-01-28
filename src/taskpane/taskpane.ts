@@ -1291,7 +1291,7 @@ export async function checkGlossary() {
           loader.style.display = 'block';
         }
         const searchPromises = layTerms.map(term => {
-          const searchResults = selection.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+          const searchResults = selection.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
           searchResults.load("items");
           return searchResults;
         });
@@ -1424,7 +1424,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
       // Check if the selected text contains the clinicalTerm
       if (selection.text.toLowerCase().includes(clinicalTerm.toLowerCase())) {
         // Search for the clinicalTerm in the document
-        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: true });
+        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load('items');
 
         await context.sync();
@@ -1466,7 +1466,7 @@ async function clearGlossary() {
       const body = context.document.body;
 
       const searchPromises = layTerms.map(term => {
-        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: true });
+        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load("items");
         return searchResults;
       });
