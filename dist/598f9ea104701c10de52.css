@@ -354,3 +354,10 @@ ul {
 .mh-34{
   min-height: 33rem;
 }
+
+
+.dropdown-toggle-sources,
+.dropdown-toggle-sources::before,
+.dropdown-toggle-sources::after {
+  align-self: center !important;
+}
