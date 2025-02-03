@@ -4,6 +4,10 @@
   letter-spacing: 0.5px;
 }
 
+*, ::after, ::before {
+  box-sizing: border-box;
+  align-self: center !important;
+}
 .btn {
   font-size: 12px;
 }
@@ -28,6 +32,27 @@
   border-top: 1px solid #E5E5E5;
   opacity: 1;
 }
+
+/* Adjust the dropdown button to allow text wrapping and keep the icon on the right */
+.dropdown-toggle-sources {
+  height: auto; /* Allow dynamic height based on content */
+  min-height: 30px; /* Set a minimum height */
+}
+
+.dropdown-toggle-icon-s ::after{
+  align-self: center;
+}
+
+/* Style for the dropdown label that holds selected items */
+.sourceDropdownLabel {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Ensure long texts are truncated */
+  white-space: normal; /* Allow wrapping of text */
+  max-width: 100%; /* Prevent overflow */
+}
+
+
 
 .w-90 {
   width: 90%;
@@ -211,14 +236,14 @@ ul {
   position: relative !important;
 }
 
-.fa-sign-out .tooltiptext {
+.tooltiptext {
   visibility: hidden;
-  width: 80px;
+  min-width: 80px;
   background-color: #212529 !important;
   color: #fff;
   text-align: center;
   border-radius: 6px;
-  padding: 5px 0;
+  padding: 5px;
   font-size: 12px;
   font-family: Arial, sans-serif;
   font-weight: 400;
@@ -227,7 +252,7 @@ ul {
   right: 25px;
 }
 
-.fa-sign-out:hover .tooltiptext {
+.ngb-tooltip:hover .tooltiptext {
   visibility: visible;
 }
 
@@ -333,4 +358,3 @@ ul {
 .mh-34{
   min-height: 33rem;
 }
-

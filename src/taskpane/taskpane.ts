@@ -27,6 +27,7 @@ let userId = 0;
 let clientList = [];
 let version = versionLink;
 let currentYear = new Date().getFullYear();
+let sourceList;
 
 /* global document, Office, Word */
 
@@ -215,7 +216,7 @@ async function fetchDocument(action) {
     const data = await response.json();
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = `
-        <img  id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo"> <i class="fa fa-sign-out me-5 c-pointer" aria-hidden="true" id="logout"><span class="tooltiptext">Logout</span></i>
+        <img  id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo"> <i class="fa fa-sign-out me-5 c-pointer ngb-tooltip" aria-hidden="true" id="logout"><span class="tooltiptext">Logout</span></i>
 `
     document.getElementById('header').innerHTML = `
     <div class="d-flex justify-content-around">
@@ -262,6 +263,14 @@ async function fetchDocument(action) {
     document.getElementById('logout').addEventListener('click', logout);
 
     dataList = data['Data'];
+    sourceList = dataList.SourceTypeList.filter(
+      (item) => item.SourceValue !== ''
+        // && /\.\w+$/.test(item.SourceValue)
+    ) // Filter items with an extension
+      .map((item) => ({
+        ...item, // Spread the existing properties
+        SourceName: transformDocumentName(item.SourceValue)
+      }));
     clientId = dataList.ClientID;
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
     GroupName = aiGroup ? aiGroup.Name : '';
@@ -695,6 +704,9 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
 
 function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const textColorClass = tag.IsApplied ? 'text-secondary' : '';
+  const tooltipButton = tag.Sources
+    ? `  <span class="tooltiptext">${tag.Sources}</span>`
+    : '';
   const body = `
     <div class="accordion-item">
       <h2 class="accordion-header" id="${headerId}">
@@ -711,7 +723,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
            class="accordion-collapse collapse"
            aria-labelledby="${headerId}"
            data-bs-parent="#accordionExample">
-        <div class="accordion-body p-0">
+        <div class="accordion-body p-0" id="accordion-body-${i}">
           <div class="chatbox" id="selected-response-parent-${i}">
             ${radioButtonsHTML}
           </div>
@@ -726,15 +738,23 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
           </div>
           <div class="d-flex align-items-end justify-content-end chatbox p-2">
             <textarea class="form-control"
-                      rows="3"
+                      rows="4"
                       id="chatbox-${i}"
                       placeholder="Type here"></textarea>
                 <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
+            <div class="d-flex flex-column align-self-end me-3">
+            <button
+                    class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
+                    id="changeSource-${i}">
+                    ${tooltipButton}
+              <i class="fa fa-file-lines text-white"></i>
+            </button>
             <button type="submit"
                     class="btn btn-primary bg-primary-clr ms-2 text-white"
                     id="sendPrompt-${i}">
               <i class="fa fa-paper-plane text-white"></i>
             </button>
+            </div>
           </div>
         </div>
       </div>
@@ -744,6 +764,8 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
 
 async function onDoNotApplyChange(event, index, tag: any) {
   tag.IsApplied = event.target.checked;
+  let sourceListBtn = document.getElementById(`changeSource-${index}`) as HTMLButtonElement;
+  sourceListBtn.disabled = true;
   const isChecked = event.target.checked;
   const tagname = document.getElementById(`tagname-${index}`);
   const dnaBtn = document.getElementById(`doNotApply-${index}`) as HTMLInputElement;
@@ -766,11 +788,16 @@ async function onDoNotApplyChange(event, index, tag: any) {
 
     const data = await response.json();
     if (data['Data'] && data['Status'] === true) {
+      sourceListBtn.disabled=false;
+      dnaBtn.disabled = false
+    }else{
+      sourceListBtn.disabled=false;
       dnaBtn.disabled = false
     }
 
   } catch (error) {
     dnaBtn.disabled = false
+    sourceListBtn.disabled=false;
     console.error('Error updating do not apply:', error);
   }
 
@@ -787,12 +814,10 @@ async function onDoNotApplyChange(event, index, tag: any) {
 
 }
 
-
-
-
-
 async function sendPrompt(tag, prompt, index) {
   if (prompt !== '' && !isTagUpdating) {
+    let sourceListBtn = document.getElementById(`changeSource-${index}`) as HTMLButtonElement;
+    sourceListBtn.disabled = true;
     isTagUpdating = true;
 
     const iconelement = document.getElementById(`sendPrompt-${index}`);
@@ -814,7 +839,8 @@ async function sendPrompt(tag, prompt, index) {
       Response: '',
       VectorID: dataList.VectorID,
       Selected: 0,
-      ID: 0
+      ID: 0,
+      SourceValue: tag.SourceValue ? tag.SourceValue : []
     };
 
     try {
@@ -859,13 +885,16 @@ async function sendPrompt(tag, prompt, index) {
         document.getElementById(`chatbox-${index}`).value = '';
 
         isTagUpdating = false;
+        sourceListBtn.disabled = false;
       } else {
         iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
         isTagUpdating = false;
+        sourceListBtn.disabled=false;
       }
     } catch (error) {
       iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
       isTagUpdating = false;
+      sourceListBtn.disabled=false;
       console.error('Error sending AI prompt:', error);
     }
   } else {
@@ -951,6 +980,10 @@ async function displayAiTagList() {
       sendPrompt(tag, textareaValue, i)
     });
 
+    document.getElementById(`changeSource-${i}`).addEventListener('click', () => {
+      // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
+      createMultiSelectDropdown(i, tag, radioButtonsHTML)
+    })
   }
 
   // Add event listeners after rendering
@@ -2201,4 +2234,260 @@ function showAddTagError(message) {
   const errorDiv = document.getElementById('submition-error');
   errorDiv.style.display = 'block';
   errorDiv.textContent = message;
+}
+
+function transformDocumentName(value: string): string {
+  if (!value || value.trim() === '') {
+    return value; // Return the input value unchanged
+  }
+
+  const parts = value.split('_');
+  if (parts.length <= 1) {
+    return value; // Return the input value unchanged if no underscores are present
+  }
+
+  return parts.slice(1).join('_').replace(/%20/g, ' ').replace(/%25/g, '%');
+}
+
+
+
+function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
+  const multiSelectHTML = `
+  <div class='p-3 chatbox'>
+    <div class="mb-3">
+      <label for="source-select-${i}" class="form-label"><span class="text-danger">*</span> Select Sources</label>
+      <div class="dropdown w-100">
+        <button 
+          class="btn btn-light border w-100 text-start d-flex justify-content-between align-items-start dropdown-toggle dropdown-toggle-sources" 
+          type="button" 
+          id="sourceDropdown-${i}" 
+          data-bs-toggle="dropdown" 
+          aria-expanded="false">
+          <span id="sourceDropdownLabel-${i}" class='sourceDropdownLabel'></span>
+          <span class="dropdown-toggle-icon dropdown-toggle-icon-s"></span>
+        </button>
+        <ul class="dropdown-menu w-100 p-2" aria-labelledby="sourceDropdown-${i}" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000;">
+          <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="selectAll-${i}">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll-${i}">
+              <label class="form-check-label" for="selectAll-${i}">Select All</label>
+            </div>
+          </li>
+          ${sourceList
+      .map(
+        (source, index) => `
+              <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="source-${i}-${index}">
+                <div class="form-check">
+                  <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${i}-${index}">
+                  <label class="form-check-label" for="source-${i}-${index}">${source.SourceName}</label>
+                </div>
+              </li>
+            `
+      )
+      .join('')}
+        </ul>
+      </div>
+    </div>
+    <div class="d-flex justify-content-end mt-2">
+      <button id="cancel-src-btn-${i}" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
+      <button id="ok-src-btn-${i}" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Ok</button>
+    </div>
+  </div>
+  `;
+
+  // Get the accordion body element
+  const accordionBody = document.getElementById(`accordion-body-${i}`);
+
+  // Set height to ensure the dropdown button appears with some space
+  accordionBody.style.minHeight = "20vh";  // You can adjust this based on your needs
+
+  // Clear existing content and insert the dropdown
+  accordionBody.innerHTML = multiSelectHTML;
+
+  // Temporary array to hold the selected sources
+  let selectedSources = [];
+
+  // Get "Select All" checkbox and individual source checkboxes
+  const selectAllCheckbox = document.getElementById(`selectAll-${i}`);
+  const individualCheckboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
+  const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel-${i}`);
+
+  // Function to update the dropdown label based on selected checkboxes
+  function updateLabel() {
+    const selectedSourceNames = selectedSources;
+    if (selectedSourceNames.length > 0) {
+      sourceDropdownLabel.innerText = selectedSourceNames.join(', ');  // Display selected sources as comma-separated
+    } else {
+      sourceDropdownLabel.innerText = ' ';  // Default text when no sources are selected
+    }
+  }
+
+  // Handle "Select All" functionality
+  selectAllCheckbox.addEventListener("change", function () {
+    const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = this.checked;  // If "Select All" is checked, all checkboxes are checked, and vice versa
+      // Update the temporary array based on the state of the checkboxes
+      if (checkbox.checked) {
+        if (!selectedSources.includes(checkbox.value)) {
+          selectedSources.push(checkbox.value);  // Add source to the array if checked
+        }
+      } else {
+        selectedSources = selectedSources.filter((source) => source !== checkbox.value);  // Remove unchecked sources
+      }
+    });
+
+    updateLabel();  // Update the label when "Select All" changes
+  });
+
+  // Handle individual checkbox state change
+  individualCheckboxes.forEach((checkbox) => {
+    checkbox.addEventListener("change", function () {
+      if (checkbox.checked) {
+        if (!selectedSources.includes(checkbox.value)) {
+          selectedSources.push(checkbox.value);  // Add source to the array if checked
+        }
+      } else {
+        selectedSources = selectedSources.filter((source) => source !== checkbox.value);  // Remove unchecked sources
+      }
+
+      // Check if all individual checkboxes are checked
+      const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
+      selectAllCheckbox.checked = allChecked;  // Update "Select All" checkbox based on individual selections
+
+      updateLabel();  // Update the label when an individual checkbox is changed
+    });
+
+    // Add click event listener to the whole list item (not just the checkbox)
+    const listItem = checkbox.closest("li");
+    listItem.addEventListener("click", function (event) {
+      checkbox.checked = !checkbox.checked;  // Toggle checkbox state
+
+      if (checkbox.checked) {
+        if (!selectedSources.includes(checkbox.value)) {
+          selectedSources.push(checkbox.value);  // Add source to the array if checked
+        }
+      } else {
+        selectedSources = selectedSources.filter((source) => source !== checkbox.value);  // Remove unchecked sources
+      }
+
+      const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
+      selectAllCheckbox.checked = allChecked;  // Update "Select All" checkbox
+
+      updateLabel();  // Update the label when a list item is clicked
+
+      event.stopPropagation();  // Prevent dropdown from closing when clicking on list item
+    });
+  });
+
+  // Prevent the dropdown from closing when clicking on the "Select All" checkbox label
+  const selectAllItem = document.querySelector(`#accordion-body-${i} .dropdown-item[data-checkbox-id="selectAll-${i}"]`);
+  selectAllItem.addEventListener("click", function (event) {
+    selectAllCheckbox.checked = !selectAllCheckbox.checked;  // Toggle "Select All" checkbox
+
+    // Update the state of all source checkboxes based on "Select All"
+    const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = selectAllCheckbox.checked;  // If "Select All" is checked, all checkboxes are checked
+    });
+
+    // Update the temporary array based on "Select All"
+    selectedSources = selectAllCheckbox.checked
+      ? Array.from(checkboxes).map((checkbox) => checkbox.value)  // Add all sources to the array if "Select All" is checked
+      : [];
+
+    updateLabel();  // Update the label when "Select All" item is clicked
+
+    event.stopPropagation();  // Prevent dropdown from closing when clicking on the "Select All" item
+  });
+
+  // Initialize checkboxes based on tag.Sources
+  if (tag.Sources && tag.Sources.length > 0) {
+    individualCheckboxes.forEach((checkbox) => {
+      if (tag.Sources.includes(checkbox.value)) {
+        checkbox.checked = true;  // Check the checkbox if its value is in tag.Sources
+        selectedSources.push(checkbox.value);  // Add the source to the temporary array
+      }
+    });
+
+    // Also check "Select All" if all checkboxes are selected
+    const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
+    selectAllCheckbox.checked = allChecked;
+    updateLabel();  // Update the label when "Select All" changes
+
+  }
+
+  // Handle "OK" button click
+  document.getElementById(`ok-src-btn-${i}`).addEventListener("click", function () {
+    tag.Sources = [...selectedSources];  // Add selected sources to tag.Sources when "OK" is clicked
+    tag.SourceValue = sourceList
+      .filter(source => selectedSources.includes(source.SourceName))  // Find the sources with matching SourceNames
+      .map(source => source.SourceValue);
+    appendAccordionBody(i, tag, radioButtonsHTML);
+  });
+
+  document.getElementById(`cancel-src-btn-${i}`).addEventListener("click", function () {
+    appendAccordionBody(i, tag, radioButtonsHTML);
+  });
+}
+
+function appendAccordionBody(i, tag, radioButtonsHTML) {
+
+  const tooltipButton = tag.Sources && tag.Sources.length > 0
+    ? `  <span class="tooltiptext">${tag.Sources}</span>`
+    : '';
+
+  const accordionBody = document.getElementById(`accordion-body-${i}`);
+
+  // Set height to ensure the dropdown button appears with some space
+  accordionBody.style.minHeight = "20vh";  // You can adjust this based on your needs
+
+  // Clear existing content and insert the dropdown
+  accordionBody.innerHTML =
+    `<div class="chatbox" id="selected-response-parent-${i}">
+            ${radioButtonsHTML}
+          </div>
+          <div class="form-check form-switch chatbox m-0">
+            <label class="form-check-label pb-3" for="doNotApply-${i}">
+              <span class="fs-12">Do not apply</span>
+            </label>
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="doNotApply-${i}"
+                   ${tag.IsApplied ? 'checked' : ''}>
+          </div>
+          <div class="d-flex align-items-end justify-content-end chatbox p-2">
+            <textarea class="form-control"
+                      rows="4"
+                      id="chatbox-${i}"
+                      placeholder="Type here"></textarea>
+                <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
+            <div class="d-flex flex-column align-self-end me-3">
+            <button
+                    class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
+                    id="changeSource-${i}">
+                    ${tooltipButton}
+              <i class="fa fa-file-lines text-white"></i>
+            </button>
+            <button type="submit"
+                    class="btn btn-primary bg-primary-clr ms-2 text-white"
+                    id="sendPrompt-${i}">
+              <i class="fa fa-paper-plane text-white"></i>
+            </button>
+            </div>
+          </div>`;
+  mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
+  document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
+
+  document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
+    const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
+
+    sendPrompt(tag, textareaValue, i)
+  });
+
+  document.getElementById(`changeSource-${i}`).addEventListener('click', () => {
+    // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
+    createMultiSelectDropdown(i, tag, radioButtonsHTML)
+  })
+
 }
