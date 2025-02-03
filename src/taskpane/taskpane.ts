@@ -265,7 +265,7 @@ async function fetchDocument(action) {
     dataList = data['Data'];
     sourceList = dataList.SourceTypeList.filter(
       (item) => item.SourceValue !== ''
-        // && /\.\w+$/.test(item.SourceValue)
+        && /\.\w+$/.test(item.SourceValue)
     ) // Filter items with an extension
       .map((item) => ({
         ...item, // Spread the existing properties
@@ -2431,11 +2431,14 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
   });
 }
 
+
+
 function appendAccordionBody(i, tag, radioButtonsHTML) {
 
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '';
+
 
   const accordionBody = document.getElementById(`accordion-body-${i}`);
 
