@@ -1941,8 +1941,7 @@ async function createTextGenTag(payload) {
 
 function mentionDropdownFn(textareaId, DropdownId, action) {
   const filterMentions = (query) => {
-    // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
-    const filtered = availableKeys.filter(item =>
+    const filtered = availableKeys.filter(item => item.AIFlag === 0).filter(item =>
       item.DisplayName.toLowerCase().includes(query.toLowerCase())
     );
     return filtered;
@@ -1968,9 +1967,9 @@ function mentionDropdownFn(textareaId, DropdownId, action) {
             mentionDropdown.innerHTML = mentions.map(item => {
               let editorValue = '';
               if (action === 'add') {
-                editorValue = `#${item.DisplayName}`;
+                editorValue = `#${item.DisplayName}#`;
               } else {
-                editorValue = item.EditorValue || `#${item.DisplayName}`;
+                editorValue = item.EditorValue || `#${item.DisplayName}#`;
               }
 
               return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.DisplayName}</li>`;

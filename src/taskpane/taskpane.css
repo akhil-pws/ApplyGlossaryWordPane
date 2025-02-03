@@ -4,10 +4,6 @@
   letter-spacing: 0.5px;
 }
 
-*, ::after, ::before {
-  box-sizing: border-box;
-  align-self: center !important;
-}
 .btn {
   font-size: 12px;
 }
