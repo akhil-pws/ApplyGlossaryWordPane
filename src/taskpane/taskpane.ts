@@ -710,14 +710,16 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const body = `
     <div class="accordion-item">
       <h2 class="accordion-header" id="${headerId}">
-        <button class="accordion-button collapsed ${textColorClass}"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#${collapseId}"
-                aria-expanded="false"
-                aria-controls="${collapseId}">
-          <span id="tagname-${i}">${tag.DisplayName}</span>
-        </button>
+     <button class="accordion-button collapsed ${textColorClass} d-flex justify-content-between align-items-center"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#${collapseId}"
+        aria-expanded="false"
+        aria-controls="${collapseId}">
+    <span id="tagname-${i}">${tag.DisplayName}</span>
+    <i class="fa fa-plus text-secondary c-pointer ms-2" title="Insert to document" id="insert-tag-${i}"></i>
+</button>
+
       </h2>
       <div id="${collapseId}"
            class="accordion-collapse collapse"
@@ -788,16 +790,16 @@ async function onDoNotApplyChange(event, index, tag: any) {
 
     const data = await response.json();
     if (data['Data'] && data['Status'] === true) {
-      sourceListBtn.disabled=false;
+      sourceListBtn.disabled = false;
       dnaBtn.disabled = false
-    }else{
-      sourceListBtn.disabled=false;
+    } else {
+      sourceListBtn.disabled = false;
       dnaBtn.disabled = false
     }
 
   } catch (error) {
     dnaBtn.disabled = false
-    sourceListBtn.disabled=false;
+    sourceListBtn.disabled = false;
     console.error('Error updating do not apply:', error);
   }
 
@@ -889,12 +891,12 @@ async function sendPrompt(tag, prompt, index) {
       } else {
         iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
         isTagUpdating = false;
-        sourceListBtn.disabled=false;
+        sourceListBtn.disabled = false;
       }
     } catch (error) {
       iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
       isTagUpdating = false;
-      sourceListBtn.disabled=false;
+      sourceListBtn.disabled = false;
       console.error('Error sending AI prompt:', error);
     }
   } else {
@@ -980,7 +982,11 @@ async function displayAiTagList() {
       sendPrompt(tag, textareaValue, i)
     });
 
-    document.getElementById(`changeSource-${i}`).addEventListener('click', () => {
+    document.getElementById(`insert-tag-${i}`)?.addEventListener('click',()=>{
+      insertTagPrompt(i)
+    })
+
+    document.getElementById(`changeSource-${i}`)?.addEventListener('click', () => {
       // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
       createMultiSelectDropdown(i, tag, radioButtonsHTML)
     })
@@ -991,6 +997,37 @@ async function displayAiTagList() {
   addCopyListeners();
 
 }
+
+async function insertTagPrompt(index:any){
+  return Word.run(async (context) => {
+    try {
+      const selection = context.document.getSelection();
+      await context.sync();
+
+      if (!selection) {
+        throw new Error('Selection is invalid or not found.');
+      }
+
+ 
+        if (aiTagList[index].EditorValue === '' ) {
+          selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
+        } else {
+          let content = removeQuotes(aiTagList[index].EditorValue);
+          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+
+          lines.forEach(line => {
+            selection.insertParagraph(line, Word.InsertLocation.before);
+          });
+        }
+      
+
+      await context.sync();
+    } catch (error) {
+      console.error('Detailed error:', error);
+    }
+  });
+}
+
 
 function addAccordionListeners() {
   const accordionButtons = document.querySelectorAll('.accordion-button');
@@ -1941,6 +1978,7 @@ async function createTextGenTag(payload) {
 
 function mentionDropdownFn(textareaId, DropdownId, action) {
   const filterMentions = (query) => {
+    // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
     const filtered = availableKeys.filter(item => item.AIFlag === 0).filter(item =>
       item.DisplayName.toLowerCase().includes(query.toLowerCase())
     );
@@ -2252,7 +2290,7 @@ function transformDocumentName(value: string): string {
 
 function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
   const multiSelectHTML = `
-  <div class='p-3 chatbox'>
+  <div class='p-3 bg-light'>
     <div class="mb-3">
       <label for="source-select-${i}" class="form-label"><span class="text-danger">*</span> Select Sources</label>
       <div class="dropdown w-100">
@@ -2493,3 +2531,9 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
   })
 
 }
+
+
+
+
+
+
