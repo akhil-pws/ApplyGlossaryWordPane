@@ -717,7 +717,6 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
         aria-expanded="false"
         aria-controls="${collapseId}">
     <span id="tagname-${i}">${tag.DisplayName}</span>
-    <i class="fa fa-plus text-secondary c-pointer ms-2" title="Insert to document" id="insert-tag-${i}"></i>
 </button>
 
       </h2>
@@ -727,6 +726,9 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
            data-bs-parent="#accordionExample">
         <div class="accordion-body p-0" id="accordion-body-${i}">
           <div class="chatbox" id="selected-response-parent-${i}">
+              <div class="d-flex justify-content-end" >
+                   <button class="btn btn-secondary text-light px-3 py-2 mt-3 me-2" id="insert-tag-${i}"><i class="fa fa-plus text-light c-pointer" title="Insert to document" ></i> Insert</button>
+               </div>
             ${radioButtonsHTML}
           </div>
           <div class="form-check form-switch chatbox m-0">
@@ -982,7 +984,7 @@ async function displayAiTagList() {
       sendPrompt(tag, textareaValue, i)
     });
 
-    document.getElementById(`insert-tag-${i}`)?.addEventListener('click',()=>{
+    document.getElementById(`insert-tag-${i}`)?.addEventListener('click', () => {
       insertTagPrompt(i)
     })
 
@@ -998,7 +1000,7 @@ async function displayAiTagList() {
 
 }
 
-async function insertTagPrompt(index:any){
+async function insertTagPrompt(index: any) {
   return Word.run(async (context) => {
     try {
       const selection = context.document.getSelection();
@@ -1008,18 +1010,18 @@ async function insertTagPrompt(index:any){
         throw new Error('Selection is invalid or not found.');
       }
 
- 
-        if (aiTagList[index].EditorValue === '' ) {
-          selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
-        } else {
-          let content = removeQuotes(aiTagList[index].EditorValue);
-          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
 
-          lines.forEach(line => {
-            selection.insertParagraph(line, Word.InsertLocation.before);
-          });
-        }
-      
+      if (aiTagList[index].EditorValue === '') {
+        selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
+      } else {
+        let content = removeQuotes(aiTagList[index].EditorValue);
+        let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+
+        lines.forEach(line => {
+          selection.insertParagraph(line, Word.InsertLocation.before);
+        });
+      }
+
 
       await context.sync();
     } catch (error) {
@@ -2484,37 +2486,42 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
 
   // Clear existing content and insert the dropdown
   accordionBody.innerHTML =
-    `<div class="chatbox" id="selected-response-parent-${i}">
+    `
+    <div class="chatbox" id="selected-response-parent-${i}">
+    <div class="d-flex justify-content-end" >
+      <button class="btn btn-secondary text-light px-3 py-2 mt-3 me-2" id="insert-tag-${i}"><i class="fa fa-plus text-light c-pointer" title="Insert to document" ></i> Insert</button>
+    </div>
+   
             ${radioButtonsHTML}
-          </div>
-          <div class="form-check form-switch chatbox m-0">
-            <label class="form-check-label pb-3" for="doNotApply-${i}">
-              <span class="fs-12">Do not apply</span>
-            </label>
+    </div>
+    <div class="form-check form-switch chatbox m-0">
+        <label class="form-check-label pb-3" for="doNotApply-${i}">
+           <span class="fs-12">Do not apply</span>
+        </label>
             <input class="form-check-input"
                    type="checkbox"
                    id="doNotApply-${i}"
                    ${tag.IsApplied ? 'checked' : ''}>
-          </div>
-          <div class="d-flex align-items-end justify-content-end chatbox p-2">
-            <textarea class="form-control"
+      </div>
+      <div class="d-flex align-items-end justify-content-end chatbox p-2">
+           <textarea class="form-control"
                       rows="4"
                       id="chatbox-${i}"
                       placeholder="Type here"></textarea>
-                <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
-            <div class="d-flex flex-column align-self-end me-3">
-            <button
+              <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
+              <div class="d-flex flex-column align-self-end me-3">
+                <button
                     class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
                     id="changeSource-${i}">
                     ${tooltipButton}
-              <i class="fa fa-file-lines text-white"></i>
-            </button>
-            <button type="submit"
+                 <i class="fa fa-file-lines text-white"></i>
+                </button>
+                <button type="submit"
                     class="btn btn-primary bg-primary-clr ms-2 text-white"
                     id="sendPrompt-${i}">
-              <i class="fa fa-paper-plane text-white"></i>
-            </button>
-            </div>
+                  <i class="fa fa-paper-plane text-white"></i>
+               </button>
+             </div>
           </div>`;
   mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
   document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
@@ -2525,15 +2532,14 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
     sendPrompt(tag, textareaValue, i)
   });
 
+
+  document.getElementById(`insert-tag-${i}`)?.addEventListener('click', () => {
+    insertTagPrompt(i)
+  })
+
   document.getElementById(`changeSource-${i}`).addEventListener('click', () => {
     // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
     createMultiSelectDropdown(i, tag, radioButtonsHTML)
   })
 
 }
-
-
-
-
-
-
