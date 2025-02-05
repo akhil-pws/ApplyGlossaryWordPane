@@ -364,3 +364,11 @@ ul {
 .text-prewrap{
   white-space: pre-wrap;
 }
+
+.formating-checkbox{
+  display: flex; 
+  align-self: flex-start;
+  align-items: start; 
+  gap: 8px; 
+  flex-wrap: wrap;
+}

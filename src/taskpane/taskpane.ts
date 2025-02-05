@@ -340,10 +340,12 @@ async function formatOptionsDisplay() {
             <!-- <h5 class="card-title">Formatting Options</h5> -->
           </div>
           <div class="card-body">
-           <div>
-                <input type="checkbox" id="empty-format-checkbox" class="form-check-input mb-2">
-                <label for="empty-format-checkbox" class="form-check-label empty-format-checkbox-label">Skip ignoring and removing format-based text</label>
-              </div>
+             <div class="formating-checkbox">
+               <input type="checkbox" id="empty-format-checkbox" class="form-check-input">
+              <label for="empty-format-checkbox" class="form-check-label empty-format-checkbox-label" style="flex: 1;">
+                   Skip ignoring and removing format-based text
+              </label>
+            </div>
             <!-- Section to display captured formatting -->
             <div id="format-details">
               <h5 class="my-3">Selected Formatting:</h5>
