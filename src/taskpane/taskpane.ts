@@ -1668,7 +1668,7 @@ async function addGenAITags() {
         <li class="dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="${client.ID}" id="sponsor${client.ID}" ${isSelectedClient ? 'checked disabled' : ''}>
-            <label class="form-check-label" for="sponsor${client.ID}">${client.Name}</label>
+            <label class="form-check-label text-prewrap" for="sponsor${client.ID}">${client.Name}</label>
           </div>
         </li>
       `;
@@ -1811,7 +1811,7 @@ async function addGenAITags() {
 
           const isAvailableForAll = availableForAllCheckbox.checked;
           const isSaveGlobally = saveGloballyCheckbox.checked;
-
+           const aigroup=dataList.Group.find(element => element.DisplayName === 'AIGroup');
           const formData = {
             DisplayName: nameField.value.trim(),
             Prompt: promptField.value.trim(),
@@ -1825,9 +1825,9 @@ async function addGenAITags() {
             AIFlag: 1,
             DocumentTypeID: dataList.DocumentTypeID,
             ReportHeadID: dataList.ID,
-            SourceTypeID: aiTagList[0].SourceTypeID,
-            ReportHeadGroupID: aiTagList[0].ReportHeadGroupID,
-            ReportHeadSourceID: aiTagList[0].ReportHeadSourceID
+            SourceTypeID: '',
+            ReportHeadGroupID: aigroup.ID,
+            ReportHeadSourceID: ''
           };
 
           createTextGenTag(formData);
@@ -1946,6 +1946,7 @@ async function createTextGenTag(payload) {
     mentionBtn.disabled = true;
     formatDropdownBtn.disabled = true;
     iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Save`;
+    iconelement.disabled=true;
 
     const response = await fetch(`${baseUrl}/api/report/group-key/add`, {
       method: 'POST',
@@ -1968,6 +1969,7 @@ async function createTextGenTag(payload) {
       cancelBtnGenAi.disabled = false;
       mentionBtn.disabled = false;
       formatDropdownBtn.disabled = false;
+      iconelement.disabled =false;
       iconelement.innerHTML = `<i class="fa fa-check-circle me-2"></i>Save`;
       showAddTagError(data['Data'])
     }
@@ -2318,7 +2320,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
               <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="source-${i}-${index}">
                 <div class="form-check">
                   <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${i}-${index}">
-                  <label class="form-check-label" for="source-${i}-${index}">${source.SourceName}</label>
+                  <label class="form-check-label text-prewrap" for="source-${i}-${index}">${source.SourceName}</label>
                 </div>
               </li>
             `
@@ -2329,7 +2331,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
     </div>
     <div class="d-flex justify-content-end mt-2">
       <button id="cancel-src-btn-${i}" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
-      <button id="ok-src-btn-${i}" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Ok</button>
+      <button id="ok-src-btn-${i}" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Save</button>
     </div>
   </div>
   `;
