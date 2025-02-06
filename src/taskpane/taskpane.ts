@@ -44,7 +44,7 @@ window.addEventListener('hashchange', () => {
 Office.onReady((info) => {
   if (info.host === Office.HostType.Word) {
     document.getElementById("app-body").style.display = "flex";
-    document.getElementById("footer").innerText = `© ${currentYear} - TrialAssure LINK Add-In ${version}`
+    document.getElementById("footer").innerText = `© ${currentYear} - TrialAssure LINK AI Assistant ${version}`
     const editor = document.getElementById('editor');
 
     window.location.hash = '#/login';
@@ -340,12 +340,13 @@ async function formatOptionsDisplay() {
             <!-- <h5 class="card-title">Formatting Options</h5> -->
           </div>
           <div class="card-body">
-             <div class="formating-checkbox">
+          <div class="formating-checkbox">
                <input type="checkbox" id="empty-format-checkbox" class="form-check-input">
               <label for="empty-format-checkbox" class="form-check-label empty-format-checkbox-label" style="flex: 1;">
                    Skip ignoring and removing format-based text
               </label>
             </div>
+
             <!-- Section to display captured formatting -->
             <div id="format-details">
               <h5 class="my-3">Selected Formatting:</h5>
@@ -728,9 +729,6 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
            data-bs-parent="#accordionExample">
         <div class="accordion-body p-0" id="accordion-body-${i}">
           <div class="chatbox" id="selected-response-parent-${i}">
-              <div class="d-flex justify-content-end" >
-                   <button class="btn btn-secondary text-light px-3 py-2 mt-3 me-2" id="insert-tag-${i}"><i class="fa fa-plus text-light c-pointer" title="Insert to document" ></i> Insert</button>
-               </div>
             ${radioButtonsHTML}
           </div>
           <div class="form-check form-switch chatbox m-0">
@@ -744,11 +742,15 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
           </div>
           <div class="d-flex align-items-end justify-content-end chatbox p-2">
             <textarea class="form-control"
-                      rows="4"
+                      rows="5"
                       id="chatbox-${i}"
                       placeholder="Type here"></textarea>
                 <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
             <div class="d-flex flex-column align-self-end me-3">
+            <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
+            <span class="tooltiptext">Insert</span>
+                <i class="fa fa-plus text-light c-pointer" ></i>
+                </button>
             <button
                     class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
                     id="changeSource-${i}">
@@ -2492,9 +2494,6 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
   accordionBody.innerHTML =
     `
     <div class="chatbox" id="selected-response-parent-${i}">
-    <div class="d-flex justify-content-end" >
-      <button class="btn btn-secondary text-light px-3 py-2 mt-3 me-2" id="insert-tag-${i}"><i class="fa fa-plus text-light c-pointer" title="Insert to document" ></i> Insert</button>
-    </div>
    
             ${radioButtonsHTML}
     </div>
@@ -2509,11 +2508,16 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
       </div>
       <div class="d-flex align-items-end justify-content-end chatbox p-2">
            <textarea class="form-control"
-                      rows="4"
+                      rows="5"
                       id="chatbox-${i}"
                       placeholder="Type here"></textarea>
               <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
               <div class="d-flex flex-column align-self-end me-3">
+                <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
+                <span class="tooltiptext">Insert</span>
+                <i class="fa fa-plus text-light c-pointer" ></i>
+                </button>
+
                 <button
                     class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
                     id="changeSource-${i}">
