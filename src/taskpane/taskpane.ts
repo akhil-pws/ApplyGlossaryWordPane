@@ -28,6 +28,8 @@ let clientList = [];
 let version = versionLink;
 let currentYear = new Date().getFullYear();
 let sourceList;
+let filteredGlossaryTerm;
+
 
 /* global document, Office, Word */
 
@@ -237,6 +239,12 @@ async function fetchDocument(action) {
     </div>
 `
 
+    if (action === 'Init') {
+      setActiveButton('mention');
+      displayMentions();
+    }else{
+      setActiveButton('aitag');
+    }
     document.getElementById('mention').addEventListener('click', () => {
       setActiveButton('mention');
       displayMentions();
@@ -265,7 +273,7 @@ async function fetchDocument(action) {
     dataList = data['Data'];
     sourceList = dataList.SourceTypeList.filter(
       (item) => item.SourceValue !== ''
-        && /\.\w+$/.test(item.SourceValue)
+        && item.AIFlag === 1
     ) // Filter items with an extension
       .map((item) => ({
         ...item, // Spread the existing properties
@@ -327,7 +335,7 @@ async function fetchClients() {
 async function formatOptionsDisplay() {
   if (!isTagUpdating) { // Check if isTagUpdating is false
     if (isGlossaryActive) {
-      await clearGlossary();
+      await removeMatchingContentControls();
     }
     const htmlBody = `
       <div class="container mt-3">
@@ -503,7 +511,7 @@ async function captureFormatting() {
 async function removeOptionsConfirmation() {
   if (!isTagUpdating) {
     if (isGlossaryActive) {
-      await clearGlossary();
+      await removeMatchingContentControls();
     } // Check if isTagUpdating is false
     const htmlBody = `
       <div class="container mt-3">
@@ -713,7 +721,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const body = `
     <div class="accordion-item">
       <h2 class="accordion-header" id="${headerId}">
-     <button class="accordion-button collapsed ${textColorClass} d-flex justify-content-between align-items-center"
+     <button class="accordion-button collapsed ${textColorClass}"
         type="button"
         data-bs-toggle="collapse"
         data-bs-target="#${collapseId}"
@@ -928,7 +936,7 @@ function copyText(text: string) {
 
 async function logout() {
   if (isGlossaryActive) {
-    await clearGlossary();
+    await removeMatchingContentControls();
   }
   sessionStorage.clear();
   window.location.hash = '#/new';
@@ -941,7 +949,7 @@ async function logout() {
 
 async function displayAiTagList() {
   if (isGlossaryActive) {
-    await clearGlossary()
+    await removeMatchingContentControls()
   }
   const container = document.getElementById('app-body');
   container.innerHTML = `
@@ -993,8 +1001,10 @@ async function displayAiTagList() {
     })
 
     document.getElementById(`changeSource-${i}`)?.addEventListener('click', () => {
+      const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
+
       // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
-      createMultiSelectDropdown(i, tag, radioButtonsHTML)
+      createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue)
     })
   }
 
@@ -1223,6 +1233,7 @@ export async function applyglossary() {
         <div id="highlighted-text"></div>`
 
   try {
+
     await Word.run(async (context) => {
 
 
@@ -1265,41 +1276,87 @@ export async function applyglossary() {
         // Optionally show an error message to the user
         // alert('Error fetching glossary data.');
       }
+      // Sort terms by length (longest first)
+      layTerms.sort((a, b) => b.ClinicalTerm.length - a.ClinicalTerm.length);
 
-      const searchPromises = layTerms.map(term => {
+      const processedTerms = new Set(); // Track added larger terms
+
+      // Filter out smaller terms if they are included in a larger term
+      const filteredTerms = layTerms.filter(term => {
+        for (const biggerTerm of processedTerms) {
+          if (biggerTerm.includes(term.ClinicalTerm.toLowerCase())) {
+            console.log(`Skipping "${term.ClinicalTerm}" because it's part of "${biggerTerm}"`);
+            return false; // Exclude this smaller term
+          }
+        }
+        processedTerms.add(term.ClinicalTerm.toLowerCase());
+        return true;
+      });
+
+      filteredGlossaryTerm = filteredTerms;
+      await removeMatchingContentControls();
+
+      const foundRanges = new Map(); // Track words already processed
+
+      const searchPromises = filteredGlossaryTerm.map(term => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load("items");
-
         return searchResults;
       });
+
       await context.sync();
-
-
 
       for (const searchResults of searchPromises) {
 
         for (const range of searchResults.items) {
-          const font = range.font;
-          font.load(["bold", "italic", "underline", "size", "highlightColor", "name", 'color']);
 
-          await context.sync();
-
-          if (
-            font.highlightColor !== capturedFormatting['Background Color'] ||
-            font.color !== capturedFormatting['Text Color'] ||
-            font.bold !== capturedFormatting['Bold'] ||
-            font.italic !== capturedFormatting['Italic'] ||
-            font.size !== capturedFormatting['Size'] ||
-            font.underline !== capturedFormatting['Underline'] ||
-            font.name !== capturedFormatting['Font Name']
-          ) {
-            font.highlightColor = "yellow";
+          if (!range || !range.text) {
+            console.log("Invalid range. Skipping...");
+            continue;
           }
 
+          // Load existing content controls inside this range
+          const font = range.font;
+          font.load(["bold", "italic", "underline", "size", "highlightColor", "name", 'color']);
+          range.load("contentControls");
+          await context.sync();
 
+          const existingControl = range.contentControls.items.length > 0;
+
+          if (existingControl) {
+            console.log(`Skipping "${range.text}" because it already has a content control.`);
+            continue; // Skip if content control is already present
+          }
+          // Check if we've already processed this term at this range
+          if (foundRanges.has(range.text)) {
+            console.log(`Skipping duplicate occurrence of "${range.text}"`);
+            continue;
+          }
+          // Mark this word as processed
+          foundRanges.set(range.text, true);
+          // Remove existing content controls if any
+          if (range.contentControls && range.contentControls.items.length > 0) {
+            console.log(`Removing existing content control from: "${range.text}"`);
+            for (const control of range.contentControls.items) {
+              control.delete(false); // 'false' keeps the text, only removes the control
+            }
+            await context.sync(); // Ensure deletion is applied before adding a new one
+          }
+
+          try {
+            // Insert a new content control
+            const contentControl = range.insertContentControl();
+            contentControl.title = `${range.text}`;
+            if (font.highlightColor !== null) {
+              contentControl.tag = `${font.highlightColor}`;
+            }
+            contentControl.font.highlightColor = "yellow"; // Highlight the control
+            contentControl.appearance = Word.ContentControlAppearance.boundingBox;
+            await context.sync();
+          } catch (error) {
+            console.error(`Error inserting content control for term "${range.text}":`, error);
+          }
         }
-
-
       }
       // document.getElementById('glossarycheck').style.display='block';
       isGlossaryActive = true;
@@ -1313,21 +1370,10 @@ export async function applyglossary() {
        <div class="loader" id="loader"></div></div>
       
 `
-
       const displayElement = document.getElementById('loader');
       displayElement.style.display = 'none';
-
-
-
-
-
-      // document.getElementById('loader').style.display='none';
-      // document.getElementById('Clear').style.display='block';
-
-      // Set the flag when glossary is marked
-
       await context.sync();
-      document.getElementById('clearGlossary').addEventListener('click', clearGlossary);
+      document.getElementById('clearGlossary').addEventListener('click', removeMatchingContentControls);
       Office.context.document.addHandlerAsync(
         Office.EventType.DocumentSelectionChanged,
         handleSelectionChange
@@ -1529,79 +1575,60 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
   }
 }
 
-
-async function clearGlossary() {
+export async function removeMatchingContentControls() {
   try {
     await Word.run(async (context) => {
       document.getElementById('app-body').innerHTML = `
       <div id="button-container">
-    
-              <div class="loader" id="loader"></div>
-    
-            <div id="highlighted-text"></div>`
+        <div class="loader" id="loader"></div>
+        <div id="highlighted-text"></div>`;
       const body = context.document.body;
 
-      const searchPromises = layTerms.map(term => {
-        const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
-        searchResults.load("items");
-        return searchResults;
-      });
-
+      // Load all content controls
+      const contentControls = body.contentControls;
+      contentControls.load("items");
       await context.sync();
-      for (const searchResults of searchPromises) {
 
-        for (const range of searchResults.items) {
-          const font = range.font;
-          font.load(["bold", "italic", "underline", "size", "highlightColor", "name", "color"]);
-
-          await context.sync();
-          if (
-            font.highlightColor !== capturedFormatting['Background Color'] ||
-            font.color !== capturedFormatting['Text Color'] ||
-            font.bold !== capturedFormatting['Bold'] ||
-            font.italic !== capturedFormatting['Italic'] ||
-            font.size !== capturedFormatting['Size'] ||
-            font.underline !== capturedFormatting['Underline'] ||
-            font.name !== capturedFormatting['Font Name']
-          ) {
-            font.highlightColor = "#FFFFFF";
-          }
-
-        }
-
-
+      if (contentControls.items.length === 0) {
+        console.log("No content controls found.");
+        return;
       }
 
-      // searchPromises.forEach(searchResults => {
-      //   searchResults.items.forEach(item => {
-      //     item.font.highlightColor = 'white'; // Reset highlight color
-      //   });
-      // });
+      for (const control of contentControls.items) {
+        if (control.title && filteredGlossaryTerm.some(term => term.ClinicalTerm.toLowerCase() === control.title.toLowerCase())) {
+          const range = control.getRange();
+          range.load("text");
+          await context.sync();
+          if (control.tag && /^#[0-9A-Fa-f]{6}$/.test(control.tag)) {
+            range.font.highlightColor = control.tag;
+          } else {
+            range.font.highlightColor = null
+          }
+          await context.sync();
+          control.delete(true);
+        }
+      }
+
       document.getElementById('app-body').innerHTML = `
       <div id="button-container">
         <button class="btn btn-secondary me-2 mark-glossary btn-sm" id="applyglossary">Apply Glossary</button>
       </div>
-`
+      `;
+
       await context.sync();
-      isGlossaryActive = false
+      isGlossaryActive = false;
       document.getElementById('applyglossary').addEventListener('click', applyglossary);
-
-
     });
-
-
-    console.log('Glossary cleared successfully');
   } catch (error) {
-    console.error('Error clearing glossary:', error);
+    console.error("Error removing content controls:", error);
   }
 }
-
 
 
 async function displayMentions() {
   if (!isTagUpdating) {
     if (isGlossaryActive) {
-      await clearGlossary();
+      await removeMatchingContentControls();
     }
 
     const htmlBody = `
@@ -1661,7 +1688,7 @@ async function displayMentions() {
 async function addGenAITags() {
   if (!isTagUpdating) {
     if (isGlossaryActive) {
-      await clearGlossary();
+      await removeMatchingContentControls();
     }
 
     let selectedClient = clientList.filter((item) => item.ID === clientId);
@@ -1815,7 +1842,7 @@ async function addGenAITags() {
 
           const isAvailableForAll = availableForAllCheckbox.checked;
           const isSaveGlobally = saveGloballyCheckbox.checked;
-           const aigroup=dataList.Group.find(element => element.DisplayName === 'AIGroup');
+          const aigroup = dataList.Group.find(element => element.DisplayName === 'AIGroup');
           const formData = {
             DisplayName: nameField.value.trim(),
             Prompt: promptField.value.trim(),
@@ -1950,7 +1977,7 @@ async function createTextGenTag(payload) {
     mentionBtn.disabled = true;
     formatDropdownBtn.disabled = true;
     iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Save`;
-    iconelement.disabled=true;
+    iconelement.disabled = true;
 
     const response = await fetch(`${baseUrl}/api/report/group-key/add`, {
       method: 'POST',
@@ -1973,7 +2000,7 @@ async function createTextGenTag(payload) {
       cancelBtnGenAi.disabled = false;
       mentionBtn.disabled = false;
       formatDropdownBtn.disabled = false;
-      iconelement.disabled =false;
+      iconelement.disabled = false;
       iconelement.innerHTML = `<i class="fa fa-check-circle me-2"></i>Save`;
       showAddTagError(data['Data'])
     }
@@ -2296,7 +2323,12 @@ function transformDocumentName(value: string): string {
 
 
 
-function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
+function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
+  const cardContainer = document.getElementById('card-container');
+
+  // Get the current scroll position
+  const scrollPosition = cardContainer.scrollTop;
+
   const multiSelectHTML = `
   <div class='p-3 bg-light'>
     <div class="mb-3">
@@ -2468,17 +2500,17 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML) {
     tag.SourceValue = sourceList
       .filter(source => selectedSources.includes(source.SourceName))  // Find the sources with matching SourceNames
       .map(source => source.SourceValue);
-    appendAccordionBody(i, tag, radioButtonsHTML);
+    appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosition);
   });
 
   document.getElementById(`cancel-src-btn-${i}`).addEventListener("click", function () {
-    appendAccordionBody(i, tag, radioButtonsHTML);
+    appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosition);
   });
 }
 
 
 
-function appendAccordionBody(i, tag, radioButtonsHTML) {
+function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosition) {
 
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
@@ -2510,7 +2542,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
            <textarea class="form-control"
                       rows="5"
                       id="chatbox-${i}"
-                      placeholder="Type here"></textarea>
+                      placeholder="Type here">${textareaValue}</textarea>
               <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
               <div class="d-flex flex-column align-self-end me-3">
                 <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
@@ -2531,6 +2563,10 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
                </button>
              </div>
           </div>`;
+
+  const cardContainer = document.getElementById('card-container');
+
+  cardContainer.scrollTop = scrollPosition;
   mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
   document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
 
@@ -2545,9 +2581,11 @@ function appendAccordionBody(i, tag, radioButtonsHTML) {
     insertTagPrompt(i)
   })
 
-  document.getElementById(`changeSource-${i}`).addEventListener('click', () => {
+  document.getElementById(`changeSource-${i}`)?.addEventListener('click', () => {
+    const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
+
     // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
-    createMultiSelectDropdown(i, tag, radioButtonsHTML)
+    createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue)
   })
 
 }
