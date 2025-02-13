@@ -1363,46 +1363,33 @@ export async function applyglossary() {
             // Add properties, or "empty" if they are null/undefined
             if (font.highlightColor !== null && font.highlightColor !== undefined) {
               fontProps.push(`highlight:${font.highlightColor}`);
-            } else {
-              fontProps.push('highlight:empty');
             }
-
+          
             if (font.color !== null && font.color !== undefined) {
               fontProps.push(`color:${font.color}`);
-            } else {
-              fontProps.push('color:empty');
             }
-
+          
             if (font.bold !== undefined) {
               fontProps.push(`bold:${font.bold}`);
-            } else {
-              fontProps.push('bold:empty');
             }
-
+          
             if (font.italic !== undefined) {
               fontProps.push(`italic:${font.italic}`);
-            } else {
-              fontProps.push('italic:empty');
             }
-
+          
             if (font.underline !== undefined) {
               fontProps.push(`underline:${font.underline}`);
-            } else {
-              fontProps.push('underline:empty');
             }
-
+          
             if (font.size !== null && font.size !== undefined) {
               fontProps.push(`size:${font.size}`);
-            } else {
-              fontProps.push('size:empty');
             }
-
-            if (font.family !== null && font.family !== undefined) {
-              fontProps.push(`family:${font.family}`);
-            } else {
-              fontProps.push('family:empty');
+          
+            // Add font family if available
+            if (font.name !== null && font.name !== undefined) {
+              fontProps.push(`family:${font.name}`);
             }
-            // Set the tag to include all the collected font properties
+          
             // Set the tag to include all the collected font properties
             contentControl.tag = fontProps.join(', ');
 
