@@ -1554,9 +1554,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
         // Replace each occurrence of the clinicalTerm with the layTerm
         searchResults.items.forEach(item => {
           item.insertText(layTerm, 'replace');
-
           // Remove the highlight color (set to white or no highlight)
-          item.font.highlightColor = 'white';
         });
         await context.sync();
         displayElement.style.display = 'none';
