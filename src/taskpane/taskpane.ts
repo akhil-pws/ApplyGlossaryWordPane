@@ -37,6 +37,7 @@ interface FontProps {
   italic?: string;
   underline?: string;
   size?: string;
+  family?:string;
 }
 
 
@@ -1396,6 +1397,11 @@ export async function applyglossary() {
               fontProps.push('size:empty');
             }
 
+            if (font.family !== null && font.family !== undefined) {
+              fontProps.push(`family:${font.family}`);
+            } else {
+              fontProps.push('family:empty');
+            }
             // Set the tag to include all the collected font properties
             // Set the tag to include all the collected font properties
             contentControl.tag = fontProps.join(', ');
@@ -1692,6 +1698,10 @@ export async function removeMatchingContentControls() {
       
             if (fontProps.size) {
               range.font.size = parseFloat(fontProps.size);
+            }
+      
+            if (fontProps.family) {
+              range.font.name = fontProps.family; // Apply the font family
             }
           }
       
