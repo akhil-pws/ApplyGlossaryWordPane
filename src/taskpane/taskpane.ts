@@ -1687,9 +1687,9 @@ export async function removeMatchingContentControls() {
               range.font.size = parseFloat(fontProps.size);
             }
       
-            if (fontProps.family) {
-              range.font.name = fontProps.family; // Apply the font family
-            }
+            // if (fontProps.family) {
+            //   range.font.name = fontProps.family; // Apply the font family
+            // }
           }
       
           // Delete the content control after applying styles
