@@ -1528,7 +1528,6 @@ function displayHighlightedText(words: string[]) {
 
   }
 }
-
 async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
   const displayElement = document.getElementById('loader');
   displayElement.style.display = 'block';
@@ -1548,23 +1547,23 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
         await context.sync();
 
         // Replace each occurrence of the clinicalTerm with the layTerm
-        searchResults.items.forEach(item => {
-          // Get the original formatting properties
-          const font = item.font;
-          font.load(['bold', 'italic', 'underline', 'color', 'highlightColor', 'size', 'name']);
-          
+        for (const item of searchResults.items) {
+          // Load the font properties
+          item.font.load(['bold', 'italic', 'underline', 'color', 'highlightColor', 'size', 'name']);
+          await context.sync();  // Ensure the properties are loaded before accessing them
+
           // Insert the layTerm while keeping the formatting
           item.insertText(layTerm, 'replace');
           
           // Apply the original formatting to the new text
-          item.font.bold = font.bold;
-          item.font.italic = font.italic;
-          item.font.underline = font.underline;
-          item.font.color = font.color;
-          item.font.highlightColor = font.highlightColor;
-          item.font.size = font.size;
-          item.font.name = font.name;
-        });
+          item.font.bold = item.font.bold;
+          item.font.italic = item.font.italic;
+          item.font.underline = item.font.underline;
+          item.font.color = item.font.color;
+          item.font.highlightColor = item.font.highlightColor;
+          item.font.size = item.font.size;
+          item.font.name = item.font.name;
+        }
 
         await context.sync();
         displayElement.style.display = 'none';
@@ -1579,6 +1578,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
     console.error('Error replacing term:', error);
   }
 }
+
 
 export async function removeMatchingContentControls() {
   try {
