@@ -30,18 +30,6 @@ let currentYear = new Date().getFullYear();
 let sourceList;
 let filteredGlossaryTerm;
 
-interface FontProps {
-  highlight?: string;
-  color?: string;
-  bold?: string;
-  italic?: string;
-  underline?: string;
-  size?: string;
-  family?:string;
-}
-
-
-
 
 /* global document, Office, Word */
 
@@ -1359,40 +1347,9 @@ export async function applyglossary() {
             // Insert a new content control
             const contentControl = range.insertContentControl();
             contentControl.title = `${range.text}`;
-            const fontProps = [];
-            // Add properties, or "empty" if they are null/undefined
-            if (font.highlightColor !== null && font.highlightColor !== undefined) {
-              fontProps.push(`highlight:${font.highlightColor}`);
+            if (font.highlightColor !== null) {
+              contentControl.tag = `${font.highlightColor}`;
             }
-          
-            if (font.color !== null && font.color !== undefined) {
-              fontProps.push(`color:${font.color}`);
-            }
-          
-            if (font.bold !== undefined) {
-              fontProps.push(`bold:${font.bold}`);
-            }
-          
-            if (font.italic !== undefined) {
-              fontProps.push(`italic:${font.italic}`);
-            }
-          
-            if (font.underline !== undefined) {
-              fontProps.push(`underline:${font.underline}`);
-            }
-          
-            if (font.size !== null && font.size !== undefined) {
-              fontProps.push(`size:${font.size}`);
-            }
-          
-            // Add font family if available
-            if (font.name !== null && font.name !== undefined) {
-              fontProps.push(`family:${font.name}`);
-            }
-          
-            // Set the tag to include all the collected font properties
-            contentControl.tag = fontProps.join(', ');
-
             contentControl.font.highlightColor = "yellow"; // Highlight the control
             contentControl.appearance = Word.ContentControlAppearance.boundingBox;
             await context.sync();
@@ -1433,7 +1390,6 @@ export async function applyglossary() {
     console.log('Error applying glossary. Please try again.');
   }
 }
-
 
 
 async function handleSelectionChange() {
@@ -1573,46 +1529,53 @@ function displayHighlightedText(words: string[]) {
   }
 }
 
-
 async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
   const displayElement = document.getElementById('loader');
   displayElement.style.display = 'block';
-  try {
 
+  try {
     await Word.run(async (context) => {
       // Get the current selection
-
       const selection = context.document.getSelection();
-
-      // Load the selection's text
       selection.load('text');
       await context.sync();
-      // Check if the selected text contains the clinicalTerm
+
       if (selection.text.toLowerCase().includes(clinicalTerm.toLowerCase())) {
         // Search for the clinicalTerm in the document
-        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: false });
+        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: true });
         searchResults.load('items');
-
+        
         await context.sync();
 
         // Replace each occurrence of the clinicalTerm with the layTerm
         searchResults.items.forEach(item => {
+          // Get the original formatting properties
+          const font = item.font;
+          font.load(['bold', 'italic', 'underline', 'color', 'highlightColor', 'size', 'name']);
+          
+          // Insert the layTerm while keeping the formatting
           item.insertText(layTerm, 'replace');
-          // Remove the highlight color (set to white or no highlight)
+          
+          // Apply the original formatting to the new text
+          item.font.bold = font.bold;
+          item.font.italic = font.italic;
+          item.font.underline = font.underline;
+          item.font.color = font.color;
+          item.font.highlightColor = font.highlightColor;
+          item.font.size = font.size;
+          item.font.name = font.name;
         });
+
         await context.sync();
         displayElement.style.display = 'none';
-
-        console.log(`Replaced '${clinicalTerm}' with '${layTerm}' and removed highlight in the document.`);
+        console.log(`Replaced '${clinicalTerm}' with '${layTerm}' and preserved the original formatting.`);
       } else {
         displayElement.style.display = 'none';
-
         console.log(`Selected text does not contain '${clinicalTerm}'.`);
       }
     });
   } catch (error) {
     displayElement.style.display = 'none';
-
     console.error('Error replacing term:', error);
   }
 }
@@ -1641,64 +1604,15 @@ export async function removeMatchingContentControls() {
           const range = control.getRange();
           range.load("text");
           await context.sync();
-      
-          if (control.tag) {
-            // Parse the tag into an object of type FontProps
-            const fontProps: FontProps = control.tag.split(',').reduce((props, item) => {
-              const [key, value] = item.split(':');
-              if (key && value) {
-                props[key.trim() as keyof FontProps] = value.trim();
-              }
-              return props;
-            }, {} as FontProps); // Explicitly cast to FontProps
-      
-            // Apply properties to the range
-            if (fontProps.highlight) {
-              if (/^#[0-9A-Fa-f]{6}$/.test(fontProps.highlight)) {
-                range.font.highlightColor = fontProps.highlight;
-              } else {
-                range.font.highlightColor = null; // Clear highlight if invalid
-              }
-            }
-      
-            if (fontProps.color) {
-              range.font.color = fontProps.color;
-            }
-      
-            if (fontProps.bold === 'true') {
-              range.font.bold = true;
-            } else if (fontProps.bold === 'false') {
-              range.font.bold = false;
-            }
-      
-            if (fontProps.italic === 'true') {
-              range.font.italic = true;
-            } else if (fontProps.italic === 'false') {
-              range.font.italic = false;
-            }
-      
-            if (fontProps.underline === 'true') {
-              range.font.underline = "Single";
-            } else if (fontProps.underline === 'false') {
-              range.font.underline = "None";
-            }
-      
-            if (fontProps.size) {
-              range.font.size = parseFloat(fontProps.size);
-            }
-      
-            if (fontProps.family) {
-              range.font.name = fontProps.family; // Apply the font family
-            }
-            await context.sync();
-
+          if (control.tag && /^#[0-9A-Fa-f]{6}$/.test(control.tag)) {
+            range.font.highlightColor = control.tag;
+          } else {
+            range.font.highlightColor = null
           }
           await context.sync();
-          // Delete the content control after applying styles
           control.delete(true);
         }
       }
-      
 
       document.getElementById('app-body').innerHTML = `
       <div id="button-container">
