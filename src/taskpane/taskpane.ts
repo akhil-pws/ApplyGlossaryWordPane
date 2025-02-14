@@ -1690,6 +1690,8 @@ export async function removeMatchingContentControls() {
             if (fontProps.family) {
               range.font.name = fontProps.family; // Apply the font family
             }
+            await context.sync();
+
           }
           await context.sync();
           // Delete the content control after applying styles
