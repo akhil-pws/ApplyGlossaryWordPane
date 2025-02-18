@@ -1560,7 +1560,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
           item.font.italic = item.font.italic;
           item.font.underline = item.font.underline;
           item.font.color = item.font.color;
-          item.font.highlightColor = item.font.highlightColor;
+          item.font.highlightColor = '#FFFFFF';
           item.font.size = item.font.size;
           item.font.name = item.font.name;
         }
