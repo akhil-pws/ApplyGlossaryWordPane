@@ -1541,7 +1541,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
 
       if (selection.text.toLowerCase().includes(clinicalTerm.toLowerCase())) {
         // Search for the clinicalTerm in the document
-        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: true });
+        const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load('items');
         
         await context.sync();
