@@ -2487,10 +2487,6 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
 
   const accordionBody = document.getElementById(`box-bottom-${i}`);
-
-  // Set height to ensure the dropdown button appears with some space
-  accordionBody.style.minHeight = "20vh";  // You can adjust this based on your needs
-
   // Clear existing content and insert the dropdown
   accordionBody.innerHTML =
     `
