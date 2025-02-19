@@ -721,15 +721,14 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const body = `
     <div class="accordion-item">
       <h2 class="accordion-header" id="${headerId}">
-     <button class="accordion-button collapsed ${textColorClass}"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#${collapseId}"
-        aria-expanded="false"
-        aria-controls="${collapseId}">
-    <span id="tagname-${i}">${tag.DisplayName}</span>
-</button>
-
+        <button class="accordion-button collapsed ${textColorClass}"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#${collapseId}"
+                aria-expanded="false"
+                aria-controls="${collapseId}">
+          <span id="tagname-${i}">${tag.DisplayName}</span>
+        </button>
       </h2>
       <div id="${collapseId}"
            class="accordion-collapse collapse"
@@ -748,28 +747,24 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                    id="doNotApply-${i}"
                    ${tag.IsApplied ? 'checked' : ''}>
           </div>
-          <div class="d-flex align-items-end justify-content-end chatbox p-2">
+          <div class="d-flex align-items-end justify-content-end chatbox p-2" id="box-bottom-${i}">
             <textarea class="form-control"
                       rows="5"
                       id="chatbox-${i}"
                       placeholder="Type here"></textarea>
-                <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
+            <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
             <div class="d-flex flex-column align-self-end me-3">
-            <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
-            <span class="tooltiptext">Insert</span>
-                <i class="fa fa-plus text-light c-pointer" ></i>
-                </button>
-            <button
-                    class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
-                    id="changeSource-${i}">
-                    ${tooltipButton}
-              <i class="fa fa-file-lines text-white"></i>
-            </button>
-            <button type="submit"
-                    class="btn btn-primary bg-primary-clr ms-2 text-white"
-                    id="sendPrompt-${i}">
-              <i class="fa fa-paper-plane text-white"></i>
-            </button>
+              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
+                <span class="tooltiptext">Insert</span>
+                <i class="fa fa-plus text-light c-pointer"></i>
+              </button>
+              <button class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip" id="changeSource-${i}">
+                ${tooltipButton}
+                <i class="fa fa-file-lines text-white"></i>
+              </button>
+              <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white" id="sendPrompt-${i}">
+                <i class="fa fa-paper-plane text-white"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -1560,7 +1555,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
           item.font.italic = item.font.italic;
           item.font.underline = item.font.underline;
           item.font.color = item.font.color;
-          item.font.highlightColor = '#FFFFFF';
+          item.font.highlightColor = '#c7c7c7';
           item.font.size = item.font.size;
           item.font.name = item.font.name;
         }
@@ -1931,9 +1926,7 @@ async function addGenAITags() {
           event.stopPropagation(); // Prevent dropdown from closing
           const checkbox = this.querySelector('.form-check-input');
           if (checkbox) {
-            if (!checkbox.disabled) {
-              checkbox.checked = !checkbox.checked;
-            }
+         
 
             if (checkbox.id === 'selectAll') {
               const isChecked = checkbox.checked;
@@ -2335,7 +2328,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
   const scrollPosition = cardContainer.scrollTop;
 
   const multiSelectHTML = `
-  <div class='p-3 bg-light'>
+  <div class='p-3 bg-light w-100'>
     <div class="mb-3">
       <label for="source-select-${i}" class="form-label"><span class="text-danger">*</span> Select Sources</label>
       <div class="dropdown w-100">
@@ -2378,10 +2371,9 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
   `;
 
   // Get the accordion body element
-  const accordionBody = document.getElementById(`accordion-body-${i}`);
+  const accordionBody = document.getElementById(`box-bottom-${i}`);
 
   // Set height to ensure the dropdown button appears with some space
-  accordionBody.style.minHeight = "20vh";  // You can adjust this based on your needs
 
   // Clear existing content and insert the dropdown
   accordionBody.innerHTML = multiSelectHTML;
@@ -2406,7 +2398,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
 
   // Handle "Select All" functionality
   selectAllCheckbox.addEventListener("change", function () {
-    const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
+   const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
     checkboxes.forEach((checkbox) => {
       checkbox.checked = this.checked;  // If "Select All" is checked, all checkboxes are checked, and vice versa
       // Update the temporary array based on the state of the checkboxes
@@ -2420,6 +2412,12 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
     });
 
     updateLabel();  // Update the label when "Select All" changes
+  });
+
+
+  const selectAllItem = document.querySelector(`#accordion-body-${i} .dropdown-item[data-checkbox-id="selectAll-${i}"]`);
+  selectAllItem.addEventListener("click", function (event) {
+    event.stopPropagation();  // Prevent dropdown from closing when clicking on the "Select All" item
   });
 
   // Handle individual checkbox state change
@@ -2443,45 +2441,11 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
     // Add click event listener to the whole list item (not just the checkbox)
     const listItem = checkbox.closest("li");
     listItem.addEventListener("click", function (event) {
-      checkbox.checked = !checkbox.checked;  // Toggle checkbox state
-
-      if (checkbox.checked) {
-        if (!selectedSources.includes(checkbox.value)) {
-          selectedSources.push(checkbox.value);  // Add source to the array if checked
-        }
-      } else {
-        selectedSources = selectedSources.filter((source) => source !== checkbox.value);  // Remove unchecked sources
-      }
-
-      const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
-      selectAllCheckbox.checked = allChecked;  // Update "Select All" checkbox
-
-      updateLabel();  // Update the label when a list item is clicked
-
       event.stopPropagation();  // Prevent dropdown from closing when clicking on list item
     });
   });
 
   // Prevent the dropdown from closing when clicking on the "Select All" checkbox label
-  const selectAllItem = document.querySelector(`#accordion-body-${i} .dropdown-item[data-checkbox-id="selectAll-${i}"]`);
-  selectAllItem.addEventListener("click", function (event) {
-    selectAllCheckbox.checked = !selectAllCheckbox.checked;  // Toggle "Select All" checkbox
-
-    // Update the state of all source checkboxes based on "Select All"
-    const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
-    checkboxes.forEach((checkbox) => {
-      checkbox.checked = selectAllCheckbox.checked;  // If "Select All" is checked, all checkboxes are checked
-    });
-
-    // Update the temporary array based on "Select All"
-    selectedSources = selectAllCheckbox.checked
-      ? Array.from(checkboxes).map((checkbox) => checkbox.value)  // Add all sources to the array if "Select All" is checked
-      : [];
-
-    updateLabel();  // Update the label when "Select All" item is clicked
-
-    event.stopPropagation();  // Prevent dropdown from closing when clicking on the "Select All" item
-  });
 
   // Initialize checkboxes based on tag.Sources
   if (tag.Sources && tag.Sources.length > 0) {
@@ -2522,7 +2486,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
     : '';
 
 
-  const accordionBody = document.getElementById(`accordion-body-${i}`);
+  const accordionBody = document.getElementById(`box-bottom-${i}`);
 
   // Set height to ensure the dropdown button appears with some space
   accordionBody.style.minHeight = "20vh";  // You can adjust this based on your needs
@@ -2530,20 +2494,6 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
   // Clear existing content and insert the dropdown
   accordionBody.innerHTML =
     `
-    <div class="chatbox" id="selected-response-parent-${i}">
-   
-            ${radioButtonsHTML}
-    </div>
-    <div class="form-check form-switch chatbox m-0">
-        <label class="form-check-label pb-3" for="doNotApply-${i}">
-           <span class="fs-12">Do not apply</span>
-        </label>
-            <input class="form-check-input"
-                   type="checkbox"
-                   id="doNotApply-${i}"
-                   ${tag.IsApplied ? 'checked' : ''}>
-      </div>
-      <div class="d-flex align-items-end justify-content-end chatbox p-2">
            <textarea class="form-control"
                       rows="5"
                       id="chatbox-${i}"
@@ -2566,8 +2516,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
                     id="sendPrompt-${i}">
                   <i class="fa fa-paper-plane text-white"></i>
                </button>
-             </div>
-          </div>`;
+             </div>`;
 
   const cardContainer = document.getElementById('card-container');
 

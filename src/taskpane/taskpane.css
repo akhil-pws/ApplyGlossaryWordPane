@@ -213,7 +213,7 @@ ul {
 }
 
 .card-container {
-  overflow: auto;
+  overflow-y: auto;
   max-height: 80vh;
 }
 
@@ -315,6 +315,7 @@ ul {
   position: sticky;
   top: 0;
   z-index: 1000;
+  height: 6rem;
 }
 
 .card-container {
@@ -351,7 +352,13 @@ ul {
 }
 
 .mh-34{
-  min-height: 33rem;
+  min-height: calc( 100vh - 102px);
+}
+
+#footer {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
 }
 
 .dropdown-toggle-sources,
