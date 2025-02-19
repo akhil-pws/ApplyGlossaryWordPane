@@ -717,7 +717,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const textColorClass = tag.IsApplied ? 'text-secondary' : '';
   const tooltipButton = tag.Sources
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
-    : '';
+    : 'Source';
   const body = `
     <div class="accordion-item">
       <h2 class="accordion-header" id="${headerId}">
@@ -763,6 +763,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                 <i class="fa fa-file-lines text-white"></i>
               </button>
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white" id="sendPrompt-${i}">
+              <span class="tooltiptext">Send</span>
                 <i class="fa fa-paper-plane text-white"></i>
               </button>
             </div>
@@ -2483,7 +2484,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
-    : '';
+    : 'Source';
 
 
   const accordionBody = document.getElementById(`box-bottom-${i}`);
@@ -2510,6 +2511,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
                 <button type="submit"
                     class="btn btn-primary bg-primary-clr ms-2 text-white"
                     id="sendPrompt-${i}">
+                    <span class="tooltiptext">Send</span>
                   <i class="fa fa-paper-plane text-white"></i>
                </button>
              </div>`;
