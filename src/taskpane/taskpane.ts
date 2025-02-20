@@ -762,7 +762,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                 ${tooltipButton}
                 <i class="fa fa-file-lines text-white"></i>
               </button>
-              <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white" id="sendPrompt-${i}">
+              <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPrompt-${i}">
               <span class="tooltiptext">Send</span>
                 <i class="fa fa-paper-plane text-white"></i>
               </button>
@@ -2509,7 +2509,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
                  <i class="fa fa-file-lines text-white"></i>
                 </button>
                 <button type="submit"
-                    class="btn btn-primary bg-primary-clr ms-2 text-white"
+                    class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip"
                     id="sendPrompt-${i}">
                     <span class="tooltiptext">Send</span>
                   <i class="fa fa-paper-plane text-white"></i>
