@@ -717,7 +717,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
   const textColorClass = tag.IsApplied ? 'text-secondary' : '';
   const tooltipButton = tag.Sources
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
-    : 'Source';
+    : '<span class="tooltiptext">Source</span>';
   const body = `
     <div class="accordion-item">
       <h2 class="accordion-header" id="${headerId}">
@@ -2484,7 +2484,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
-    : 'Source';
+    : '<span class="tooltiptext">Source</span>';
 
 
   const accordionBody = document.getElementById(`box-bottom-${i}`);
