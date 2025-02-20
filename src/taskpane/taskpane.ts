@@ -131,9 +131,9 @@ async function handleLogin(event) {
   event.preventDefault();
 
   // Get the values from the form fields
-  const organization = document.getElementById('organization').value;
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
+  const organization = (document.getElementById('organization') as HTMLInputElement).value;
+  const username = (document.getElementById('username') as HTMLInputElement).value;
+  const password = (document.getElementById('password') as HTMLInputElement).value;
   if (organization.toLowerCase().trim() === organizationName.toLocaleLowerCase().trim()) {
     document.getElementById('app-body').innerHTML = `
   <div id="button-container">
