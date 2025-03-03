@@ -278,6 +278,22 @@ async function fetchDocument(action) {
     aiTagList = aiGroup ? aiGroup.GroupKey : [];
 
     availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT');
+    availableKeys.forEach((key) => {
+      if (key.AIFlag === 1) {
+        const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
+
+        let match;
+        if ((match = regex.exec(key.EditorValue) !== null)) {
+          {
+            key.EditorValue = updateEditorFinalTable(key.EditorValue);
+            key.UserValue = key.EditorValue;
+            key.InitialTable = true;
+            key.ComponentKeyDataType = 'TABLE';
+          }
+
+        }
+      }
+    });
     fetchClients();
 
     if (action === 'Init') {
@@ -1170,10 +1186,17 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
           selectElement.classList.add('ai-selected-reply');
         }
 
+        tag.UserValue = chat.FormattedResponse
+          ? '\n' + chat.FormattedResponse
+          : chat.Response;
 
-        tag.UserValue = chat.Response;
-        tag.EditorValue = chat.Response;
-        tag.text = chat.Response;
+        tag.EditorValue = chat.FormattedResponse
+          ? '\n' + chat.FormattedResponse
+          : chat.Response;
+
+        tag.text = chat.FormattedResponse
+          ? '\n' + chat.FormattedResponse
+          : chat.Response;
       }
 
     } catch (error) {
@@ -2163,6 +2186,7 @@ function mentionDropdownFn(textareaId, DropdownId, action) {
     });
   }
 }
+
 export async function replaceMention(word: any, type: any) {
   return Word.run(async (context) => {
     try {
@@ -2176,104 +2200,110 @@ export async function replaceMention(word: any, type: any) {
       if (type === 'TABLE') {
         const parser = new DOMParser();
         const doc = parser.parseFromString(word.EditorValue, 'text/html');
-        const tableElement = doc.querySelector('table');
 
-        if (!tableElement) {
-          selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
-          throw new Error('No table found in the provided HTML.');
-        }
+        const bodyNodes = Array.from(doc.body.childNodes);
 
-        const rows = Array.from(tableElement.querySelectorAll('tr'));
-
-        if (rows.length === 0) {
-          throw new Error('The table does not contain any rows.');
-        }
-
-        const maxCols = Math.max(...rows.map(row => {
-          return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-            return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-          }, 0);
-        }));
-
-        const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-        await context.sync();
-
-        if (!paragraph) {
-          throw new Error('Failed to insert the paragraph.');
-        }
-
-        const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-        await context.sync();
-
-        if (!table) {
-          throw new Error('Failed to insert the table.');
-        }
-
-        const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-        rows.forEach((row, rowIndex) => {
-          const cells = Array.from(row.querySelectorAll('td, th'));
-          let cellIndex = 0;
-
-          cells.forEach((cell) => {
-            while (rowspanTracker[cellIndex] > 0) {
-              rowspanTracker[cellIndex]--;
-              cellIndex++;
-            }
-
-            const cellText = Array.from(cell.childNodes)
-              .map(node => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                  return node.textContent?.trim() || '';
-                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                  return (node as HTMLElement).innerText.trim();
+        for (const node of bodyNodes) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const textContent = node.textContent?.trim();
+            if (textContent) {
+              textContent.split('\n').forEach(line => {
+                if (line.trim()) {
+                  insertLineWithHeadingStyle(selection, line);
                 }
-                return '';
-              })
-              .filter(text => text.length > 0)
-              .join(' ');
-
-            const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-            const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-            // Ensure cellIndex is within bounds
-            if (cellIndex >= maxCols) {
-              // Adjust cellIndex to fit within table dimensions
-              cellIndex = maxCols - 1;
+              });
             }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as HTMLElement;
 
-            // Set cell value
-            try {
-              table.getCell(rowIndex, cellIndex).value = cellText;
+            if (element.tagName.toLowerCase() === 'table') {
+              const rows = Array.from(element.querySelectorAll('tr'));
 
-              // Clear cells that span columns
-              for (let i = 1; i < colspan; i++) {
-                if (cellIndex + i < maxCols) {
-                  table.getCell(rowIndex, cellIndex + i).value = "";
-                }
+              if (rows.length === 0) {
+                selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                continue;
               }
 
-              // Update rowspanTracker
-              if (rowspan > 1) {
-                for (let i = 0; i < colspan; i++) {
-                  if (cellIndex + i < maxCols) {
-                    rowspanTracker[cellIndex + i] = rowspan - 1;
+              const maxCols = Math.max(...rows.map(row => {
+                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                  return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                }, 0);
+              }));
+
+              const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
+              await context.sync();
+
+              const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+              table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
+
+              await context.sync();
+
+              const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+              rows.forEach((row, rowIndex) => {
+                const cells = Array.from(row.querySelectorAll('td, th'));
+                let cellIndex = 0;
+
+                cells.forEach((cell) => {
+                  while (rowspanTracker[cellIndex] > 0) {
+                    rowspanTracker[cellIndex]--;
+                    cellIndex++;
                   }
-                }
-              }
 
-              // Advance cellIndex by colspan
-              cellIndex += colspan;
-              if (cellIndex >= maxCols) {
-                // Adjust cellIndex if it exceeds the table width
-                cellIndex = maxCols - 1;
+                  const cellText = Array.from(cell.childNodes)
+                    .map(node => {
+                      if (node.nodeType === Node.TEXT_NODE) {
+                        return node.textContent?.trim() || '';
+                      } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        return (node as HTMLElement).innerText.trim();
+                      }
+                      return '';
+                    })
+                    .filter(text => text.length > 0)
+                    .join(' ');
+
+                  const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                  const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+                  // if (rowIndex === 0) {
+                  //   const cell = table.getCell(rowIndex, cellIndex);
+                  //   const paragraph = cell.body.paragraphs.getFirst();
+                  //   paragraph.font.bold = true;
+                  //   paragraph.font.highlightColor = "lightGray";  // This works!
+                  // }
+                  table.getCell(rowIndex, cellIndex).value = cellText;
+
+                  for (let i = 1; i < colspan; i++) {
+                    if (cellIndex + i < maxCols) {
+                      table.getCell(rowIndex, cellIndex + i).value = "";
+                    }
+                  }
+
+                  if (rowspan > 1) {
+                    for (let i = 0; i < colspan; i++) {
+                      if (cellIndex + i < maxCols) {
+                        rowspanTracker[cellIndex + i] = rowspan - 1;
+                      }
+                    }
+                  }
+
+                  cellIndex += colspan;
+                });
+              });
+            } else {
+              const elementText = element.innerText.trim();
+              if (elementText) {
+                elementText.split('\n').forEach(line => {
+                  if (line.trim()) {
+                    insertLineWithHeadingStyle(selection, line);
+                  }
+                });
               }
-            } catch (cellError) {
-              console.error('Error setting cell value:', cellError);
             }
-          });
-        });
-      } else {
+          }
+        }
+      }
+
+      else {
         if (word.EditorValue === '' || word.IsApplied) {
           selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
         } else {
@@ -2292,6 +2322,36 @@ export async function replaceMention(word: any, type: any) {
     }
   });
 }
+
+
+function insertLineWithHeadingStyle(range: Word.Range, line: string) {
+  let style = "Normal";
+  let text = line;
+
+  if (line.startsWith('###### ')) {
+    style = "Heading 6";
+    text = line.substring(7).trim();
+  } else if (line.startsWith('##### ')) {
+    style = "Heading 5";
+    text = line.substring(6).trim();
+  } else if (line.startsWith('#### ')) {
+    style = "Heading 4";
+    text = line.substring(5).trim();
+  } else if (line.startsWith('### ')) {
+    style = "Heading 3";
+    text = line.substring(4).trim();
+  } else if (line.startsWith('## ')) {
+    style = "Heading 2";
+    text = line.substring(3).trim();
+  } else if (line.startsWith('# ')) {
+    style = "Heading 1";
+    text = line.substring(2).trim();
+  }
+
+  const paragraph = range.insertParagraph(text, Word.InsertLocation.before);
+  paragraph.style = style;
+}
+
 
 
 function removeQuotes(value: string): string {
@@ -2543,4 +2603,72 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
     createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue)
   })
 
+
+}
+
+
+function updateEditorFinalTable(data) {
+  const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
+  const tableArrays = [];
+  let match;
+  // Extract and parse the table content from each EditorValue
+  while ((match = regex.exec(data)) !== null) {
+    try {
+      const parsedContent = JSON.parse(match[1]);
+      tableArrays.push(parsedContent);
+    } catch (error) {
+      console.error('Failed to parse JSON:', error, match[1]);
+    }
+  }
+
+  let tables = [];
+  // Generate HTML tables from the parsed content
+  tableArrays.forEach((obj, i) => {
+    const table = document.createElement('table');
+    table.className = 'table table-styling table-striped table-bordered';
+    table.id = `table-${i}`;
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    // Assuming obj[0] has the keys for the table columns
+    const keysArray = Object.keys(obj[0]);
+
+    keysArray.forEach((key) => {
+      const th = document.createElement('th');
+      th.className = 'header-text';
+      th.textContent = key;
+      headerRow.appendChild(th);
+    });
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    // Iterate through the data and create rows
+    Object.entries(obj).forEach(([key, value]) => {
+      const row = document.createElement('tr');
+
+      keysArray.forEach((key) => {
+        const td = document.createElement('td');
+        td.textContent = value[key] || ''; // Handle empty or undefined values
+        row.appendChild(td);
+      });
+
+      tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+
+    // Add the table HTML to the tables array
+    tables.push(table.outerHTML);
+  });
+
+  // Replace <TableStart>...</TableEnd> with the generated table HTML
+  let tableIndex = 0;
+  const output = data.replace(regex, () => {
+    return tables[tableIndex++] || ''; // Replace with the appropriate table HTML
+  });
+  return '\n ' + output;
 }
