@@ -240,9 +240,9 @@ async function fetchDocument(action) {
 `
 
     if (action === 'Init') {
-      setActiveButton('mention');
-      displayMentions();
-    }else{
+      setActiveButton('aitag');
+      displayAiTagList();
+    } else {
       setActiveButton('aitag');
     }
     document.getElementById('mention').addEventListener('click', () => {
@@ -1539,7 +1539,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
         // Search for the clinicalTerm in the document
         const searchResults = selection.search(clinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load('items');
-        
+
         await context.sync();
 
         // Replace each occurrence of the clinicalTerm with the layTerm
@@ -1550,7 +1550,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
 
           // Insert the layTerm while keeping the formatting
           item.insertText(layTerm, 'replace');
-          
+
           // Apply the original formatting to the new text
           item.font.bold = item.font.bold;
           item.font.italic = item.font.italic;
@@ -1927,7 +1927,7 @@ async function addGenAITags() {
           event.stopPropagation(); // Prevent dropdown from closing
           const checkbox = this.querySelector('.form-check-input');
           if (checkbox) {
-         
+
 
             if (checkbox.id === 'selectAll') {
               const isChecked = checkbox.checked;
@@ -2399,7 +2399,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
 
   // Handle "Select All" functionality
   selectAllCheckbox.addEventListener("change", function () {
-   const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
+    const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
     checkboxes.forEach((checkbox) => {
       checkbox.checked = this.checked;  // If "Select All" is checked, all checkboxes are checked, and vice versa
       // Update the temporary array based on the state of the checkboxes
