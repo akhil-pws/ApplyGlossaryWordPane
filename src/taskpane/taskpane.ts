@@ -238,13 +238,6 @@ async function fetchDocument(action) {
         </div>
     </div>
 `
-
-    if (action === 'Init') {
-      setActiveButton('aitag');
-      displayAiTagList();
-    } else {
-      setActiveButton('aitag');
-    }
     document.getElementById('mention').addEventListener('click', () => {
       setActiveButton('mention');
       displayMentions();
@@ -286,9 +279,19 @@ async function fetchDocument(action) {
 
     availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT');
     fetchClients();
+
+    if (action === 'Init') {
+      setActiveButton('aitag');
+      displayAiTagList();
+    } else {
+      setActiveButton('aitag');
+    }
+
+
     if (action === 'AIpanel') {
       displayAiTagList();
     }
+
 
   } catch (error) {
     console.error('Error fetching glossary data:', error);
