@@ -1622,7 +1622,7 @@ export async function applyglossary() {
           range.load("contentControls");
           await context.sync();
 
-          const existingControl = range.contentControls.items.length > 0 && (!range.contentControls.items[0].tag || !range.contentControls.items[0].tag.startsWith('tagname-'));
+          const existingControl = range.contentControls.items.length > 0;
 
           if (existingControl) {
             console.log(`Skipping "${range.text}" because it already has a content control.`);
@@ -1703,11 +1703,17 @@ export async function checkGlossary() {
       const selection = context.document.getSelection();
 
       selection.load("text, font.highlightColor");
+      const contentControls = selection.contentControls;
 
+      contentControls.load("items/title,items/tag");
       await context.sync();
 
-
-
+      if (contentControls.items.length > 0) {
+        const cc = contentControls.items[0];
+        if (cc.tag && cc.tag.startsWith("tagname")) {
+          return;
+        }
+      }
       if (selection.text) {
         const loader = document.getElementById('loader');
         if (loader) {
