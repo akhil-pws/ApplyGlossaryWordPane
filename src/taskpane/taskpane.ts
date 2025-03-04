@@ -1622,7 +1622,7 @@ export async function applyglossary() {
           range.load("contentControls");
           await context.sync();
 
-          const existingControl = range.contentControls.items.length > 0;
+          const existingControl = range.contentControls.items.length > 0 && (!range.contentControls.items[0].tag || !range.contentControls.items[0].tag.startsWith('tagname-'));
 
           if (existingControl) {
             console.log(`Skipping "${range.text}" because it already has a content control.`);
@@ -3080,7 +3080,7 @@ async function handleSelectionChanged() {
 
     if (contentControls.items.length > 0) {
       const cc = contentControls.items[0];
-      if (cc.tag.startsWith("tagname")) {
+      if (cc.tag && cc.tag.startsWith("tagname")) {
         showTagDetails(cc.tag);  // This will handle the highlighting logic
       }
     } else {
