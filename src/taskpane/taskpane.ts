@@ -29,6 +29,8 @@ let version = versionLink;
 let currentYear = new Date().getFullYear();
 let sourceList;
 let filteredGlossaryTerm;
+let currentlyHighlightedElement: HTMLElement | null = null;
+
 
 
 /* global document, Office, Word */
@@ -45,6 +47,7 @@ window.addEventListener('hashchange', () => {
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Word) {
+    registerSelectionChangedHandler();
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("footer").innerText = `© ${currentYear} - TrialAssure LINK AI Assistant ${version}`
     const editor = document.getElementById('editor');
@@ -52,6 +55,7 @@ Office.onReady((info) => {
     window.location.hash = '#/login';
     retrieveDocumentProperties()
   }
+
 });
 
 
@@ -764,7 +768,7 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                 data-bs-target="#${collapseId}"
                 aria-expanded="false"
                 aria-controls="${collapseId}">
-          <span id="tagname-${i}">${tag.DisplayName}</span>
+          <span id="tagname-${aiTagList[i].DisplayName}">${tag.DisplayName}</span>
         </button>
       </h2>
       <div id="${collapseId}"
@@ -816,7 +820,7 @@ async function onDoNotApplyChange(event, index, tag: any) {
   let sourceListBtn = document.getElementById(`changeSource-${index}`) as HTMLButtonElement;
   sourceListBtn.disabled = true;
   const isChecked = event.target.checked;
-  const tagname = document.getElementById(`tagname-${index}`);
+  const tagname = document.getElementById(`tagname-${aiTagList[index].DisplayName}`);
   const dnaBtn = document.getElementById(`doNotApply-${index}`) as HTMLInputElement;
 
   try {
@@ -1249,7 +1253,7 @@ async function applyAITagFn() {
             const range = item.getRange();
             const contentControl = range.insertContentControl();
             contentControl.title = tag.DisplayName;
-            contentControl.tag = `aiTag_${tag.DisplayName}`;
+            contentControl.tag = `tagname-${tag.DisplayName}`;
           } else if (tag.ComponentKeyDataType === 'TABLE') {
             // Replace the existing tag with a table instead
             const range = item.getRange();
@@ -1268,7 +1272,7 @@ async function applyAITagFn() {
           // Create content control around this paragraph (will expand as we add content)
           const contentControl = containerParagraph.insertContentControl();
           contentControl.title = tag.DisplayName;
-          contentControl.tag = `aiTag_${tag.DisplayName}`;
+          contentControl.tag = `tagname-${tag.DisplayName}`;
           await context.sync();
 
           const parser = new DOMParser();
@@ -2944,3 +2948,52 @@ function updateEditorFinalTable(data) {
   });
   return '\n ' + output;
 }
+
+
+function registerSelectionChangedHandler() {
+  Office.context.document.addHandlerAsync(
+    Office.EventType.DocumentSelectionChanged,
+    handleSelectionChanged
+  );
+}
+
+async function handleSelectionChanged() {
+  await Word.run(async (context) => {
+    const selection = context.document.getSelection();
+    const contentControls = selection.contentControls;
+
+    contentControls.load("items/title,items/tag");
+    await context.sync();
+
+    if (contentControls.items.length > 0) {
+      const cc = contentControls.items[0];
+      if (cc.tag.startsWith("tagname")) {
+        showTagDetails(cc.tag);  // This will handle the highlighting logic
+      }
+    } else {
+      if (currentlyHighlightedElement) {
+        currentlyHighlightedElement.style.backgroundColor = "";
+      }
+    }
+  });
+}
+
+function showTagDetails(tag: string) {
+  // Clear previous highlight
+  if (currentlyHighlightedElement) {
+    currentlyHighlightedElement.style.backgroundColor = "";
+  }
+
+  // Find and highlight the new element
+  const spanElement = document.getElementById(tag);
+  if (spanElement) {
+    spanElement.style.backgroundColor = "yellow";
+
+    // Store the currently highlighted element
+    currentlyHighlightedElement = spanElement;
+  } else {
+    // If no element found, clear the tracker
+    currentlyHighlightedElement = null;
+  }
+}
+
