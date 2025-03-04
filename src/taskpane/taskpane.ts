@@ -1066,6 +1066,16 @@ async function insertTagPrompt(index: any) {
         selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
       } else {
         if (aiTagList[index].ComponentKeyDataType === 'TABLE') {
+
+          const containerParagraph = selection.insertParagraph("", Word.InsertLocation.before);
+          await context.sync();
+
+          // Create content control around this paragraph (will expand as we add content)
+          const contentControl = containerParagraph.insertContentControl();
+          contentControl.title = aiTagList[index].DisplayName;
+          contentControl.tag = `tagname-${aiTagList[index].DisplayName}`;
+          await context.sync();
+
           const parser = new DOMParser();
           const doc = parser.parseFromString(aiTagList[index].EditorValue, 'text/html');
 
@@ -1077,7 +1087,8 @@ async function insertTagPrompt(index: any) {
               if (textContent) {
                 textContent.split('\n').forEach(line => {
                   if (line.trim()) {
-                    insertLineWithHeadingStyle(selection, line);
+                    const para = contentControl.insertParagraph(line, Word.InsertLocation.end);
+                    applyHeadingStyleIfNeeded(para, line);  // Optional if you want heading styles
                   }
                 });
               }
@@ -1088,25 +1099,15 @@ async function insertTagPrompt(index: any) {
                 const rows = Array.from(element.querySelectorAll('tr'));
 
                 if (rows.length === 0) {
-                  selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                  contentControl.insertParagraph("[Empty Table]", Word.InsertLocation.end);
                   continue;
                 }
 
-                const maxCols = Math.max(...rows.map(row => {
-                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                  }, 0);
-                }));
-
-                const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
+                const table = contentControl.insertTable(rows.length, element.rows[0].cells.length, Word.InsertLocation.end);
+                table.style = "Grid Table 4 - Accent 1";
                 await context.sync();
 
-                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
-
-                await context.sync();
-
-                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+                const rowspanTracker: number[] = new Array(element.rows[0].cells.length).fill(0);
 
                 rows.forEach((row, rowIndex) => {
                   const cells = Array.from(row.querySelectorAll('td, th'));
@@ -1132,23 +1133,18 @@ async function insertTagPrompt(index: any) {
 
                     const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
                     const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                    // if (rowIndex === 0) {
-                    //   const cell = table.getCell(rowIndex, cellIndex);
-                    //   const paragraph = cell.body.paragraphs.getFirst();
-                    //   paragraph.font.bold = true;
-                    //   paragraph.font.highlightColor = "lightGray";  // This works!
-                    // }
+
                     table.getCell(rowIndex, cellIndex).value = cellText;
 
                     for (let i = 1; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
+                      if (cellIndex + i < element.rows[0].cells.length) {
                         table.getCell(rowIndex, cellIndex + i).value = "";
                       }
                     }
 
                     if (rowspan > 1) {
                       for (let i = 0; i < colspan; i++) {
-                        if (cellIndex + i < maxCols) {
+                        if (cellIndex + i < element.rows[0].cells.length) {
                           rowspanTracker[cellIndex + i] = rowspan - 1;
                         }
                       }
@@ -1162,22 +1158,27 @@ async function insertTagPrompt(index: any) {
                 if (elementText) {
                   elementText.split('\n').forEach(line => {
                     if (line.trim()) {
-                      insertLineWithHeadingStyle(selection, line);
+                      const para = contentControl.insertParagraph(line, Word.InsertLocation.end);
+                      applyHeadingStyleIfNeeded(para, line);  // Optional if you want heading styles
                     }
                   });
                 }
               }
             }
           }
+
         } else {
           if (aiTagList[index].EditorValue === '' || aiTagList[index].IsApplied) {
             selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
           } else {
             let content = removeQuotes(aiTagList[index].EditorValue);
             let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-
+            let cc = selection.insertContentControl();
+            cc.tag = `tagname-${aiTagList[index].DisplayName}`;
+            cc.title = aiTagList[index].DisplayName;
+            cc.appearance = "BoundingBox";
             lines.forEach(line => {
-              selection.insertParagraph(line, Word.InsertLocation.before);
+              cc.insertParagraph(line, Word.InsertLocation.end);
             });
           }
         }
@@ -2476,105 +2477,207 @@ export async function replaceMention(word: any, type: any) {
       }
 
       if (type === 'TABLE') {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(word.EditorValue, 'text/html');
+        if (word.AIFlag === 0) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(word.EditorValue, 'text/html');
 
-        const bodyNodes = Array.from(doc.body.childNodes);
+          const bodyNodes = Array.from(doc.body.childNodes);
 
-        for (const node of bodyNodes) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const textContent = node.textContent?.trim();
-            if (textContent) {
-              textContent.split('\n').forEach(line => {
-                if (line.trim()) {
-                  insertLineWithHeadingStyle(selection, line);
-                }
-              });
-            }
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node as HTMLElement;
-
-            if (element.tagName.toLowerCase() === 'table') {
-              const rows = Array.from(element.querySelectorAll('tr'));
-
-              if (rows.length === 0) {
-                selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                continue;
-              }
-
-              const maxCols = Math.max(...rows.map(row => {
-                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                  return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                }, 0);
-              }));
-
-              const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-              await context.sync();
-
-              const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-              table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
-
-              await context.sync();
-
-              const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-              rows.forEach((row, rowIndex) => {
-                const cells = Array.from(row.querySelectorAll('td, th'));
-                let cellIndex = 0;
-
-                cells.forEach((cell) => {
-                  while (rowspanTracker[cellIndex] > 0) {
-                    rowspanTracker[cellIndex]--;
-                    cellIndex++;
-                  }
-
-                  const cellText = Array.from(cell.childNodes)
-                    .map(node => {
-                      if (node.nodeType === Node.TEXT_NODE) {
-                        return node.textContent?.trim() || '';
-                      } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        return (node as HTMLElement).innerText.trim();
-                      }
-                      return '';
-                    })
-                    .filter(text => text.length > 0)
-                    .join(' ');
-
-                  const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                  const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                  // if (rowIndex === 0) {
-                  //   const cell = table.getCell(rowIndex, cellIndex);
-                  //   const paragraph = cell.body.paragraphs.getFirst();
-                  //   paragraph.font.bold = true;
-                  //   paragraph.font.highlightColor = "lightGray";  // This works!
-                  // }
-                  table.getCell(rowIndex, cellIndex).value = cellText;
-
-                  for (let i = 1; i < colspan; i++) {
-                    if (cellIndex + i < maxCols) {
-                      table.getCell(rowIndex, cellIndex + i).value = "";
-                    }
-                  }
-
-                  if (rowspan > 1) {
-                    for (let i = 0; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
-                        rowspanTracker[cellIndex + i] = rowspan - 1;
-                      }
-                    }
-                  }
-
-                  cellIndex += colspan;
-                });
-              });
-            } else {
-              const elementText = element.innerText.trim();
-              if (elementText) {
-                elementText.split('\n').forEach(line => {
+          for (const node of bodyNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              const textContent = node.textContent?.trim();
+              if (textContent) {
+                textContent.split('\n').forEach(line => {
                   if (line.trim()) {
                     insertLineWithHeadingStyle(selection, line);
                   }
                 });
+              }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+
+              if (element.tagName.toLowerCase() === 'table') {
+                const rows = Array.from(element.querySelectorAll('tr'));
+
+                if (rows.length === 0) {
+                  selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                  continue;
+                }
+
+                const maxCols = Math.max(...rows.map(row => {
+                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                  }, 0);
+                }));
+
+                const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
+                await context.sync();
+
+                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
+
+                await context.sync();
+
+                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+                rows.forEach((row, rowIndex) => {
+                  const cells = Array.from(row.querySelectorAll('td, th'));
+                  let cellIndex = 0;
+
+                  cells.forEach((cell) => {
+                    while (rowspanTracker[cellIndex] > 0) {
+                      rowspanTracker[cellIndex]--;
+                      cellIndex++;
+                    }
+
+                    const cellText = Array.from(cell.childNodes)
+                      .map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                          return node.textContent?.trim() || '';
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          return (node as HTMLElement).innerText.trim();
+                        }
+                        return '';
+                      })
+                      .filter(text => text.length > 0)
+                      .join(' ');
+
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+                    // if (rowIndex === 0) {
+                    //   const cell = table.getCell(rowIndex, cellIndex);
+                    //   const paragraph = cell.body.paragraphs.getFirst();
+                    //   paragraph.font.bold = true;
+                    //   paragraph.font.highlightColor = "lightGray";  // This works!
+                    // }
+                    table.getCell(rowIndex, cellIndex).value = cellText;
+
+                    for (let i = 1; i < colspan; i++) {
+                      if (cellIndex + i < maxCols) {
+                        table.getCell(rowIndex, cellIndex + i).value = "";
+                      }
+                    }
+
+                    if (rowspan > 1) {
+                      for (let i = 0; i < colspan; i++) {
+                        if (cellIndex + i < maxCols) {
+                          rowspanTracker[cellIndex + i] = rowspan - 1;
+                        }
+                      }
+                    }
+
+                    cellIndex += colspan;
+                  });
+                });
+              } else {
+                const elementText = element.innerText.trim();
+                if (elementText) {
+                  elementText.split('\n').forEach(line => {
+                    if (line.trim()) {
+                      insertLineWithHeadingStyle(selection, line);
+                    }
+                  });
+                }
+              }
+            }
+          }
+        } else {
+          const containerParagraph = selection.insertParagraph("", Word.InsertLocation.before);
+          await context.sync();
+
+          // Create content control around this paragraph (will expand as we add content)
+          const contentControl = containerParagraph.insertContentControl();
+          contentControl.title = word.DisplayName;
+          contentControl.tag = `tagname-${word.DisplayName}`;
+          await context.sync();
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(word.EditorValue, 'text/html');
+
+          const bodyNodes = Array.from(doc.body.childNodes);
+
+          for (const node of bodyNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              const textContent = node.textContent?.trim();
+              if (textContent) {
+                textContent.split('\n').forEach(line => {
+                  if (line.trim()) {
+                    const para = contentControl.insertParagraph(line, Word.InsertLocation.end);
+                    applyHeadingStyleIfNeeded(para, line);  // Optional if you want heading styles
+                  }
+                });
+              }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+
+              if (element.tagName.toLowerCase() === 'table') {
+                const rows = Array.from(element.querySelectorAll('tr'));
+
+                if (rows.length === 0) {
+                  contentControl.insertParagraph("[Empty Table]", Word.InsertLocation.end);
+                  continue;
+                }
+
+                const table = contentControl.insertTable(rows.length, element.rows[0].cells.length, Word.InsertLocation.end);
+                table.style = "Grid Table 4 - Accent 1";
+                await context.sync();
+
+                const rowspanTracker: number[] = new Array(element.rows[0].cells.length).fill(0);
+
+                rows.forEach((row, rowIndex) => {
+                  const cells = Array.from(row.querySelectorAll('td, th'));
+                  let cellIndex = 0;
+
+                  cells.forEach((cell) => {
+                    while (rowspanTracker[cellIndex] > 0) {
+                      rowspanTracker[cellIndex]--;
+                      cellIndex++;
+                    }
+
+                    const cellText = Array.from(cell.childNodes)
+                      .map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                          return node.textContent?.trim() || '';
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          return (node as HTMLElement).innerText.trim();
+                        }
+                        return '';
+                      })
+                      .filter(text => text.length > 0)
+                      .join(' ');
+
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+
+                    table.getCell(rowIndex, cellIndex).value = cellText;
+
+                    for (let i = 1; i < colspan; i++) {
+                      if (cellIndex + i < element.rows[0].cells.length) {
+                        table.getCell(rowIndex, cellIndex + i).value = "";
+                      }
+                    }
+
+                    if (rowspan > 1) {
+                      for (let i = 0; i < colspan; i++) {
+                        if (cellIndex + i < element.rows[0].cells.length) {
+                          rowspanTracker[cellIndex + i] = rowspan - 1;
+                        }
+                      }
+                    }
+
+                    cellIndex += colspan;
+                  });
+                });
+              } else {
+                const elementText = element.innerText.trim();
+                if (elementText) {
+                  elementText.split('\n').forEach(line => {
+                    if (line.trim()) {
+                      const para = contentControl.insertParagraph(line, Word.InsertLocation.end);
+                      applyHeadingStyleIfNeeded(para, line);  // Optional if you want heading styles
+                    }
+                  });
+                }
               }
             }
           }
@@ -2585,10 +2688,20 @@ export async function replaceMention(word: any, type: any) {
         } else {
           let content = removeQuotes(word.EditorValue);
           let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+          if (word.AIFlag === 0) {
+            lines.forEach(line => {
+              selection.insertParagraph(line, Word.InsertLocation.before);
+            });
+          } else {
+            let cc = selection.insertContentControl();
+            cc.tag = `tagname-${word.DisplayName}`;
+            cc.title = word.DisplayName;
+            cc.appearance = "BoundingBox";
+            lines.forEach(line => {
+              cc.insertParagraph(line, Word.InsertLocation.end);
+            });
+          }
 
-          lines.forEach(line => {
-            selection.insertParagraph(line, Word.InsertLocation.before);
-          });
         }
       }
 
