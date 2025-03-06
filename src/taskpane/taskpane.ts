@@ -3108,7 +3108,6 @@ function showTagDetails(tag: string) {
   if (spanElement) {
     spanElement.style.backgroundColor = "yellow";
 
-    // Store the currently highlighted element
     currentlyHighlightedElement = spanElement;
   } else {
     // If no element found, clear the tracker
