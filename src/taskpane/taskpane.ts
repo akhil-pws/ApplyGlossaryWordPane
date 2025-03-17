@@ -2846,11 +2846,11 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
 }
 
-
 function updateEditorFinalTable(data) {
   const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
   const tableArrays = [];
   let match;
+
   // Extract and parse the table content from each EditorValue
   while ((match = regex.exec(data)) !== null) {
     try {
@@ -2862,38 +2862,93 @@ function updateEditorFinalTable(data) {
   }
 
   let tables = [];
-  // Generate HTML tables from the parsed content
+  
   tableArrays.forEach((obj, i) => {
     const table = document.createElement('table');
     table.className = 'table table-styling table-striped table-bordered';
     table.id = `table-${i}`;
 
     const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
+    const headerRow1 = document.createElement('tr'); // Main headers
+    const headerRow2 = document.createElement('tr'); // Sub-headers (only added if needed)
 
-    // Assuming obj[0] has the keys for the table columns
-    const keysArray = Object.keys(obj[0]);
+    let keysArray = Object.keys(obj[0]); // Extract keys
+    let hasNestedHeaders = false;
+    let nestedKeysMap = {}; // Store sub-headers
 
+    // Check for nested objects and prepare headers
     keysArray.forEach((key) => {
-      const th = document.createElement('th');
-      th.className = 'header-text';
-      th.textContent = key;
-      headerRow.appendChild(th);
+      if (key === "Period") return; // Skip "Period" for now
+
+      if (typeof obj[0][key] === 'object' && obj[0][key] !== null) {
+        hasNestedHeaders = true;
+        let subKeys = Object.keys(obj[0][key]);
+        nestedKeysMap[key] = subKeys;
+
+        // Create a main header with colspan for sub-headers
+        const th = document.createElement('th');
+        th.className = 'header-text';
+        th.textContent = key;
+        th.colSpan = subKeys.length; // Expand to fit all sub-headers
+        headerRow1.appendChild(th);
+
+        // Add sub-header columns
+        subKeys.forEach((subKey) => {
+          const subTh = document.createElement('th');
+          subTh.className = 'header-text';
+          subTh.textContent = subKey;
+          headerRow2.appendChild(subTh);
+        });
+      } else {
+        // Standard column with rowspan
+        const th = document.createElement('th');
+        th.className = 'header-text';
+        th.textContent = key;
+        th.rowSpan = hasNestedHeaders ? 2 : 1; // Rowspan if sub-headers exist
+        headerRow1.appendChild(th);
+      }
     });
 
-    thead.appendChild(headerRow);
+    // Add "Period" as a single merged column at the beginning
+    const periodTh = document.createElement('th');
+    periodTh.className = 'header-text';
+    periodTh.textContent = "Period";
+    periodTh.rowSpan = hasNestedHeaders ? 2 : 1;
+    headerRow1.prepend(periodTh);
+
+    thead.appendChild(headerRow1);
+    if (hasNestedHeaders) {
+      thead.appendChild(headerRow2);
+    }
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
 
     // Iterate through the data and create rows
-    Object.entries(obj).forEach(([key, value]) => {
+    obj.forEach((rowData) => {
       const row = document.createElement('tr');
 
+      // Add "Period" column first
+      const periodTd = document.createElement('td');
+      periodTd.textContent = rowData["Period"];
+      row.appendChild(periodTd);
+
       keysArray.forEach((key) => {
-        const td = document.createElement('td');
-        td.textContent = value[key] || ''; // Handle empty or undefined values
-        row.appendChild(td);
+        if (key === "Period") return; // Skip "Period" again
+
+        if (typeof rowData[key] === 'object' && rowData[key] !== null) {
+          // Handle sub-columns
+          nestedKeysMap[key].forEach((subKey) => {
+            const td = document.createElement('td');
+            td.textContent = rowData[key][subKey] || ''; // Handle undefined values
+            row.appendChild(td);
+          });
+        } else {
+          // Normal cell
+          const td = document.createElement('td');
+          td.textContent = rowData[key] || '';
+          row.appendChild(td);
+        }
       });
 
       tbody.appendChild(row);
@@ -2910,5 +2965,6 @@ function updateEditorFinalTable(data) {
   const output = data.replace(regex, () => {
     return tables[tableIndex++] || ''; // Replace with the appropriate table HTML
   });
+
   return '\n ' + output;
 }
