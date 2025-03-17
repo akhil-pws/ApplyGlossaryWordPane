@@ -101,7 +101,7 @@ function loadLoginPage() {
 
 
   document.getElementById('app-body').innerHTML = `
-    <div class="container mt-5">
+    <div class="container">
       <form id="login-form" class="p-4 border rounded">
         <div class="mb-3">
           <label for="organization" class="form-label fw-bold">Organization</label>
@@ -711,7 +711,7 @@ async function generateRadioButtons(tag: any, index: number): Promise<string> {
             </div>
           </span>
         </div>
-        <div class="col-md-12 mt-2 p-2 d-flex align-items-center">
+        <div class="col-md-12 mt-2 p-2 ps-3 d-flex align-items-center">
           <span class="radio-select">
             <input class="form-check-input c-pointer" type="radio" name="flexRadioDefault-${index}"
               id="flexRadioDefault1-${index}-${j}" ${chat.Selected === 1 ? 'checked' : ''}>
@@ -1055,7 +1055,6 @@ async function insertTagPrompt(index: any) {
       if (!selection) {
         throw new Error('Selection is invalid or not found.');
       }
-
 
       if (aiTagList[index].EditorValue === '') {
         selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
@@ -1424,17 +1423,20 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
           selectElement.classList.add('ai-selected-reply');
         }
 
+        
+        tag.ComponentKeyDataType= chat.FormattedResponse?'TABLE':'TEXT';
         tag.UserValue = chat.FormattedResponse
-          ? '\n' + chat.FormattedResponse
+          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
           : chat.Response;
 
         tag.EditorValue = chat.FormattedResponse
-          ? '\n' + chat.FormattedResponse
+          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
           : chat.Response;
 
         tag.text = chat.FormattedResponse
-          ? '\n' + chat.FormattedResponse
+          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
           : chat.Response;
+
       }
 
     } catch (error) {
