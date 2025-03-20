@@ -2649,7 +2649,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
           <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="selectAll-${i}">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll-${i}">
-              <label class="form-check-label" for="selectAll-${i}">Select All</label>
+              <label class="form-check-label w-100" for="selectAll-${i}">Select All</label>
             </div>
           </li>
           ${sourceList
@@ -2658,7 +2658,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
               <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="source-${i}-${index}">
                 <div class="form-check">
                   <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${i}-${index}">
-                  <label class="form-check-label text-prewrap" for="source-${i}-${index}">${source.SourceName}</label>
+                  <label class="form-check-label w-100 text-prewrap" for="source-${i}-${index}">${source.SourceName}</label>
                 </div>
               </li>
             `
@@ -2847,132 +2847,68 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 }
 
 
+function jsonToHtmlTable(jsonData) {
+  if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
+       return '<p>No data available</p>';
+   }
+
+   let headers = new Set();
+   let rows = [];
+
+   function flattenObject(obj, prefix = "", result = {}) {
+       Object.keys(obj).forEach(key => {
+           const value = obj[key];
+           const newKey = prefix ? `${prefix} > ${key}` : key;
+
+           if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+               flattenObject(value, newKey, result);
+           } else if (Array.isArray(value)) {
+               result[newKey] = value.map(item => {
+                   return typeof item === 'object' 
+                       ? Object.entries(item).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join('<br>') 
+                       : item;
+               }).join('<br>');
+           } else {
+               result[newKey] = value;
+           }
+       });
+       return result;
+   }
+
+   if (!Array.isArray(jsonData)) {
+       jsonData = Object.entries(jsonData).map(([key, value]) => ({ [key]: value }));
+   }
+
+   jsonData.forEach(item => {
+       let flattenedItem = flattenObject(item);
+       Object.keys(flattenedItem).forEach(key => headers.add(key));
+       rows.push(flattenedItem);
+   });
+
+   let table = '<table border="1" cellspacing="0" cellpadding="5">';
+   table += '<tr>' + [...headers].map(header => `<th>${header}</th>`).join('') + '</tr>';
+   rows.forEach(row => {
+       table += '<tr>' + [...headers].map(header => `<td>${row[header] || ''}</td>`).join('') + '</tr>';
+   });
+
+   table += '</table>';
+   return table;
+}
+
 function updateEditorFinalTable(data) {
   const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
-  const tableArrays = [];
   let match;
+  let tables = [];
 
-  // Extract and parse the table content from each EditorValue
   while ((match = regex.exec(data)) !== null) {
     try {
       const parsedContent = JSON.parse(match[1]);
-      tableArrays.push(parsedContent);
+      tables.push(jsonToHtmlTable(parsedContent));
     } catch (error) {
-      console.error('Failed to parse JSON:', error, match[1]);
+      console.error("Failed to parse JSON:", error, match[1]);
     }
   }
 
-  let tables = [];
-
-  tableArrays.forEach((obj, i) => {
-    const table = document.createElement('table');
-    table.className = 'table table-styling table-striped table-bordered';
-    table.id = `table-${i}`;
-
-    const thead = document.createElement('thead');
-    const headerRow1 = document.createElement('tr'); // Main headers
-    const headerRow2 = document.createElement('tr'); // Sub-headers (only added if needed)
-
-    let hasNestedHeaders = false;
-    let nestedKeysMap = {};
-
-    // Identify nested objects and extract keys dynamically
-    Object.keys(obj).forEach((key) => {
-      if (typeof obj[key] === 'object' && obj[key] !== null) {
-        hasNestedHeaders = true;
-        let subKeys = Object.keys(obj[key]);
-        nestedKeysMap[key] = subKeys;
-
-        // Main header with colspan
-        const th = document.createElement('th');
-        th.className = 'header-text';
-        th.textContent = key;
-        th.colSpan = subKeys.length;
-        headerRow1.appendChild(th);
-
-        // Add sub-headers
-        subKeys.forEach((subKey) => {
-          const subTh = document.createElement('th');
-          subTh.className = 'header-text';
-          subTh.textContent = subKey;
-          headerRow2.appendChild(subTh);
-        });
-      } else {
-        // Simple header with rowspan
-        const th = document.createElement('th');
-        th.className = 'header-text';
-        th.textContent = key;
-        th.rowSpan = hasNestedHeaders ? 2 : 1;
-        headerRow1.appendChild(th);
-      }
-    });
-
-    thead.appendChild(headerRow1);
-    if (hasNestedHeaders) {
-      thead.appendChild(headerRow2);
-    }
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-
-    // ** Process Rows Dynamically, Handling Nested Objects **
-    let rowCount = 1; // Default row count
-    let expandedRows = []; // Store rows when expanding nested objects
-
-    Object.keys(obj).forEach((key) => {
-      if (typeof obj[key] === 'object' && obj[key] !== null) {
-        // ** Handle Nested Object Inside Rows **
-        let subKeys = Object.keys(obj[key]);
-        let subValues = Object.values(obj[key]);
-        rowCount = subKeys.length; // Update row count for rowspan
-
-        subKeys.forEach((subKey, index) => {
-          const row = document.createElement('tr');
-
-          // Add the first column with rowspan only for the first row
-          if (index === 0) {
-            const mainTd = document.createElement('td');
-            mainTd.textContent = key;
-            mainTd.rowSpan = rowCount;
-            row.appendChild(mainTd);
-          }
-
-          // Add sub-key and value
-          const subTd1 = document.createElement('td');
-          subTd1.textContent = subKey;
-          row.appendChild(subTd1);
-
-          const subTd2 = document.createElement('td');
-          subTd2.textContent = subValues[index] || '';
-          row.appendChild(subTd2);
-
-          expandedRows.push(row); // Store the generated rows
-        });
-      } else {
-        // ** Handle Normal (Flat) Data **
-        if (rowCount === 1) {
-          const row = document.createElement('tr');
-          const td = document.createElement('td');
-          td.textContent = obj[key] || '';
-          row.appendChild(td);
-          tbody.appendChild(row);
-        }
-      }
-    });
-
-    // Append expanded rows to tbody
-    expandedRows.forEach((row) => tbody.appendChild(row));
-
-    table.appendChild(tbody);
-    tables.push(table.outerHTML);
-  });
-
   let tableIndex = 0;
-  const output = data.replace(regex, () => {
-    return tables[tableIndex++] || '';
-  });
-
-  return '\n ' + output;
+  return data.replace(regex, () => tables[tableIndex++] || "");
 }
-
-
