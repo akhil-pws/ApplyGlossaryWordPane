@@ -2846,6 +2846,7 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
 }
 
+
 function updateEditorFinalTable(data) {
   const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
   const tableArrays = [];
@@ -2862,7 +2863,7 @@ function updateEditorFinalTable(data) {
   }
 
   let tables = [];
-  
+
   tableArrays.forEach((obj, i) => {
     const table = document.createElement('table');
     table.className = 'table table-styling table-striped table-bordered';
@@ -2872,27 +2873,24 @@ function updateEditorFinalTable(data) {
     const headerRow1 = document.createElement('tr'); // Main headers
     const headerRow2 = document.createElement('tr'); // Sub-headers (only added if needed)
 
-    let keysArray = Object.keys(obj[0]); // Extract keys
     let hasNestedHeaders = false;
-    let nestedKeysMap = {}; // Store sub-headers
+    let nestedKeysMap = {};
 
-    // Check for nested objects and prepare headers
-    keysArray.forEach((key) => {
-      if (key === "Period") return; // Skip "Period" for now
-
-      if (typeof obj[0][key] === 'object' && obj[0][key] !== null) {
+    // Identify nested objects and extract keys dynamically
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === 'object' && obj[key] !== null) {
         hasNestedHeaders = true;
-        let subKeys = Object.keys(obj[0][key]);
+        let subKeys = Object.keys(obj[key]);
         nestedKeysMap[key] = subKeys;
 
-        // Create a main header with colspan for sub-headers
+        // Main header with colspan
         const th = document.createElement('th');
         th.className = 'header-text';
         th.textContent = key;
-        th.colSpan = subKeys.length; // Expand to fit all sub-headers
+        th.colSpan = subKeys.length;
         headerRow1.appendChild(th);
 
-        // Add sub-header columns
+        // Add sub-headers
         subKeys.forEach((subKey) => {
           const subTh = document.createElement('th');
           subTh.className = 'header-text';
@@ -2900,21 +2898,14 @@ function updateEditorFinalTable(data) {
           headerRow2.appendChild(subTh);
         });
       } else {
-        // Standard column with rowspan
+        // Simple header with rowspan
         const th = document.createElement('th');
         th.className = 'header-text';
         th.textContent = key;
-        th.rowSpan = hasNestedHeaders ? 2 : 1; // Rowspan if sub-headers exist
+        th.rowSpan = hasNestedHeaders ? 2 : 1;
         headerRow1.appendChild(th);
       }
     });
-
-    // Add "Period" as a single merged column at the beginning
-    const periodTh = document.createElement('th');
-    periodTh.className = 'header-text';
-    periodTh.textContent = "Period";
-    periodTh.rowSpan = hasNestedHeaders ? 2 : 1;
-    headerRow1.prepend(periodTh);
 
     thead.appendChild(headerRow1);
     if (hasNestedHeaders) {
@@ -2924,47 +2915,64 @@ function updateEditorFinalTable(data) {
 
     const tbody = document.createElement('tbody');
 
-    // Iterate through the data and create rows
-    obj.forEach((rowData) => {
-      const row = document.createElement('tr');
+    // ** Process Rows Dynamically, Handling Nested Objects **
+    let rowCount = 1; // Default row count
+    let expandedRows = []; // Store rows when expanding nested objects
 
-      // Add "Period" column first
-      const periodTd = document.createElement('td');
-      periodTd.textContent = rowData["Period"];
-      row.appendChild(periodTd);
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === 'object' && obj[key] !== null) {
+        // ** Handle Nested Object Inside Rows **
+        let subKeys = Object.keys(obj[key]);
+        let subValues = Object.values(obj[key]);
+        rowCount = subKeys.length; // Update row count for rowspan
 
-      keysArray.forEach((key) => {
-        if (key === "Period") return; // Skip "Period" again
+        subKeys.forEach((subKey, index) => {
+          const row = document.createElement('tr');
 
-        if (typeof rowData[key] === 'object' && rowData[key] !== null) {
-          // Handle sub-columns
-          nestedKeysMap[key].forEach((subKey) => {
-            const td = document.createElement('td');
-            td.textContent = rowData[key][subKey] || ''; // Handle undefined values
-            row.appendChild(td);
-          });
-        } else {
-          // Normal cell
+          // Add the first column with rowspan only for the first row
+          if (index === 0) {
+            const mainTd = document.createElement('td');
+            mainTd.textContent = key;
+            mainTd.rowSpan = rowCount;
+            row.appendChild(mainTd);
+          }
+
+          // Add sub-key and value
+          const subTd1 = document.createElement('td');
+          subTd1.textContent = subKey;
+          row.appendChild(subTd1);
+
+          const subTd2 = document.createElement('td');
+          subTd2.textContent = subValues[index] || '';
+          row.appendChild(subTd2);
+
+          expandedRows.push(row); // Store the generated rows
+        });
+      } else {
+        // ** Handle Normal (Flat) Data **
+        if (rowCount === 1) {
+          const row = document.createElement('tr');
           const td = document.createElement('td');
-          td.textContent = rowData[key] || '';
+          td.textContent = obj[key] || '';
           row.appendChild(td);
+          tbody.appendChild(row);
         }
-      });
-
-      tbody.appendChild(row);
+      }
     });
 
-    table.appendChild(tbody);
+    // Append expanded rows to tbody
+    expandedRows.forEach((row) => tbody.appendChild(row));
 
-    // Add the table HTML to the tables array
+    table.appendChild(tbody);
     tables.push(table.outerHTML);
   });
 
-  // Replace <TableStart>...</TableEnd> with the generated table HTML
   let tableIndex = 0;
   const output = data.replace(regex, () => {
-    return tables[tableIndex++] || ''; // Replace with the appropriate table HTML
+    return tables[tableIndex++] || '';
   });
 
   return '\n ' + output;
 }
+
+
