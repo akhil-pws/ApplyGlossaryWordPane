@@ -2888,7 +2888,7 @@ function jsonToHtmlTable(jsonData) {
    let table = '<table border="1" cellspacing="0" cellpadding="5">';
    table += '<tr>' + [...headers].map(header => `<th>${header}</th>`).join('') + '</tr>';
    rows.forEach(row => {
-       table += '<tr>' + [...headers].map(header => `<td>${row[header] || ''}</td>`).join('') + '</tr>';
+       table += '<tr>' + [...headers].map(header => `<td>${row[header]}</td>`).join('') + '</tr>';
    });
 
    table += '</table>';
