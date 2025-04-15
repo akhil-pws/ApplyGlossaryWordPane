@@ -51,6 +51,13 @@ Office.onReady((info) => {
 
     window.location.hash = '#/login';
     retrieveDocumentProperties()
+    hiddenmetaData();
+    Office.context.document.addHandlerAsync(
+      Office.EventType.DocumentSelectionChanged,
+      () => {
+        logBookmarksInSelection(); // Trigger function when selection changes
+      }
+    );
   }
 });
 
@@ -790,6 +797,10 @@ function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
                       placeholder="Type here"></textarea>
             <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
             <div class="d-flex flex-column align-self-end me-3">
+             <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="view-tag-${i}">
+                <span>View</span>
+                
+              </button>
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
                 <span class="tooltiptext">Insert</span>
                 <i class="fa fa-plus text-light c-pointer"></i>
@@ -1032,6 +1043,10 @@ async function displayAiTagList() {
       insertTagPrompt(i)
     })
 
+    document.getElementById(`view-tag-${i}`)?.addEventListener('click', () => {
+      viewTags(i)
+    })
+
     document.getElementById(`changeSource-${i}`)?.addEventListener('click', () => {
       const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
 
@@ -1184,6 +1199,50 @@ async function insertTagPrompt(index: any) {
 }
 
 
+async function viewTags(index: any) {
+  return Word.run(async (context) => {
+    try {
+      const body = context.document.body;
+      context.load(body, "text");
+      await context.sync();
+
+      const tag = aiTagList[index];
+      const bookmarks = body.getRange().getBookmarks(); // Get all bookmarks
+      await context.sync();
+
+      if (bookmarks.value.length > 0) {
+        for (const bookmarkName of bookmarks.value) {
+          let processedName = bookmarkName.split("_Split_")[0]; // Extract base name
+          processedName = processedName.replace(/_/g, " ");
+          let checkColor=bookmarkName.split("Color")[1];
+          if (tag.DisplayName === processedName && !checkColor) {
+            // Get bookmark range correctly
+            const range = context.document.getBookmarkRange(bookmarkName);
+            range.load("font"); // Load font properties
+            await context.sync(); // Wait for properties to be available
+            const highlightColor = range.font.highlightColor ? range.font.highlightColor.replace("#", ""):'FFFFFF'; 
+            let cleanDisplayName = processedName.replace(/\s+/g, "_");
+
+            let uniqueStr = new Date().getTime();
+            let splitString = 'Split';
+            const newBookmarkName = highlightColor ? `${cleanDisplayName}_${splitString}_${uniqueStr}_Color${highlightColor}`:bookmarkName;
+        // Remove #
+      
+            range.insertText(tag.EditorValue, Word.InsertLocation.replace);
+            range.font.highlightColor = "cyan"; // Reset color if no bookmarks
+            range.insertBookmark(newBookmarkName);
+
+            await context.sync(); // Apply changes
+
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error during tag application:", err);
+    }
+  });
+}
+
 function addAccordionListeners() {
   const accordionButtons = document.querySelectorAll('.accordion-button');
 
@@ -1232,6 +1291,22 @@ async function applyAITagFn() {
 
         await context.sync(); // Synchronize to fetch the search results
 
+
+        const bookmarks = body.getRange().getBookmarks(); // Returns ClientResult<string[]>
+
+        await context.sync(); // Sync to retrieve bookmark values
+
+        const bookmarkNames = bookmarks.value; // Access the actual array of bookmark names
+        // Filter bookmark names matching the tag.DisplayName
+        const matchingBookmarks = bookmarkNames.filter((bookmarkName) => {
+          let processedName = bookmarkName.split("_Split_")[0]; // Extract the base name
+          processedName = processedName.replace(/_/g, " "); // Replace underscores with spaces
+
+          return processedName === tag.DisplayName; // Compare with tag.DisplayName
+        });
+
+        // Filter bookmarks matching the tag.DisplayName
+
         // Log the number of search results for debugging
         console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
         const tableInsertPositions: { range: Word.Range, tag: any }[] = [];
@@ -1243,12 +1318,58 @@ async function applyAITagFn() {
             if (tag.ComponentKeyDataType === 'TABLE') {
               const range = item.getRange();
               tableInsertPositions.push({ range, tag });
-              range.delete(); 
-            }else{
-              item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+              range.delete();
+            } else {
+              item.insertText('', Word.InsertLocation.replace);
+
+              insertSingleBookmark(tag.EditorValue, tag.DisplayName);
             }
           }
         });
+
+
+        if (bookmarks.value.length > 0) {
+          const selectedNames = []
+          bookmarks.value.forEach((bookmarkName) => {
+
+            matchingBookmarks.forEach((item) => {
+              if (bookmarkName === item) {
+                let bookmarkRange = context.document.getBookmarkRange(bookmarkName);
+                if (bookmarkRange) {
+                  bookmarkRange.insertText(tag.EditorValue, Word.InsertLocation.replace); // Modify text here
+                  bookmarkRange.insertBookmark(bookmarkName);
+
+                }
+              }
+            })
+          });
+          await context.sync(); // Apply changes
+
+        }
+        // for (const bookmarkName of matchingBookmarks) {
+        //   debugger
+        //   const bookmarkSearchResults = body.search(bookmarkName, {
+        //     matchCase: false,
+        //     matchWholeWord: true,
+        //   });
+
+        //   context.load(bookmarkSearchResults, 'items');
+        //   await context.sync();
+
+        //   bookmarkSearchResults.items.forEach((bookmarkRange: Word.Range) => {
+        //     if (tag.EditorValue !== "" && !tag.IsApplied) {
+        //       if (tag.ComponentKeyDataType === "TABLE") {
+        //         // Handle table replacement as before
+        //         tableInsertPositions.push({ range: bookmarkRange, tag });
+        //         bookmarkRange.delete();
+        //       } else {
+        //         // Handle non-table bookmark replacements
+        //         bookmarkRange.insertText(tag.EditorValue, Word.InsertLocation.replace);
+        //         insertSingleBookmark(tag.EditorValue, tag.DisplayName);
+        //       }
+        //     }
+        //   });
+        // }
 
         for (const { range, tag } of tableInsertPositions) {
           const parser = new DOMParser();
@@ -1423,8 +1544,8 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
           selectElement.classList.add('ai-selected-reply');
         }
 
-        
-        tag.ComponentKeyDataType= chat.FormattedResponse?'TABLE':'TEXT';
+
+        tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
         tag.UserValue = chat.FormattedResponse
           ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
           : chat.Response;
@@ -2547,12 +2668,17 @@ export async function replaceMention(word: any, type: any) {
         if (word.EditorValue === '' || word.IsApplied) {
           selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
         } else {
-          let content = removeQuotes(word.EditorValue);
-          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-
-          lines.forEach(line => {
-            selection.insertParagraph(line, Word.InsertLocation.before);
-          });
+          if (word.AIFlag === 1) {
+            let content = removeQuotes(word.EditorValue);
+            let textToInsert = content.replace(/\r?\n/g, "\n"); // Ensure line breaks remain
+            insertSingleBookmark(textToInsert, word.DisplayName);
+          } else {
+            let content = removeQuotes(word.EditorValue);
+            let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+            lines.forEach(line => {
+              selection.insertParagraph(line, Word.InsertLocation.before);
+            });
+          }
         }
       }
 
@@ -2849,50 +2975,50 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
 function jsonToHtmlTable(jsonData) {
   if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
-       return '<p>No data available</p>';
-   }
+    return '<p>No data available</p>';
+  }
 
-   let headers = new Set();
-   let rows = [];
+  let headers = new Set();
+  let rows = [];
 
-   function flattenObject(obj, prefix = "", result = {}) {
-       Object.keys(obj).forEach(key => {
-           const value = obj[key];
-           const newKey = prefix ? `${prefix} > ${key}` : key;
+  function flattenObject(obj, prefix = "", result = {}) {
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      const newKey = prefix ? `${prefix} > ${key}` : key;
 
-           if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-               flattenObject(value, newKey, result);
-           } else if (Array.isArray(value)) {
-               result[newKey] = value.map(item => {
-                   return typeof item === 'object' 
-                       ? Object.entries(item).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join('<br>') 
-                       : item;
-               }).join('<br>');
-           } else {
-               result[newKey] = value;
-           }
-       });
-       return result;
-   }
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        flattenObject(value, newKey, result);
+      } else if (Array.isArray(value)) {
+        result[newKey] = value.map(item => {
+          return typeof item === 'object'
+            ? Object.entries(item).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join('<br>')
+            : item;
+        }).join('<br>');
+      } else {
+        result[newKey] = value;
+      }
+    });
+    return result;
+  }
 
-   if (!Array.isArray(jsonData)) {
-       jsonData = Object.entries(jsonData).map(([key, value]) => ({ [key]: value }));
-   }
+  if (!Array.isArray(jsonData)) {
+    jsonData = Object.entries(jsonData).map(([key, value]) => ({ [key]: value }));
+  }
 
-   jsonData.forEach(item => {
-       let flattenedItem = flattenObject(item);
-       Object.keys(flattenedItem).forEach(key => headers.add(key));
-       rows.push(flattenedItem);
-   });
+  jsonData.forEach(item => {
+    let flattenedItem = flattenObject(item);
+    Object.keys(flattenedItem).forEach(key => headers.add(key));
+    rows.push(flattenedItem);
+  });
 
-   let table = '<table border="1" cellspacing="0" cellpadding="5">';
-   table += '<tr>' + [...headers].map(header => `<th>${header}</th>`).join('') + '</tr>';
-   rows.forEach(row => {
-       table += '<tr>' + [...headers].map(header => `<td>${row[header]}</td>`).join('') + '</tr>';
-   });
+  let table = '<table border="1" cellspacing="0" cellpadding="5">';
+  table += '<tr>' + [...headers].map(header => `<th>${header}</th>`).join('') + '</tr>';
+  rows.forEach(row => {
+    table += '<tr>' + [...headers].map(header => `<td>${row[header]}</td>`).join('') + '</tr>';
+  });
 
-   table += '</table>';
-   return table;
+  table += '</table>';
+  return table;
 }
 
 function updateEditorFinalTable(data) {
@@ -2911,4 +3037,67 @@ function updateEditorFinalTable(data) {
 
   let tableIndex = 0;
   return data.replace(regex, () => tables[tableIndex++] || "");
+}
+
+async function insertSingleBookmark(text: any, DisplayName: any) {
+  return Word.run(async (context) => {
+    let range = context.document.getSelection();
+    await context.sync(); // Ensure selection is ready
+
+    // Replace spaces with underscores in DisplayName
+    let cleanDisplayName = DisplayName.replace(/\s+/g, "_");
+
+    let uniqueStr = new Date().getTime();
+    let splitString = 'Split';
+    let bookmarkName = `${cleanDisplayName}_${splitString}_${uniqueStr}`;
+
+    // Insert text and get the range of inserted content
+    let insertedTextRange = range.insertText(text, Word.InsertLocation.replace);
+
+    await context.sync(); // Ensure text is inserted
+
+    // Expand the range to cover the newly inserted text and apply bookmark
+    insertedTextRange.insertBookmark(bookmarkName);
+
+    await context.sync(); // Ensure bookmark is inserted
+    console.log(`Single bookmark added: ${bookmarkName}`);
+  });
+}
+
+async function logBookmarksInSelection() {
+  return Word.run(async (context) => {
+    let range = context.document.getSelection();
+    await context.sync(); // Ensure selection is ready
+
+    // Get bookmarks in the selection
+    let bookmarks = range.getBookmarks(); // Returns ClientResult<string[]>
+
+    await context.sync(); // Ensure bookmarks are retrieved
+
+    if (bookmarks.value.length > 0) {
+      console.log("📌 Bookmarks in selection:");
+      const selectedNames = []
+      bookmarks.value.forEach((bookmarkName) => {
+        let processedName = bookmarkName.split("_Split_")[0];
+
+        // 🔹 Replace `_` with spaces
+        processedName = processedName.replace(/_/g, " ");
+        selectedNames.push(processedName)
+      });
+      console.log("📌 Bookmark Name:", selectedNames);
+
+    } else {
+      console.log("❌ No bookmarks found in selection.");
+    }
+  });
+}
+
+function hiddenmetaData(){
+  Word.run(async (context) => {
+    const settings = context.document.settings;
+    settings.add("trackedText", "highlightedText");
+ 
+    await context.sync();
+    console.log("Custom property added for tracking.");
+});
 }
