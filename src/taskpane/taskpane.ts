@@ -2,19 +2,21 @@
  * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
  * See LICENSE in the project root for license information.
  */
-
 import { dataUrl, storeUrl, versionLink } from "./data";
-let jwt = '';
-let baseUrl = dataUrl
+import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
+import { chatfooter, copyText, insertTagPrompt, renderSelectedTags, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { addtagbody, logoheader, navTabs, promptbuilderbody } from "./components/bodyelements";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateAiHistory, updateGroupKey } from "./api";
+export let jwt = '';
 let storedUrl = storeUrl
 let documentID = ''
 let organizationName = ''
 let aiTagList = [];
 let initialised = true;
-let availableKeys = [];
+export let availableKeys = [];
+let promptBuilderList = [];
 let glossaryName = ''
 let isGlossaryActive: boolean = false;
-let imageList = [];
 let GroupName: string = '';
 let layTerms = [];
 let dataList: any = []
@@ -29,6 +31,8 @@ let version = versionLink;
 let currentYear = new Date().getFullYear();
 let sourceList;
 let filteredGlossaryTerm;
+export let selectedNames = [];
+export let isPendingResponse = false;
 
 
 /* global document, Office, Word */
@@ -51,11 +55,11 @@ Office.onReady((info) => {
 
     window.location.hash = '#/login';
     retrieveDocumentProperties()
-    hiddenmetaData();
+
     Office.context.document.addHandlerAsync(
       Office.EventType.DocumentSelectionChanged,
       () => {
-        logBookmarksInSelection(); // Trigger function when selection changes
+        logBookmarksInSelection();
       }
     );
   }
@@ -149,25 +153,7 @@ async function handleLogin(event) {
           </div
 `
     try {
-      const response = await fetch(`${baseUrl}/api/user/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ClientName: organization,
-          Username: username,
-          Password: password
-        })
-      });
-
-
-      if (!response.ok) {
-        showLoginError("An error occurred during login. Please try again.")
-        throw new Error('Network response was not ok.');
-      }
-
-      const data = await response.json();
+      const data = await loginUser(organization, username, password);
       if (data.Status === true && data['Data']) {
         if (data['Data'].ResponseStatus) {
           jwt = data.Data.Token;
@@ -181,10 +167,6 @@ async function handleLogin(event) {
       } else {
         showLoginError("An error occurred during login. Please try again.")
       }
-
-
-      // Handle successful login (e.g., navigate to the next page or show a success message)
-
     } catch (error) {
       showLoginError("An error occurred during login. Please try again.")
       console.error('Error during login:', error);
@@ -211,64 +193,10 @@ function displayMenu() {
 
 async function fetchDocument(action) {
   try {
-    const response = await fetch(`${baseUrl}/api/report/id/${documentID}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`
-      }
-    });
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok.');
-    }
-
-    const data = await response.json();
+    const data = await getReportById(documentID, jwt);
     document.getElementById('app-body').innerHTML = ``
-    document.getElementById('logo-header').innerHTML = `
-        <img  id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo"> <i class="fa fa-sign-out me-5 c-pointer ngb-tooltip" aria-hidden="true" id="logout"><span class="tooltiptext">Logout</span></i>
-`
-    document.getElementById('header').innerHTML = `
-    <div class="d-flex justify-content-around">
-        <button class="btn btn-dark" id="mention">Insert</button>
-        <button class="btn btn-dark" id="aitag">Refine</button>
-
-        <!-- Dropdown for Formatting -->
-        <div class="dropdown">
-            <button class="btn btn-dark dropdown-toggle" type="button" id="formatDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                Actions
-            </button>
-            <ul class="dropdown-menu" aria-labelledby="formatDropdown" style="z-index: 100000;">
-                <li><button class="dropdown-item" id="selectFormat">Define Formatting</button></li>
-                <li><button class="dropdown-item" id="glossary" disabled>Glossary</button></li>
-                <li><button class="dropdown-item" id="removeFormatting" disabled>Remove Formatted Text</button></li>
-            </ul>
-        </div>
-    </div>
-`
-    document.getElementById('mention').addEventListener('click', () => {
-      setActiveButton('mention');
-      displayMentions();
-    });
-
-    document.getElementById('glossary').addEventListener('click', () => {
-      setActiveButton('formatDropdown');
-      fetchGlossary()
-    });
-
-    document.getElementById('aitag').addEventListener('click', () => {
-      setActiveButton('aitag');
-      displayAiTagList();
-    });
-    document.getElementById('selectFormat').addEventListener('click', () => {
-      setActiveButton('formatDropdown');
-      formatOptionsDisplay();
-    });
-    document.getElementById('removeFormatting').addEventListener('click', () => {
-      setActiveButton('formatDropdown');
-      removeOptionsConfirmation();
-    });
-
-    document.getElementById('logout').addEventListener('click', logout);
+    document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
     sourceList = dataList.SourceTypeList.filter(
@@ -319,63 +247,73 @@ async function fetchDocument(action) {
 
     );
     fetchClients();
+    loadPromptTemplates();
+    loadHomepage(availableKeys);
+    document.getElementById('home').addEventListener('click', async () => {
+      if (!isPendingResponse) {
+        if (isGlossaryActive) {
+          await removeMatchingContentControls();
+        }
 
-    if (action === 'Init') {
-      setActiveButton('aitag');
-      displayAiTagList();
-    } else {
-      setActiveButton('aitag');
+        loadHomepage(availableKeys);
+      }
+    });
+
+    document.getElementById('glossary').addEventListener('click', () => {
+      if (emptyFormat) {
+        fetchGlossary();
+      }
+    });
+
+    document.getElementById('define-formatting').addEventListener('click', () => {
+      if (!isPendingResponse) {
+        formatOptionsDisplay()
+      }
     }
+    );
 
 
-    if (action === 'AIpanel') {
-      displayAiTagList();
+    document.getElementById('removeFormatting').addEventListener('click', () => {
+      if (Object.keys(capturedFormatting).length > 0) {
+        removeOptionsConfirmation();
+      }
+    });
+
+    document.getElementById('logout').addEventListener('click', async () => {
+      if (!isPendingResponse) {
+        if (isGlossaryActive) {
+          await removeMatchingContentControls();
+        }
+
+        logout()
+      }
     }
-
+    );
 
   } catch (error) {
     console.error('Error fetching glossary data:', error);
   }
 }
 
-function setActiveButton(buttonId) {
-  const buttons = ['mention', 'aitag', 'selectFormat', 'removeFormatting', 'formatDropdown'];
-  buttons.forEach(id => {
-    const button = document.getElementById(id);
-    if (button) {
-      if (id === buttonId) {
-        button.classList.add('active');
-      } else {
-        button.classList.remove('active');
-      }
-    }
-  });
-}
-
 async function fetchClients() {
   try {
-    const response = await fetch(`${baseUrl}/api/client/all/${userId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`
-      }
-    });
+    const userId = sessionStorage.getItem('userId') || '';
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok.');
+
+    const data = await getAllClients(userId, jwt);
+
+    if (data.Status && data.Data) {
+      clientList = data['Data'];
+    } else {
+      console.warn("Failed to load clients or no clients found.");
     }
-
-
-
-    const data = await response.json();
-    clientList = data['Data'];
   } catch (error) {
   }
 }
 
 
 
-async function formatOptionsDisplay() {
+export async function formatOptionsDisplay() {
   if (!isTagUpdating) { // Check if isTagUpdating is false
     if (isGlossaryActive) {
       await removeMatchingContentControls();
@@ -417,7 +355,10 @@ async function formatOptionsDisplay() {
     }
 
     const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
-    glossaryBtn.disabled = true;
+    if (!glossaryBtn.classList.contains('disabled-link')) {
+      glossaryBtn.classList.add('disabled-link');
+    }
+
     if (emptyFormat) {
       clearCapturedFormatting();
     }
@@ -431,10 +372,14 @@ async function formatOptionsDisplay() {
         const formatList = document.getElementById("format-list");
         formatList.innerHTML = "<p>Multiple style values found. Try again</p>";
         const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
-        removeFormatBtn.disabled = true;
+
+
+        if (!removeFormatBtn.classList.contains('disabled-link')) {
+          removeFormatBtn.classList.add('disabled-link');
+        }
       } else {
         const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
-        removeFormatBtn.disabled = false;
+        removeFormatBtn.classList.remove('disabled-link');
         displayCapturedFormatting();
       }
     }
@@ -458,7 +403,9 @@ async function formatOptionsDisplay() {
         isNoFormatTextAvailable = false;
         emptyFormat = false;
         const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
-        glossaryBtn.disabled = true;
+        if (!glossaryBtn.classList.contains('disabled-link')) {
+          glossaryBtn.classList.add('disabled-link');
+        }
       }
     });
 
@@ -492,13 +439,15 @@ function clearCapturedFormatting() {
   // formatList.innerHTML = `<li>No formatting selected.</li>`;
   emptyFormat = true;
   const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
-  glossaryBtn.disabled = false;
+  glossaryBtn.classList.remove('disabled-link');
   const CaptureBtn = document.getElementById('capture-format-btn') as HTMLButtonElement;
   CaptureBtn.disabled = true;
 
-  const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
-  removeFormatBtn.disabled = true;
 
+  const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
+  if (!removeFormatBtn.classList.contains('disabled-link')) {
+    removeFormatBtn.classList.add('disabled-link');
+  }
   console.log("Captured formatting cleared.");
 }
 
@@ -537,10 +486,13 @@ async function captureFormatting() {
         const formatList = document.getElementById("format-list");
         formatList.innerHTML = "<p>Multiple style values found. Try again</p>";
         const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
-        removeFormatBtn.disabled = true;
+        if (!removeFormatBtn.classList.contains('disabled-link')) {
+          removeFormatBtn.classList.add('disabled-link');
+        }
+
       } else {
         const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
-        removeFormatBtn.disabled = false;
+        removeFormatBtn.classList.remove('disabled-link');
         displayCapturedFormatting();
       }
     });
@@ -660,7 +612,7 @@ async function removeFormattedText() {
       emptyFormat = true;
       isNoFormatTextAvailable = true;
       const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
-      glossaryBtn.disabled = false;
+      glossaryBtn.classList.remove('disabled-link');
       formatOptionsDisplay()
     });
   } catch (error) {
@@ -669,28 +621,26 @@ async function removeFormattedText() {
 }
 
 
-async function fetchAIHistory(tag) {
+export async function fetchAIHistory(tag) {
   try {
-    const response = await fetch(`${baseUrl}/api/report/ai-history/${tag.ID}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwt}`
-      }
-    });
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok.');
+    const data = await getAiHistory(tag.ID, jwt);
+
+
+    if (data.Status && data.Data) {
+      tag.ReportHeadAIHistoryList = data['Data'] || [];
+      tag.FilteredReportHeadAIHistoryList = [];
+      tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
+        historyList.Response = removeQuotes(historyList.Response);
+        tag.FilteredReportHeadAIHistoryList.unshift(historyList);
+
+      });
+      return tag.FilteredReportHeadAIHistoryList;
+      // Use the data here
+    } else {
+      console.warn("No AI history available.");
     }
 
-    const data = await response.json();
-    tag.ReportHeadAIHistoryList = data['Data'] || [];
-    tag.FilteredReportHeadAIHistoryList = [];
-    tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
-      historyList.Response = removeQuotes(historyList.Response);
-      tag.FilteredReportHeadAIHistoryList.unshift(historyList);
-
-    });
-    return tag.FilteredReportHeadAIHistoryList;
 
   } catch (error) {
     console.error('Error fetching AI history:', error);
@@ -698,188 +648,12 @@ async function fetchAIHistory(tag) {
   }
 }
 
-
-async function generateRadioButtons(tag: any, index: number): Promise<string> {
-  if (!tag.FilteredReportHeadAIHistoryList || tag.FilteredReportHeadAIHistoryList.length === 0) {
-    await fetchAIHistory(tag);
-  }
-
-  if (tag.FilteredReportHeadAIHistoryList.length > 0) {
-    // Generate the HTML
-    const html = tag.FilteredReportHeadAIHistoryList.map((chat: any, j: number) =>
-      `<div class="row chatbox m-0 p-0">
-        <div class="col-md-12 mt-2 p-2">
-          <span class="ms-3">
-            <i class="fa fa-copy text-secondary c-pointer" title="Copy Response" id="copyPrompt-${index}-${j}"></i>
-          </span>
-          <span class="float-end w-75 me-3">
-            <div class="form-control h-34 d-flex align-items-center dynamic-height user">
-              ${chat.Prompt}
-            </div>
-          </span>
-        </div>
-        <div class="col-md-12 mt-2 p-2 ps-3 d-flex align-items-center">
-          <span class="radio-select">
-            <input class="form-check-input c-pointer" type="radio" name="flexRadioDefault-${index}"
-              id="flexRadioDefault1-${index}-${j}" ${chat.Selected === 1 ? 'checked' : ''}>
-          </span>
-          <span class="ms-2 w-75">
-            <div class="form-control h-34 d-flex align-items-center dynamic-height ai-reply ${chat.Selected === 1 ? 'ai-selected-reply' : 'bg-light'}" id='selected-response-${index}${j}'>
-              ${chat.Response}
-            </div>
-          </span>
-          <span class="ms-2">
-            <i class="fa fa-copy text-secondary c-pointer" title="Copy Response" id="copyResponse-${index}-${j}"></i>
-          </span>
-        </div>
-
-
-      </div>`
-    ).join('');
-
-    // Attach event listeners after the HTML is inserted
-    setTimeout(() => {
-      tag.FilteredReportHeadAIHistoryList.forEach((chat: any, j: number) => {
-        document.getElementById(`copyPrompt-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Prompt));
-        document.getElementById(`copyResponse-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Response));
-        document.getElementById(`flexRadioDefault1-${index}-${j}`)?.addEventListener('change', () => onRadioChange(tag, index, j));
-
-      });
-    }, 0);
-
-    return html;
-  } else {
-    return '<div>No AI history available.</div>';
-  }
-}
-
-
-
-
-function accordionContent(headerId, collapseId, tag, radioButtonsHTML, i) {
-  const textColorClass = tag.IsApplied ? 'text-secondary' : '';
-  const tooltipButton = tag.Sources
-    ? `  <span class="tooltiptext">${tag.Sources}</span>`
-    : '<span class="tooltiptext">Source</span>';
-  const body = `
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="${headerId}">
-        <button class="accordion-button collapsed ${textColorClass}"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#${collapseId}"
-                aria-expanded="false"
-                aria-controls="${collapseId}">
-          <span id="tagname-${i}">${tag.DisplayName}</span>
-        </button>
-      </h2>
-      <div id="${collapseId}"
-           class="accordion-collapse collapse"
-           aria-labelledby="${headerId}"
-           data-bs-parent="#accordionExample">
-        <div class="accordion-body p-0" id="accordion-body-${i}">
-          <div class="chatbox" id="selected-response-parent-${i}">
-            ${radioButtonsHTML}
-          </div>
-          <div class="form-check form-switch chatbox m-0">
-            <label class="form-check-label pb-3" for="doNotApply-${i}">
-              <span class="fs-12">Do not apply</span>
-            </label>
-            <input class="form-check-input"
-                   type="checkbox"
-                   id="doNotApply-${i}"
-                   ${tag.IsApplied ? 'checked' : ''}>
-          </div>
-          <div class="d-flex align-items-end justify-content-end chatbox p-2" id="box-bottom-${i}">
-            <textarea class="form-control"
-                      rows="5"
-                      id="chatbox-${i}"
-                      placeholder="Type here"></textarea>
-            <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
-            <div class="d-flex flex-column align-self-end me-3">
-             <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="view-tag-${i}">
-                <span>View</span>
-                
-              </button>
-              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
-                <span class="tooltiptext">Insert</span>
-                <i class="fa fa-plus text-light c-pointer"></i>
-              </button>
-              <button class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip" id="changeSource-${i}">
-                ${tooltipButton}
-                <i class="fa fa-file-lines text-white"></i>
-              </button>
-              <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPrompt-${i}">
-              <span class="tooltiptext">Send</span>
-                <i class="fa fa-paper-plane text-white"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  return body;
-}
-
-async function onDoNotApplyChange(event, index, tag: any) {
-  tag.IsApplied = event.target.checked;
-  let sourceListBtn = document.getElementById(`changeSource-${index}`) as HTMLButtonElement;
-  sourceListBtn.disabled = true;
-  const isChecked = event.target.checked;
-  const tagname = document.getElementById(`tagname-${index}`);
-  const dnaBtn = document.getElementById(`doNotApply-${index}`) as HTMLInputElement;
-
-  try {
-    dnaBtn.disabled = true
-    const response = await fetch(`${baseUrl}/api/report/head/groupkey`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`
-      },
-      body: JSON.stringify(tag)
-    });
-
-    if (!response.ok) {
-      dnaBtn.disabled = false
-      throw new Error('Network response was not ok.');
-    }
-
-    const data = await response.json();
-    if (data['Data'] && data['Status'] === true) {
-      sourceListBtn.disabled = false;
-      dnaBtn.disabled = false
-    } else {
-      sourceListBtn.disabled = false;
-      dnaBtn.disabled = false
-    }
-
-  } catch (error) {
-    dnaBtn.disabled = false
-    sourceListBtn.disabled = false;
-    console.error('Error updating do not apply:', error);
-  }
-
-  if (tagname) {
-    const match = availableKeys.find(item => tag.DisplayName === item.DisplayName);
-    if (isChecked) {
-      if (match) match.IsApplied = true;
-      tagname.classList.add('text-secondary');
-    } else {
-      if (match) match.IsApplied = false;
-      tagname.classList.remove('text-secondary');
-    }
-  }
-
-}
-
-async function sendPrompt(tag, prompt, index) {
+export async function sendPrompt(tag, prompt) {
   if (prompt !== '' && !isTagUpdating) {
-    let sourceListBtn = document.getElementById(`changeSource-${index}`) as HTMLButtonElement;
-    sourceListBtn.disabled = true;
+
     isTagUpdating = true;
 
-    const iconelement = document.getElementById(`sendPrompt-${index}`);
+    const iconelement = document.getElementById(`sendPromptButton`);
     iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
 
     const payload = {
@@ -903,20 +677,9 @@ async function sendPrompt(tag, prompt, index) {
     };
 
     try {
-      const response = await fetch(`${baseUrl}/api/report/ai-history/add`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${jwt}`
-        },
-        body: JSON.stringify(payload)
-      });
+      isPendingResponse = true;
+      const data = await addAiHistory(payload, jwt);
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok.');
-      }
-
-      const data = await response.json();
       if (data['Data'] && data['Data'] !== 'false') {
         tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
         tag.FilteredReportHeadAIHistoryList = [];
@@ -926,34 +689,22 @@ async function sendPrompt(tag, prompt, index) {
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
 
-        // Update only the inner content of the accordion body
-        const innerContainer = document.getElementById(`selected-response-parent-${index}`);
-        if (innerContainer) {
-          const radioButtonsHTML = await generateRadioButtons(tag, index);
-          innerContainer.innerHTML = radioButtonsHTML;
-        }
+        const appbody = document.getElementById('app-body')
+        appbody.innerHTML = await generateCheckboxHistory(tag);
+        isPendingResponse = false;
 
-        // Reapply event listeners for the new buttons and radio options
-        tag.FilteredReportHeadAIHistoryList.forEach((chat, j) => {
-          document.getElementById(`copyPrompt-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Prompt));
-          document.getElementById(`copyResponse-${index}-${j}`)?.addEventListener('click', () => copyText(chat.Response));
-          document.getElementById(`flexRadioDefault1-${index}-${j}`)?.addEventListener('change', () => onRadioChange(tag, index, j));
-        });
-
-        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
-        document.getElementById(`chatbox-${index}`).value = '';
-
-        isTagUpdating = false;
-        sourceListBtn.disabled = false;
-      } else {
-        iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
-        isTagUpdating = false;
-        sourceListBtn.disabled = false;
       }
+
+      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
+      document.getElementById(`chatInput`).value = '';
+      isTagUpdating = false;
+      isPendingResponse = false;
+      // sourceListBtn.disabled = false;
+
     } catch (error) {
       iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
       isTagUpdating = false;
-      sourceListBtn.disabled = false;
+      isPendingResponse = false;
       console.error('Error sending AI prompt:', error);
     }
   } else {
@@ -965,16 +716,7 @@ async function sendPrompt(tag, prompt, index) {
 
 
 // Your existing copyText function
-function copyText(text: string) {
-  // Copy text to clipboard logic
-  const tempTextArea = document.createElement('textarea');
-  tempTextArea.value = text;
-  document.body.appendChild(tempTextArea);
-  tempTextArea.select();
-  document.execCommand('copy');
-  document.body.removeChild(tempTextArea);
 
-}
 
 
 async function logout() {
@@ -985,262 +727,7 @@ async function logout() {
   window.location.hash = '#/new';
   initialised = true;
   document.getElementById('logo-header').innerHTML = ``;
-  document.getElementById('header').innerHTML = ``
   login();
-}
-
-
-async function displayAiTagList() {
-  if (isGlossaryActive) {
-    await removeMatchingContentControls()
-  }
-  const container = document.getElementById('app-body');
-  container.innerHTML = `
-  <div class="d-flex justify-content-between px-2">
-      <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white  mb-3 mt-2 px-3 py-2" id="addgenaitag">
-        <i class="fa fa-plus text-light px-1"></i>
-        Add
-    </button>
-
-     <button class="btn btn-primary btn-sm bg-primary-clr c-pointer text-white mb-3 mt-2 px-3 py-2" id="applyAITag">
-        <i class="fa fa-robot text-light px-1"></i>
-        Apply
-    </button>
-    </div>
-
-    <div class="card-container"  id="card-container">
-    </div>
-  `; // Clear any previous content
-  const Cardcontainer = document.getElementById('card-container');
-  document.getElementById('applyAITag').addEventListener('click', applyAITagFn);
-
-  document.getElementById('addgenaitag').addEventListener('click', addGenAITags);
-
-  for (let i = 0; i < aiTagList.length; i++) {
-    const tag = aiTagList[i];
-    const accordionItem = document.createElement('div');
-    accordionItem.classList.add('accordion');
-    accordionItem.id = `accordion-item-${i}`; // Replace 'yourUniqueId' with your desired ID
-
-    const headerId = `flush-headingOne-${i}`;
-    const collapseId = `flush-collapseOne-${i}`;
-
-    const radioButtonsHTML = await generateRadioButtons(tag, i);
-
-    accordionItem.innerHTML = accordionContent(headerId, collapseId, tag, radioButtonsHTML, i);
-
-    Cardcontainer.appendChild(accordionItem);
-    mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
-    document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
-
-    document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
-      const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
-
-      sendPrompt(tag, textareaValue, i)
-    });
-
-    document.getElementById(`insert-tag-${i}`)?.addEventListener('click', () => {
-      insertTagPrompt(i)
-    })
-
-    document.getElementById(`view-tag-${i}`)?.addEventListener('click', () => {
-      viewTags(i)
-    })
-
-    document.getElementById(`changeSource-${i}`)?.addEventListener('click', () => {
-      const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
-
-      // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
-      createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue)
-    })
-  }
-
-  // Add event listeners after rendering
-  addAccordionListeners();
-  addCopyListeners();
-
-}
-
-async function insertTagPrompt(index: any) {
-  return Word.run(async (context) => {
-    try {
-      const selection = context.document.getSelection();
-      await context.sync();
-
-      if (!selection) {
-        throw new Error('Selection is invalid or not found.');
-      }
-
-      if (aiTagList[index].EditorValue === '') {
-        selection.insertParagraph(`#${aiTagList[index].DisplayName}#`, Word.InsertLocation.before);
-      } else {
-        if (aiTagList[index].ComponentKeyDataType === 'TABLE') {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(aiTagList[index].EditorValue, 'text/html');
-
-          const bodyNodes = Array.from(doc.body.childNodes);
-
-          for (const node of bodyNodes) {
-            if (node.nodeType === Node.TEXT_NODE) {
-              const textContent = node.textContent?.trim();
-              if (textContent) {
-                textContent.split('\n').forEach(line => {
-                  if (line.trim()) {
-                    insertLineWithHeadingStyle(selection, line);
-                  }
-                });
-              }
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as HTMLElement;
-
-              if (element.tagName.toLowerCase() === 'table') {
-                const rows = Array.from(element.querySelectorAll('tr'));
-
-                if (rows.length === 0) {
-                  selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                  continue;
-                }
-
-                const maxCols = Math.max(...rows.map(row => {
-                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                  }, 0);
-                }));
-
-                const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-                await context.sync();
-
-                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
-
-                await context.sync();
-
-                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-                rows.forEach((row, rowIndex) => {
-                  const cells = Array.from(row.querySelectorAll('td, th'));
-                  let cellIndex = 0;
-
-                  cells.forEach((cell) => {
-                    while (rowspanTracker[cellIndex] > 0) {
-                      rowspanTracker[cellIndex]--;
-                      cellIndex++;
-                    }
-
-                    const cellText = Array.from(cell.childNodes)
-                      .map(node => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                          return node.textContent?.trim() || '';
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                          return (node as HTMLElement).innerText.trim();
-                        }
-                        return '';
-                      })
-                      .filter(text => text.length > 0)
-                      .join(' ');
-
-                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                    // if (rowIndex === 0) {
-                    //   const cell = table.getCell(rowIndex, cellIndex);
-                    //   const paragraph = cell.body.paragraphs.getFirst();
-                    //   paragraph.font.bold = true;
-                    //   paragraph.font.highlightColor = "lightGray";  // This works!
-                    // }
-                    table.getCell(rowIndex, cellIndex).value = cellText;
-
-                    for (let i = 1; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
-                        table.getCell(rowIndex, cellIndex + i).value = "";
-                      }
-                    }
-
-                    if (rowspan > 1) {
-                      for (let i = 0; i < colspan; i++) {
-                        if (cellIndex + i < maxCols) {
-                          rowspanTracker[cellIndex + i] = rowspan - 1;
-                        }
-                      }
-                    }
-
-                    cellIndex += colspan;
-                  });
-                });
-              } else {
-                const elementText = element.innerText.trim();
-                if (elementText) {
-                  elementText.split('\n').forEach(line => {
-                    if (line.trim()) {
-                      insertLineWithHeadingStyle(selection, line);
-                    }
-                  });
-                }
-              }
-            }
-          }
-        } else {
-          let content = removeQuotes(aiTagList[index].EditorValue);
-          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-
-          lines.forEach(line => {
-            selection.insertParagraph(line, Word.InsertLocation.before);
-          });
-        }
-
-
-      }
-
-
-      await context.sync();
-    } catch (error) {
-      console.error('Detailed error:', error);
-    }
-  });
-}
-
-
-async function viewTags(index: any) {
-  return Word.run(async (context) => {
-    try {
-      const body = context.document.body;
-      context.load(body, "text");
-      await context.sync();
-
-      const tag = aiTagList[index];
-      const bookmarks = body.getRange().getBookmarks(); // Get all bookmarks
-      await context.sync();
-
-      if (bookmarks.value.length > 0) {
-        for (const bookmarkName of bookmarks.value) {
-          let processedName = bookmarkName.split("_Split_")[0]; // Extract base name
-          processedName = processedName.replace(/_/g, " ");
-          let checkColor=bookmarkName.split("Color")[1];
-          if (tag.DisplayName === processedName && !checkColor) {
-            // Get bookmark range correctly
-            const range = context.document.getBookmarkRange(bookmarkName);
-            range.load("font"); // Load font properties
-            await context.sync(); // Wait for properties to be available
-            const highlightColor = range.font.highlightColor ? range.font.highlightColor.replace("#", ""):'FFFFFF'; 
-            let cleanDisplayName = processedName.replace(/\s+/g, "_");
-
-            let uniqueStr = new Date().getTime();
-            let splitString = 'Split';
-            const newBookmarkName = highlightColor ? `${cleanDisplayName}_${splitString}_${uniqueStr}_Color${highlightColor}`:bookmarkName;
-        // Remove #
-      
-            range.insertText(tag.EditorValue, Word.InsertLocation.replace);
-            range.font.highlightColor = "cyan"; // Reset color if no bookmarks
-            range.insertBookmark(newBookmarkName);
-
-            await context.sync(); // Apply changes
-
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Error during tag application:", err);
-    }
-  });
 }
 
 function addAccordionListeners() {
@@ -1267,7 +754,7 @@ function addCopyListeners() {
   });
 }
 
-async function applyAITagFn() {
+export async function applyAITagFn() {
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
@@ -1291,22 +778,6 @@ async function applyAITagFn() {
 
         await context.sync(); // Synchronize to fetch the search results
 
-
-        const bookmarks = body.getRange().getBookmarks(); // Returns ClientResult<string[]>
-
-        await context.sync(); // Sync to retrieve bookmark values
-
-        const bookmarkNames = bookmarks.value; // Access the actual array of bookmark names
-        // Filter bookmark names matching the tag.DisplayName
-        const matchingBookmarks = bookmarkNames.filter((bookmarkName) => {
-          let processedName = bookmarkName.split("_Split_")[0]; // Extract the base name
-          processedName = processedName.replace(/_/g, " "); // Replace underscores with spaces
-
-          return processedName === tag.DisplayName; // Compare with tag.DisplayName
-        });
-
-        // Filter bookmarks matching the tag.DisplayName
-
         // Log the number of search results for debugging
         console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
         const tableInsertPositions: { range: Word.Range, tag: any }[] = [];
@@ -1320,56 +791,10 @@ async function applyAITagFn() {
               tableInsertPositions.push({ range, tag });
               range.delete();
             } else {
-              item.insertText('', Word.InsertLocation.replace);
-
-              insertSingleBookmark(tag.EditorValue, tag.DisplayName);
+              item.insertText(tag.EditorValue, Word.InsertLocation.replace);
             }
           }
         });
-
-
-        if (bookmarks.value.length > 0) {
-          const selectedNames = []
-          bookmarks.value.forEach((bookmarkName) => {
-
-            matchingBookmarks.forEach((item) => {
-              if (bookmarkName === item) {
-                let bookmarkRange = context.document.getBookmarkRange(bookmarkName);
-                if (bookmarkRange) {
-                  bookmarkRange.insertText(tag.EditorValue, Word.InsertLocation.replace); // Modify text here
-                  bookmarkRange.insertBookmark(bookmarkName);
-
-                }
-              }
-            })
-          });
-          await context.sync(); // Apply changes
-
-        }
-        // for (const bookmarkName of matchingBookmarks) {
-        //   debugger
-        //   const bookmarkSearchResults = body.search(bookmarkName, {
-        //     matchCase: false,
-        //     matchWholeWord: true,
-        //   });
-
-        //   context.load(bookmarkSearchResults, 'items');
-        //   await context.sync();
-
-        //   bookmarkSearchResults.items.forEach((bookmarkRange: Word.Range) => {
-        //     if (tag.EditorValue !== "" && !tag.IsApplied) {
-        //       if (tag.ComponentKeyDataType === "TABLE") {
-        //         // Handle table replacement as before
-        //         tableInsertPositions.push({ range: bookmarkRange, tag });
-        //         bookmarkRange.delete();
-        //       } else {
-        //         // Handle non-table bookmark replacements
-        //         bookmarkRange.insertText(tag.EditorValue, Word.InsertLocation.replace);
-        //         insertSingleBookmark(tag.EditorValue, tag.DisplayName);
-        //       }
-        //     }
-        //   });
-        // }
 
         for (const { range, tag } of tableInsertPositions) {
           const parser = new DOMParser();
@@ -1506,20 +931,8 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
       matchingKey.EditorValue = payload.Response;
     }
     try {
-      const response = await fetch(`${baseUrl}/api/report/ai-history/update`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${jwt}`
-        },
-        body: JSON.stringify(payload)
-      });
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok.');
-      }
-
-      const data = await response.json();
+      const data = await updateAiHistory(payload, jwt);
 
       if (data['Data']) {
         tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
@@ -1530,8 +943,7 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
 
-        // Use querySelectorAll to remove 'ai-selected-reply' from all elements
-        const selectedParent = document.getElementById(`selected-response-parent-${tagIndex}`)
+        const selectedParent = document.getElementById(`selected-response-parent-${tagIndex}`);
         const allSelectedDivs = selectedParent.querySelectorAll('.ai-selected-reply');
         allSelectedDivs.forEach(div => {
           div.classList.remove('ai-selected-reply');
@@ -1544,27 +956,21 @@ async function onRadioChange(tag, tagIndex, chatIndex) {
           selectElement.classList.add('ai-selected-reply');
         }
 
+        const finalResponse = chat.FormattedResponse
+          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+          : chat.Response;
 
         tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-        tag.UserValue = chat.FormattedResponse
-          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-          : chat.Response;
-
-        tag.EditorValue = chat.FormattedResponse
-          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-          : chat.Response;
-
-        tag.text = chat.FormattedResponse
-          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-          : chat.Response;
-
+        tag.UserValue = finalResponse;
+        tag.EditorValue = finalResponse;
+        tag.text = finalResponse;
       }
 
     } catch (error) {
       console.error('Error updating AI data:', error);
     } finally {
-      const iconelement = document.getElementById(`sendPrompt-${tagIndex}`)
-      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`
+      const iconelement = document.getElementById(`sendPrompt-${tagIndex}`);
+      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
       isTagUpdating = false;
     }
   }
@@ -1628,36 +1034,21 @@ export async function applyglossary() {
         "Content": body.text.replace(/[\n\r]/g, ' ')
       };
       try {
-        const response = await fetch(`${baseUrl}/api/glossary-template/client-id/${dataList?.ClientID}`, {
-          method: 'POST', // or 'POST', depending on your API
-          headers: {
-            'Content-Type': 'application/json',
 
-            'Authorization': `Bearer ${jwt}`
-          },
-          body: JSON.stringify(bodyText)
-        });
-        if (!response.ok) {
-          throw new Error('Network response was not ok.');
-        }
+        const data = await fetchGlossaryTemplate(dataList?.ClientID, bodyText, jwt);
 
+        layTerms = data.Data;
 
-        const data = await response.json();
-        layTerms = data.Data
         if (data.Data.length > 0) {
-          glossaryName = data.Data[0].GlossaryTemplate
-          loadGlossary()
+          glossaryName = data.Data[0].GlossaryTemplate;
+          loadGlossary();
         } else {
           document.getElementById('app-body').innerHTML = `
-       <p class="text-center">Data not available<p/>
-  `
+            <p class="text-center">Data not available</p>
+          `;
         }
-
-        // alert('Glossary data loaded successfully.');
       } catch (error) {
         console.error('Error fetching glossary data:', error);
-        // Optionally show an error message to the user
-        // alert('Error fetching glossary data.');
       }
       // Sort terms by length (longest first)
       layTerms.sort((a, b) => b.ClinicalTerm.length - a.ClinicalTerm.length);
@@ -1667,7 +1058,7 @@ export async function applyglossary() {
       // Filter out smaller terms if they are included in a larger term
       const filteredTerms = layTerms.filter(term => {
         for (const biggerTerm of processedTerms) {
-          if (biggerTerm.includes(term.ClinicalTerm.toLowerCase())) {
+          if (typeof biggerTerm === 'string' && biggerTerm.includes(term.ClinicalTerm.toLowerCase())) {
             console.log(`Skipping "${term.ClinicalTerm}" because it's part of "${biggerTerm}"`);
             return false; // Exclude this smaller term
           }
@@ -2019,61 +1410,11 @@ async function displayMentions() {
       await removeMatchingContentControls();
     }
 
-    const htmlBody = `
-      <div class="container mt-3">
-        <div class="card">
-          <div class="card-header">
-            <h5 class="card-title">Search Tags</h5>
-          </div>
-          <div class="card-body">
-            <div class="form-group">
-              <input type="text" id="search-box" class="form-control" placeholder="Search Tags..." autocomplete="off" />
-            </div>
-            <ul id="suggestion-list" class="list-group mt-2"></ul>
-          </div>
-        </div>
-      </div>
-    `;
 
-    document.getElementById('app-body').innerHTML = htmlBody;
-
-    const searchBox = document.getElementById('search-box');
-    const suggestionList = document.getElementById('suggestion-list');
-
-    // Function to filter and display suggestions
-    function updateSuggestions() {
-      const searchTerm = searchBox.value.toLowerCase();
-      if (searchTerm === '') {
-        suggestionList.innerHTML = ``;
-        return;
-      }
-      suggestionList.innerHTML = '';
-
-      // Filter mention list based on search term
-      const filteredMentions = availableKeys.filter(mention =>
-        mention.DisplayName.toLowerCase().includes(searchTerm)
-      );
-
-      // Render filtered suggestions
-      filteredMentions.forEach(mention => {
-        const listItem = document.createElement('li');
-        listItem.className = 'list-group-item list-group-item-action';
-        listItem.textContent = mention.DisplayName;
-        listItem.onclick = () => {
-          // Replace # with the selected value (adjust as needed)
-          replaceMention(mention, mention.ComponentKeyDataType);
-          suggestionList.innerHTML = ''; // Clear suggestions after selection
-        };
-        suggestionList.appendChild(listItem);
-      });
-    }
-
-    // Add input event listener to the search box
-    searchBox.addEventListener('input', updateSuggestions);
   }
 }
 
-async function addGenAITags() {
+export async function addGenAITags() {
   if (!isTagUpdating) {
     if (isGlossaryActive) {
       await removeMatchingContentControls();
@@ -2093,86 +1434,22 @@ async function addGenAITags() {
       `;
     }).join('');
 
-    const htmlBody = `
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-body p-3">
-            <form id="genai-form" autocomplete="off" novalidate>
-              <!-- Name Field -->
-              <div class="mb-3">
-                <label for="name" class="form-label"><span class="text-danger">*</span> Name</label>
-                <input type="text" class="form-control" id="name" required>
-                <div class="invalid-feedback">Name is required.</div>
-                <div id="submition-error" class="invalid-feedback" style="display: none;"></div>
-
-              </div>
-
-              <!-- Description Field -->
-              <div class="mb-3">
-                <label for="description" class="form-label">Description</label>
-                <textarea class="form-control" id="description" rows="6"></textarea>
-              </div>
-
-              <!-- Prompt Field -->
-              <div class="mb-3">
-                <label for="prompt" class="form-label"><span class="text-danger">*</span> Prompt 
-                  <small class="text-secondary">(Note: Use # tag for content suggestions)</small>
-                </label>
-                <textarea class="form-control" id="prompt" rows="6"  required></textarea>
-                <div class="invalid-feedback">Prompt is required.</div>
-                <div id="mention-dropdown" class="dropdown-menu"></div>
-              </div>
-
-              <!-- Save Globally Checkbox -->
-              <div class="form-check mb-3">
-                <input type="checkbox" class="form-check-input" id="saveGlobally">
-                <label class="form-check-label" for="saveGlobally">Save Globally</label>
-              </div>
-
-              <!-- Available to All Sponsors Checkbox -->
-              <div class="form-check mb-3">
-                <input type="checkbox" class="form-check-input" id="isAvailableForAll" disabled>
-                <label class="form-check-label" for="isAvailableForAll">Available to All Sponsors</label>
-              </div>
-
-              <!-- Sponsor Dropdown -->
-              <div class="mb-3">
-                <label for="sponsor" class="form-label"><span class="text-danger">*</span> Sponsor</label>
-                <div class="dropdown w-100">
-                  <button 
-                    class="btn btn-white border w-100 text-start d-flex justify-content-between align-items-center dropdown-toggle" 
-                    type="button" 
-                    id="sponsorDropdown" 
-                    data-bs-toggle="dropdown" 
-                    aria-expanded="false" 
-                    disabled>
-                    <span id="sponsorDropdownLabel">Select Sponsors</span>
-                    <span class="dropdown-toggle-icon"></span>
-                  </button>
-                  <ul class="dropdown-menu w-100 p-2" aria-labelledby="sponsorDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-                    <li class="dropdown-item p-2" style="cursor: pointer;">
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll">
-                        <label class="form-check-label" for="selectAll">Select All</label>
-                      </div>
-                    </li>
-                    ${sponsorOptions}
-                  </ul>
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="text-end mt-3">
-                <button id="cancel-btn-gen-ai" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
-                <button type="submit" class="btn btn-success bg-success-clr" id="text-gen-save"><i class="fa fa-check-circle me-2"></i>Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>`;
-
+    document.getElementById('app-body').innerHTML = navTabs;
     // Add modal HTML to the DOM
-    document.getElementById('app-body').innerHTML = htmlBody;
+    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions);
+    const promptTemplateElement = document.getElementById('add-prompt-template')
+    setupPromptBuilderUI(promptTemplateElement, promptBuilderList)
+
+
+    document.getElementById('tag-tab').addEventListener('click', () => {
+      switchToAddTag()
+    });
+
+
+    document.getElementById('prompt-tab').addEventListener('click', () => {
+      switchToPromptBuilder()
+    });
+
     //prompt starting
     mentionDropdownFn('prompt', 'mention-dropdown', 'add');
     //prompt end
@@ -2186,7 +1463,11 @@ async function addGenAITags() {
     const sponsorDropdownButton = document.getElementById('sponsorDropdown');
     const sponsorDropdownItems = document.querySelectorAll('.dropdown-item .form-check-input');
 
-    document.getElementById('cancel-btn-gen-ai').addEventListener('click', displayAiTagList);
+    document.getElementById('cancel-btn-gen-ai').addEventListener('click', () => {
+      if (!isPendingResponse) {
+        loadHomepage(availableKeys)
+      }
+    });
 
     // Check if elements exist
     if (form && nameField && promptField && sponsorDropdownItems.length > 0) {
@@ -2201,7 +1482,7 @@ async function addGenAITags() {
         }
       };
       // Form validation logic on submit
-      form.addEventListener('submit', function (e) {
+      form.addEventListener('submit', async function (e) {
         e.preventDefault();
 
         // Reset previous validation errors
@@ -2249,7 +1530,7 @@ async function addGenAITags() {
             ReportHeadSourceID: ''
           };
 
-          createTextGenTag(formData);
+          await createTextGenTag(formData);
         }
       });
 
@@ -2281,48 +1562,55 @@ async function addGenAITags() {
       // Event listener for "Available to All Sponsors" checkbox
 
       saveGloballyCheckbox.addEventListener('change', function () {
-        if (this.checked) {
-          availableForAllCheckbox.disabled = false;
-          sponsorDropdownButton.disabled = false;
-        } else {
-          enableSponsors();
-          availableForAllCheckbox.checked = false;
-          availableForAllCheckbox.disabled = true;
-          sponsorDropdownButton.disabled = true;
-          sponsorDropdownItems.forEach(checkbox => {
-            if (!checkbox.disabled) {
-              checkbox.checked = false;
-              checkbox.disabled = false;
-            }
-          });
-          updateDropdownLabel();
+        if (!isPendingResponse) {
+          if (this.checked) {
+            availableForAllCheckbox.disabled = false;
+            sponsorDropdownButton.disabled = false;
+          } else {
+            enableSponsors();
+            availableForAllCheckbox.checked = false;
+            availableForAllCheckbox.disabled = true;
+            sponsorDropdownButton.disabled = true;
+            sponsorDropdownItems.forEach(checkbox => {
+              if (!checkbox.disabled) {
+                checkbox.checked = false;
+                checkbox.disabled = false;
+              }
+            });
+            updateDropdownLabel();
+          }
         }
       });
 
       // Event listener for "Available to All Sponsors" checkbox
       availableForAllCheckbox.addEventListener('change', function () {
-        if (this.checked) {
-          checkAndDisableSponsors();
-        } else {
-          enableSponsors();
+        if (!isPendingResponse) {
+
+          if (this.checked) {
+            checkAndDisableSponsors();
+          } else {
+            enableSponsors();
+          }
         }
       });
 
       // Add event listener to prevent dropdown close on item selection
       document.querySelectorAll('.dropdown-item').forEach(item => {
         item.addEventListener('click', function (event) {
-          event.stopPropagation(); // Prevent dropdown from closing
-          const checkbox = this.querySelector('.form-check-input');
-          if (checkbox) {
+          {
+            event.stopPropagation(); // Prevent dropdown from closing
+            const checkbox = this.querySelector('.form-check-input');
+            if (checkbox) {
 
 
-            if (checkbox.id === 'selectAll') {
-              const isChecked = checkbox.checked;
-              sponsorDropdownItems.forEach(cb => {
-                if (!cb.disabled) cb.checked = isChecked;
-              });
+              if (checkbox.id === 'selectAll') {
+                const isChecked = checkbox.checked;
+                sponsorDropdownItems.forEach(cb => {
+                  if (!cb.disabled) cb.checked = isChecked;
+                });
+              }
+              updateDropdownLabel();
             }
-            updateDropdownLabel();
           }
         });
       });
@@ -2353,42 +1641,24 @@ async function addGenAITags() {
 async function createTextGenTag(payload) {
   try {
     const iconelement = document.getElementById(`text-gen-save`);
-    const aiTagBtn = document.getElementById('aitag');
-    const mentionBtn = document.getElementById('mention');
-    const formatDropdownBtn = document.getElementById('formatDropdown');
     const cancelBtnGenAi = document.getElementById('cancel-btn-gen-ai');
 
-    aiTagBtn.disabled = true;
-    cancelBtnGenAi.disabled = true;
-    mentionBtn.disabled = true;
-    formatDropdownBtn.disabled = true;
+
+    (cancelBtnGenAi as HTMLButtonElement).disabled = true;
     iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Save`;
-    iconelement.disabled = true;
+    (iconelement as HTMLButtonElement).disabled = true;
+    isPendingResponse = true;
 
-    const response = await fetch(`${baseUrl}/api/report/group-key/add`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`
-      },
-      body: JSON.stringify(payload)
-    });
+    const data = await addGroupKey(payload, jwt);
+    isPendingResponse = false;
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok.');
-    }
-
-    const data = await response.json();
     if (data['Data'] && data['Status']) {
       fetchDocument('AIpanel');
     } else {
-      aiTagBtn.disabled = false;
-      cancelBtnGenAi.disabled = false;
-      mentionBtn.disabled = false;
-      formatDropdownBtn.disabled = false;
-      iconelement.disabled = false;
+      (cancelBtnGenAi as HTMLButtonElement).disabled = false;
+      (iconelement as HTMLButtonElement).disabled = false;
       iconelement.innerHTML = `<i class="fa fa-check-circle me-2"></i>Save`;
-      showAddTagError(data['Data'])
+      showAddTagError(data['Data']);
     }
 
   } catch (error) {
@@ -2397,7 +1667,7 @@ async function createTextGenTag(payload) {
 }
 
 
-function mentionDropdownFn(textareaId, DropdownId, action) {
+export function mentionDropdownFn(textareaId, DropdownId, action) {
   const filterMentions = (query) => {
     // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
     const filtered = availableKeys.filter(item => item.AIFlag === 0).filter(item =>
@@ -2416,7 +1686,6 @@ function mentionDropdownFn(textareaId, DropdownId, action) {
       const cursorPosition = promptField.selectionStart;
       const textBeforeCursor = promptField.value.slice(0, cursorPosition);
       const lastHashtag = textBeforeCursor.lastIndexOf('#');
-
       if (lastHashtag !== -1) {
         const query = textBeforeCursor.slice(lastHashtag + 1).trim();
         if (query.length > 0) {
@@ -2668,17 +1937,12 @@ export async function replaceMention(word: any, type: any) {
         if (word.EditorValue === '' || word.IsApplied) {
           selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
         } else {
-          if (word.AIFlag === 1) {
-            let content = removeQuotes(word.EditorValue);
-            let textToInsert = content.replace(/\r?\n/g, "\n"); // Ensure line breaks remain
-            insertSingleBookmark(textToInsert, word.DisplayName);
-          } else {
-            let content = removeQuotes(word.EditorValue);
-            let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-            lines.forEach(line => {
-              selection.insertParagraph(line, Word.InsertLocation.before);
-            });
-          }
+          let content = removeQuotes(word.EditorValue);
+          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+
+          lines.forEach(line => {
+            selection.insertParagraph(line, Word.InsertLocation.before);
+          });
         }
       }
 
@@ -2751,40 +2015,38 @@ function transformDocumentName(value: string): string {
 
 
 
-function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
-  const cardContainer = document.getElementById('card-container');
+export function createMultiSelectDropdown(tag) {
 
   // Get the current scroll position
-  const scrollPosition = cardContainer.scrollTop;
 
   const multiSelectHTML = `
   <div class='p-3 bg-light w-100'>
     <div class="mb-3">
-      <label for="source-select-${i}" class="form-label"><span class="text-danger">*</span> Select Sources</label>
+      <label for="source-select" class="form-label"><span class="text-danger">*</span> Select Sources</label>
       <div class="dropdown w-100">
         <button 
           class="btn btn-light border w-100 text-start d-flex justify-content-between align-items-start dropdown-toggle dropdown-toggle-sources" 
           type="button" 
-          id="sourceDropdown-${i}" 
+          id="sourceDropdown" 
           data-bs-toggle="dropdown" 
           aria-expanded="false">
-          <span id="sourceDropdownLabel-${i}" class='sourceDropdownLabel'></span>
+          <span id="sourceDropdownLabel" class='sourceDropdownLabel'></span>
           <span class="dropdown-toggle-icon dropdown-toggle-icon-s"></span>
         </button>
-        <ul class="dropdown-menu w-100 p-2" aria-labelledby="sourceDropdown-${i}" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000;">
-          <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="selectAll-${i}">
+        <ul class="dropdown-menu w-100 p-2" aria-labelledby="sourceDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000;">
+          <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="selectAll">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll-${i}">
-              <label class="form-check-label w-100" for="selectAll-${i}">Select All</label>
+              <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll">
+              <label class="form-check-label w-100" for="selectAll">Select All</label>
             </div>
           </li>
           ${sourceList
       .map(
         (source, index) => `
-              <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="source-${i}-${index}">
+              <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="source-${index}">
                 <div class="form-check">
-                  <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${i}-${index}">
-                  <label class="form-check-label w-100 text-prewrap" for="source-${i}-${index}">${source.SourceName}</label>
+                  <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${index}">
+                  <label class="form-check-label w-100 text-prewrap" for="source-${index}">${source.SourceName}</label>
                 </div>
               </li>
             `
@@ -2794,14 +2056,14 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
       </div>
     </div>
     <div class="d-flex justify-content-end mt-2">
-      <button id="cancel-src-btn-${i}" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
-      <button id="ok-src-btn-${i}" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Save</button>
+      <button id="cancel-src-btn" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
+      <button id="ok-src-btn" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Save</button>
     </div>
   </div>
   `;
 
   // Get the accordion body element
-  const accordionBody = document.getElementById(`box-bottom-${i}`);
+  const accordionBody = document.getElementById(`chatFooter`);
 
   // Set height to ensure the dropdown button appears with some space
 
@@ -2812,9 +2074,9 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
   let selectedSources = [];
 
   // Get "Select All" checkbox and individual source checkboxes
-  const selectAllCheckbox = document.getElementById(`selectAll-${i}`);
-  const individualCheckboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
-  const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel-${i}`);
+  const selectAllCheckbox = document.getElementById(`selectAll`);
+  const individualCheckboxes = document.querySelectorAll(`.source-checkbox`);
+  const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel`);
 
   // Function to update the dropdown label based on selected checkboxes
   function updateLabel() {
@@ -2828,7 +2090,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
 
   // Handle "Select All" functionality
   selectAllCheckbox.addEventListener("change", function () {
-    const checkboxes = document.querySelectorAll(`#accordion-body-${i} .source-checkbox`);
+    const checkboxes = document.querySelectorAll(`.source-checkbox`);
     checkboxes.forEach((checkbox) => {
       checkbox.checked = this.checked;  // If "Select All" is checked, all checkboxes are checked, and vice versa
       // Update the temporary array based on the state of the checkboxes
@@ -2845,7 +2107,7 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
   });
 
 
-  const selectAllItem = document.querySelector(`#accordion-body-${i} .dropdown-item[data-checkbox-id="selectAll-${i}"]`);
+  const selectAllItem = document.querySelector(`.dropdown-item[data-checkbox-id="selectAll"]`);
   selectAllItem.addEventListener("click", function (event) {
     event.stopPropagation();  // Prevent dropdown from closing when clicking on the "Select All" item
   });
@@ -2894,16 +2156,20 @@ function createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue) {
   }
 
   // Handle "OK" button click
-  document.getElementById(`ok-src-btn-${i}`).addEventListener("click", function () {
+  document.getElementById(`ok-src-btn`).addEventListener("click", function () {
     tag.Sources = [...selectedSources];  // Add selected sources to tag.Sources when "OK" is clicked
     tag.SourceValue = sourceList
       .filter(source => selectedSources.includes(source.SourceName))  // Find the sources with matching SourceNames
       .map(source => source.SourceValue);
-    appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosition);
+
+    accordionBody.innerHTML = chatfooter(tag);
+    initializeAIHistoryEvents(tag, jwt, availableKeys);
+
   });
 
-  document.getElementById(`cancel-src-btn-${i}`).addEventListener("click", function () {
-    appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosition);
+  document.getElementById(`cancel-src-btn`).addEventListener("click", function () {
+    accordionBody.innerHTML = chatfooter(tag);
+    initializeAIHistoryEvents(tag, jwt, availableKeys);
   });
 }
 
@@ -2949,12 +2215,11 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
 
   cardContainer.scrollTop = scrollPosition;
   mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
-  document.getElementById(`doNotApply-${i}`)?.addEventListener('change', () => onDoNotApplyChange(event, i, tag));
 
   document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
     const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
 
-    sendPrompt(tag, textareaValue, i)
+    sendPrompt(tag, textareaValue,)
   });
 
 
@@ -2962,107 +2227,25 @@ function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosi
     insertTagPrompt(i)
   })
 
-  document.getElementById(`changeSource-${i}`)?.addEventListener('click', () => {
+  document.getElementById(`changeSource`)?.addEventListener('click', () => {
     const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
-
     // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
-    createMultiSelectDropdown(i, tag, radioButtonsHTML, textareaValue)
+    createMultiSelectDropdown(tag)
   })
-
-
 }
 
-
-function jsonToHtmlTable(jsonData) {
-  if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
-    return '<p>No data available</p>';
-  }
-
-  let headers = new Set();
-  let rows = [];
-
-  function flattenObject(obj, prefix = "", result = {}) {
-    Object.keys(obj).forEach(key => {
-      const value = obj[key];
-      const newKey = prefix ? `${prefix} > ${key}` : key;
-
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        flattenObject(value, newKey, result);
-      } else if (Array.isArray(value)) {
-        result[newKey] = value.map(item => {
-          return typeof item === 'object'
-            ? Object.entries(item).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join('<br>')
-            : item;
-        }).join('<br>');
-      } else {
-        result[newKey] = value;
-      }
-    });
-    return result;
-  }
-
-  if (!Array.isArray(jsonData)) {
-    jsonData = Object.entries(jsonData).map(([key, value]) => ({ [key]: value }));
-  }
-
-  jsonData.forEach(item => {
-    let flattenedItem = flattenObject(item);
-    Object.keys(flattenedItem).forEach(key => headers.add(key));
-    rows.push(flattenedItem);
-  });
-
-  let table = '<table border="1" cellspacing="0" cellpadding="5">';
-  table += '<tr>' + [...headers].map(header => `<th>${header}</th>`).join('') + '</tr>';
-  rows.forEach(row => {
-    table += '<tr>' + [...headers].map(header => `<td>${row[header]}</td>`).join('') + '</tr>';
-  });
-
-  table += '</table>';
-  return table;
-}
-
-function updateEditorFinalTable(data) {
-  const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
-  let match;
-  let tables = [];
-
-  while ((match = regex.exec(data)) !== null) {
-    try {
-      const parsedContent = JSON.parse(match[1]);
-      tables.push(jsonToHtmlTable(parsedContent));
-    } catch (error) {
-      console.error("Failed to parse JSON:", error, match[1]);
+async function loadPromptTemplates() {
+  try {
+    const data = await getAllPromptTemplates(jwt);
+    if (data.Status && data.Data) {
+      promptBuilderList = data.Data;
     }
+    // Do something with the data
+  } catch (error) {
+    console.error('Error fetching prompt templates:', error);
   }
-
-  let tableIndex = 0;
-  return data.replace(regex, () => tables[tableIndex++] || "");
 }
 
-async function insertSingleBookmark(text: any, DisplayName: any) {
-  return Word.run(async (context) => {
-    let range = context.document.getSelection();
-    await context.sync(); // Ensure selection is ready
-
-    // Replace spaces with underscores in DisplayName
-    let cleanDisplayName = DisplayName.replace(/\s+/g, "_");
-
-    let uniqueStr = new Date().getTime();
-    let splitString = 'Split';
-    let bookmarkName = `${cleanDisplayName}_${splitString}_${uniqueStr}`;
-
-    // Insert text and get the range of inserted content
-    let insertedTextRange = range.insertText(text, Word.InsertLocation.replace);
-
-    await context.sync(); // Ensure text is inserted
-
-    // Expand the range to cover the newly inserted text and apply bookmark
-    insertedTextRange.insertBookmark(bookmarkName);
-
-    await context.sync(); // Ensure bookmark is inserted
-    console.log(`Single bookmark added: ${bookmarkName}`);
-  });
-}
 
 async function logBookmarksInSelection() {
   return Word.run(async (context) => {
@@ -3073,31 +2256,17 @@ async function logBookmarksInSelection() {
     let bookmarks = range.getBookmarks(); // Returns ClientResult<string[]>
 
     await context.sync(); // Ensure bookmarks are retrieved
-
     if (bookmarks.value.length > 0) {
-      console.log("📌 Bookmarks in selection:");
-      const selectedNames = []
+      selectedNames = []
       bookmarks.value.forEach((bookmarkName) => {
         let processedName = bookmarkName.split("_Split_")[0];
-
-        // 🔹 Replace `_` with spaces
         processedName = processedName.replace(/_/g, " ");
         selectedNames.push(processedName)
+        const container = document.getElementById('tags-in-selected-text');
+        if(container){
+          renderSelectedTags(selectedNames,availableKeys)// Trigger function when selection changes
+        }
       });
-      console.log("📌 Bookmark Name:", selectedNames);
-
-    } else {
-      console.log("❌ No bookmarks found in selection.");
     }
   });
-}
-
-function hiddenmetaData(){
-  Word.run(async (context) => {
-    const settings = context.document.settings;
-    settings.add("trackedText", "highlightedText");
- 
-    await context.sync();
-    console.log("Custom property added for tracking.");
-});
 }
