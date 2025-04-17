@@ -31,11 +31,13 @@
 
 /* Adjust the dropdown button to allow text wrapping and keep the icon on the right */
 .dropdown-toggle-sources {
-  height: auto; /* Allow dynamic height based on content */
-  min-height: 30px; /* Set a minimum height */
+  height: auto;
+  /* Allow dynamic height based on content */
+  min-height: 30px;
+  /* Set a minimum height */
 }
 
-.dropdown-toggle-icon-s ::after{
+.dropdown-toggle-icon-s ::after {
   align-self: center;
 }
 
@@ -43,9 +45,12 @@
 .sourceDropdownLabel {
   display: block;
   overflow: hidden;
-  text-overflow: ellipsis; /* Ensure long texts are truncated */
-  white-space: normal; /* Allow wrapping of text */
-  max-width: 100%; /* Prevent overflow */
+  text-overflow: ellipsis;
+  /* Ensure long texts are truncated */
+  white-space: normal;
+  /* Allow wrapping of text */
+  max-width: 100%;
+  /* Prevent overflow */
 }
 
 
@@ -66,8 +71,11 @@
 }
 
 .user {
-  background-color: #f1f1f1;
+  background-color: #f4f4f4;
   text-align: justify;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+  hyphens: auto;
 }
 
 .ai-reply {
@@ -75,7 +83,10 @@
 }
 
 .ai-selected-reply {
-  background-color: #d8feda;
+  text-align: justify;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+  hyphens: auto;
 }
 
 .accordion,
@@ -95,9 +106,6 @@
   align-content: space-around;
 }
 
-.chatbox {
-  background-color: #e7f1f9;
-}
 
 /* 
 * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
@@ -198,6 +206,7 @@ ul {
   0% {
     -webkit-transform: rotate(0deg);
   }
+
   100% {
     -webkit-transform: rotate(360deg);
   }
@@ -207,6 +216,7 @@ ul {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -315,7 +325,7 @@ ul {
   position: sticky;
   top: 0;
   z-index: 1000;
-  height: 6rem;
+  height: 3rem;
 }
 
 .card-container {
@@ -323,8 +333,16 @@ ul {
   position: relative;
 }
 
+#chatFooter {
+  position: relative; /* So absolute positioning inside works */
+}
+
+.prompt-box{
+  position: relative; 
+}
+
 #mention-dropdown {
-  position: relative;
+  position: absolute; /* ⬅️ This is the key change */
   display: none;
   z-index: 1000;
   background-color: white;
@@ -333,13 +351,12 @@ ul {
   width: 100%;
   max-height: 200px;
   overflow-y: auto;
-  margin-top: 5px;
   max-width: 250px;
 }
 
 .list-group {
   overflow: auto;
-  max-height: 300px;
+  max-height: 130px;
 }
 
 .form-switch {
@@ -351,8 +368,8 @@ ul {
   background-color: #dee2e6;
 }
 
-.mh-34{
-  min-height: calc( 100vh - 102px);
+.mh-34 {
+  min-height: calc(100vh - 70px);
 }
 
 #footer {
@@ -367,14 +384,23 @@ ul {
   align-self: center !important;
 }
 
-.text-prewrap{
+.text-prewrap {
   white-space: pre-wrap;
 }
 
-.formating-checkbox{
-  display: flex; 
+.formating-checkbox {
+  display: flex;
   align-self: flex-start;
-  align-items: start; 
-  gap: 8px; 
+  align-items: start;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.chat-body{
+  min-height: calc(100vh - 210px);
+}
+
+.selected-text-box{
+  position: absolute;
+  top: 270px;
 }
