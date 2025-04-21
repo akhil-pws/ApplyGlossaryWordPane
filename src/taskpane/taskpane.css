@@ -357,7 +357,7 @@ ul {
 
 .list-group {
   overflow: auto;
-  max-height: 300px;
+  max-height: 150px;
   z-index: 10;
   position: relative;
 }
