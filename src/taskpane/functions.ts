@@ -383,24 +383,28 @@ export function renderSelectedTags(selectedNames, availableKeys) {
     badge.style.cursor = 'pointer';
     badge.innerHTML = `${name} <i class="fa-solid fa-robot ms-2 text-muted" aria-label="AI Suggested"></i>`;
 
-    badge.addEventListener('click', () => {
+    badge.addEventListener('click', async () => {
+      await selectMatchingBookmarkFromSelection(name);
+    
       const aiTag = availableKeys.find(
         mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
       );
-
+    
       if (aiTag) {
         const appBody = document.getElementById('app-body');
         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-
+    
         generateCheckboxHistory(aiTag).then(html => {
           appBody.innerHTML = html;
         });
       }
     });
+    
 
     badgeWrapper.appendChild(badge);
   });
 }
+
 
 
 export function applyThemeClasses(theme) {
@@ -455,4 +459,27 @@ export function swicthThemeIcon(){
     icon.classList.remove('fa-sun');
     icon.classList.add('fa-moon');
   }
+}
+
+async function selectMatchingBookmarkFromSelection(displayName) {
+  return Word.run(async (context) => {
+    const selection = context.document.getSelection();
+    const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
+    await context.sync();
+
+    const targetBookmarkName = bookmarks.value.find(bookmark => {
+      const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
+      return cleanName.toLowerCase() === displayName.toLowerCase();
+    });
+
+    if (targetBookmarkName) {
+      const range = context.document.getBookmarkRangeOrNullObject(targetBookmarkName);
+      range.load('isNullObject');
+      await context.sync();
+
+      if (!range.isNullObject) {
+        range.select(); // Select the entire bookmark
+      }
+    }
+  });
 }

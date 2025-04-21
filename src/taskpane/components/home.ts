@@ -1,12 +1,12 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, insertSingleBookmark, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, insertSingleBookmark, removeQuotes, switchToAddTag, updateEditorFinalTable } from "../functions";
 import { addGenAITags, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
 
 let preview = '';
 
 
-export function loadHomepage(availableKeys, selectedNames = []) {
-    const searchBoxClass = theme==='Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+export function loadHomepage(availableKeys) {
+    const searchBoxClass = theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
 
     document.getElementById('app-body').innerHTML = `
     <div class="container pt-3">
@@ -44,13 +44,12 @@ export function loadHomepage(availableKeys, selectedNames = []) {
 
     const searchBox = document.getElementById('search-box');
     const suggestionList = document.getElementById('suggestion-list');
-    renderSelectedTags(selectedNames, availableKeys);
 
     function updateSuggestions() {
         const searchTerm = searchBox.value.trim().toLowerCase();
         suggestionList.replaceChildren(); // Clear previous results
         if (searchTerm === '') {
-            suggestionList.innerHTML=''
+            suggestionList.innerHTML = ''
             return;
         }
 
@@ -63,31 +62,31 @@ export function loadHomepage(availableKeys, selectedNames = []) {
 
         const createSection = (labelText, mentions, isAISection = false) => {
             if (mentions.length === 0) return;
-        
+
             // Define the theme classes based on the current theme
             const themeClasses = theme === 'Dark'
-            ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
-            : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
-          
-        
+                ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
+                : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
+
+
             // Create the section label
             const label = document.createElement('li');
             label.className = `list-group-item fw-bold text-secondary ${themeClasses.labelClass}`;
             label.textContent = labelText;
             suggestionList.appendChild(label);
-        
+
             // Loop through mentions and create the list items
             mentions.forEach(mention => {
                 const listItem = document.createElement('li');
                 listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`; // Apply the theme classes
-        
+
                 // Create the icon for AI or non-AI tags
                 const icon = isAISection
                     ? `<i class="fa-solid fa-robot text-muted me-2"></i>`
                     : `<i class="fa-solid fa-layer-group text-muted me-2"></i>`;
-        
+
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
-        
+
                 listItem.onclick = () => {
                     if (isAISection) {
                         const appBody = document.getElementById('app-body');
@@ -102,15 +101,15 @@ export function loadHomepage(availableKeys, selectedNames = []) {
                         suggestionList.replaceChildren();
                     }
                 };
-        
+
                 suggestionList.appendChild(listItem);
             });
         };
-        
+
         // Call the function for each section
         createSection('Properties', nonAITags, false);
         createSection('AI Tags', aiTags, true);
-        
+
     }
 
     // Add input event listener to the search box
@@ -137,166 +136,147 @@ export function loadHomepage(availableKeys, selectedNames = []) {
 
 export async function replaceMention(word: any, type: any) {
     return Word.run(async (context) => {
-        try {
-            const selection = context.document.getSelection();
-            await context.sync();
-
-            if (!selection) {
-                throw new Error('Selection is invalid or not found.');
-            }
-            if (type === 'TABLE') {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(word.EditorValue, 'text/html');
-
-                const bodyNodes = Array.from(doc.body.childNodes);
-                const cleanDisplayName = word.DisplayName.replace(/\s+/g, "_");
-                const uniqueStr = new Date().getTime();
-                const bookmarkName = `${cleanDisplayName}_Split_${uniqueStr}`;
-
-                const startMarker = selection.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
-                await context.sync();
-
-                for (const node of bodyNodes) {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        const textContent = node.textContent?.trim();
-                        if (textContent) {
-                            textContent.split('\n').forEach(line => {
-                                if (line.trim()) {
-                                    insertLineWithHeadingStyle(selection, line);
-                                }
-                            });
-                        }
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const element = node as HTMLElement;
-
-                        if (element.tagName.toLowerCase() === 'table') {
-                            const rows = Array.from(element.querySelectorAll('tr'));
-
-                            if (rows.length === 0) {
-                                selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                                continue;
-                            }
-
-                            const maxCols = Math.max(...rows.map(row => {
-                                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                                }, 0);
-                            }));
-
-                            const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-                            await context.sync();
-
-                            const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
-
-                            await context.sync();
-
-                            const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-                            rows.forEach((row, rowIndex) => {
-                                const cells = Array.from(row.querySelectorAll('td, th'));
-                                let cellIndex = 0;
-
-                                cells.forEach((cell) => {
-                                    while (rowspanTracker[cellIndex] > 0) {
-                                        rowspanTracker[cellIndex]--;
-                                        cellIndex++;
-                                    }
-
-                                    const cellText = Array.from(cell.childNodes)
-                                        .map(node => {
-                                            if (node.nodeType === Node.TEXT_NODE) {
-                                                return node.textContent?.trim() || '';
-                                            } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                return (node as HTMLElement).innerText.trim();
-                                            }
-                                            return '';
-                                        })
-                                        .filter(text => text.length > 0)
-                                        .join(' ');
-
-                                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                                    table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                    for (let i = 1; i < colspan; i++) {
-                                        if (cellIndex + i < maxCols) {
-                                            table.getCell(rowIndex, cellIndex + i).value = "";
-                                        }
-                                    }
-
-                                    if (rowspan > 1) {
-                                        for (let i = 0; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols) {
-                                                rowspanTracker[cellIndex + i] = rowspan - 1;
-                                            }
-                                        }
-                                    }
-
-                                    cellIndex += colspan;
-                                });
-                            });
-                        } else {
-                            const elementText = element.innerText.trim();
-                            if (elementText) {
-                                elementText.split('\n').forEach(line => {
-                                    if (line.trim()) {
-                                        insertLineWithHeadingStyle(selection, line);
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }
-
-                const endMarker = selection.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
-                await context.sync();
-
-                // Now create bookmark between start and end markers
-                const markers = context.document.body.paragraphs;
-                context.load(markers, 'text');
-
-                await context.sync();
-
-                const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
-                const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
-
-                if (start && end) {
-                    const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
-                    bookmarkRange.insertBookmark(bookmarkName);
-                    console.log(`Bookmark added for table: ${bookmarkName}`);
-                }
-
-                // Optionally: Remove the markers
-                start.insertText('', Word.InsertLocation.replace);
-                end.insertText('', Word.InsertLocation.replace);
-            }
-
-            else {
-                if (word.EditorValue === '' || word.IsApplied) {
-                    selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
-                } else {
-                    // if (word.AIFlag === 1) {
-                    //     let content = removeQuotes(word.EditorValue);
-                    //     let textToInsert = content.replace(/\r?\n/g, "\n"); // Ensure line breaks remain
-                    //     insertSingleBookmark(textToInsert, word.DisplayName);
-                    // } else {
-                    let content = removeQuotes(word.EditorValue);
-                    let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-                    lines.forEach(line => {
-                        selection.insertParagraph(line, Word.InsertLocation.before);
-                    });
-
-                }
-            }
-
-            await context.sync();
-        } catch (error) {
-            console.error('Detailed error:', error);
+      try {
+        const selection = context.document.getSelection();
+        await context.sync();
+  
+        if (!selection) {
+          throw new Error('Selection is invalid or not found.');
         }
+  
+        let newSelection = selection;
+  
+        if (type === 'TABLE') {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(word.EditorValue, 'text/html');
+          const bodyNodes = Array.from(doc.body.childNodes);
+  
+          await context.sync();
+  
+          for (const node of bodyNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              const textContent = node.textContent?.trim();
+              if (textContent) {
+                textContent.split('\n').forEach(line => {
+                  if (line.trim()) {
+                    insertLineWithHeadingStyle(selection, line);
+                  }
+                });
+              }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+  
+              if (element.tagName.toLowerCase() === 'table') {
+                const rows = Array.from(element.querySelectorAll('tr'));
+  
+                if (rows.length === 0) {
+                  selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                  continue;
+                }
+  
+                const maxCols = Math.max(...rows.map(row => {
+                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                  }, 0);
+                }));
+  
+                const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
+                await context.sync();
+  
+                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
+  
+                await context.sync();
+  
+                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+  
+                rows.forEach((row, rowIndex) => {
+                  const cells = Array.from(row.querySelectorAll('td, th'));
+                  let cellIndex = 0;
+  
+                  cells.forEach((cell) => {
+                    while (rowspanTracker[cellIndex] > 0) {
+                      rowspanTracker[cellIndex]--;
+                      cellIndex++;
+                    }
+  
+                    const cellText = Array.from(cell.childNodes)
+                      .map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                          return node.textContent?.trim() || '';
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          return (node as HTMLElement).innerText.trim();
+                        }
+                        return '';
+                      })
+                      .filter(text => text.length > 0)
+                      .join(' ');
+  
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+                    table.getCell(rowIndex, cellIndex).value = cellText;
+  
+                    for (let i = 1; i < colspan; i++) {
+                      if (cellIndex + i < maxCols) {
+                        table.getCell(rowIndex, cellIndex + i).value = "";
+                      }
+                    }
+  
+                    if (rowspan > 1) {
+                      for (let i = 0; i < colspan; i++) {
+                        if (cellIndex + i < maxCols) {
+                          rowspanTracker[cellIndex + i] = rowspan - 1;
+                        }
+                      }
+                    }
+  
+                    cellIndex += colspan;
+                  });
+                });
+  
+                newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
+              } else {
+                const elementText = element.innerText.trim();
+                if (elementText) {
+                  elementText.split('\n').forEach(line => {
+                    if (line.trim()) {
+                      insertLineWithHeadingStyle(selection, line);
+                    }
+                  });
+                }
+                newSelection = selection; // If it's not a table, just use the existing selection.
+              }
+            }
+          }
+        } else {
+          if (word.EditorValue === '' || word.IsApplied) {
+            selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
+          } else {
+            let content = removeQuotes(word.EditorValue);
+            let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+            lines.forEach(line => {
+              selection.insertParagraph(line, Word.InsertLocation.before);
+            });
+          }
+          newSelection = selection; // After inserting the text, set selection to it.
+        }
+  
+        // Move the cursor to the next line after content insertion
+        const nextLineParagraph = selection.insertParagraph("", Word.InsertLocation.after);
+        await context.sync();
+  
+        // Set the new cursor position after content
+        newSelection = nextLineParagraph;
+        selection.select(); // Select the new paragraph where the cursor will be
+        await context.sync();
+  
+      } catch (error) {
+        console.error('Detailed error:', error);
+      }
     });
-}
-
+  }
+  
+  
 export async function openAITag(tag) {
     tag.ReportHeadAIHistoryList.forEach((historyList) => {
         historyList.Response = removeQuotes(historyList.Response);
@@ -672,6 +652,11 @@ async function insertTagPrompt(tag: any) {
                 const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
                 bookmarkRange.insertBookmark(bookmarkName);
                 console.log(`Bookmark added: ${bookmarkName}`);
+                const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
+                await context.sync();
+
+                // Move the cursor to this paragraph (now it's outside the bookmark)
+                afterBookmark.select();
             }
 
             if (start) start.insertText('', Word.InsertLocation.replace);

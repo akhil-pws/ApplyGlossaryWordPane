@@ -596,6 +596,7 @@ async function removeFormattedText() {
 
       // Iterate through each paragraph in the document body
       for (const paragraph of paragraphs.items) {
+        
         // Check if the paragraph contains text
         if (paragraph.text.trim() !== "") {
           const textRanges = paragraph.split([" "]); // Split paragraph into individual words/segments
@@ -788,31 +789,29 @@ export async function applyAITagFn() {
       context.load(body, 'text');
       await context.sync();
 
-      // Iterate over the aiTagList to search and replace
       for (let i = 0; i < aiTagList.length; i++) {
         const tag = aiTagList[i];
-        // Clean up the EditorValue by removing quotes
         tag.EditorValue = removeQuotes(tag.EditorValue);
 
-        // Search for all instances of the tag.DisplayName enclosed with `#`
         const searchResults = body.search(`#${tag.DisplayName}#`, {
           matchCase: false,
           matchWholeWord: false,
         });
-
-        // Load the search results to ensure they are available for further operations
         context.load(searchResults, 'items');
+        await context.sync();
 
-        await context.sync(); // Synchronize to fetch the search results
-
-        // Log the number of search results for debugging
         console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
         const tableInsertPositions: { range: Word.Range, tag: any }[] = [];
 
-        // Replace each found instance with tag.EditorValue
-        searchResults.items.forEach((item: any) => {
-          // Ensure the EditorValue is not empty before replacing
+        for (const item of searchResults.items) {
           if (tag.EditorValue !== "" && !tag.IsApplied) {
+            const cleanDisplayName = tag.DisplayName.replace(/[^\w\s]/gi, "").replace(/\s+/g, "_");
+            const uniqueStr = new Date().getTime();
+            const bookmarkName = `${cleanDisplayName}_Split_${uniqueStr}`;
+
+            const startMarker = item.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
+            await context.sync();
+
             if (tag.ComponentKeyDataType === 'TABLE') {
               const range = item.getRange();
               tableInsertPositions.push({ range, tag });
@@ -820,13 +819,38 @@ export async function applyAITagFn() {
             } else {
               item.insertText(tag.EditorValue, Word.InsertLocation.replace);
             }
+
+            const endMarker = item.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
+            await context.sync();
+
+            const markers = context.document.body.paragraphs;
+            context.load(markers, 'text');
+            await context.sync();
+
+            const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
+            const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
+
+            if (start && end) {
+              const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
+              bookmarkRange.insertBookmark(bookmarkName);
+              console.log(`Bookmark added: ${bookmarkName}`);
+              const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
+              await context.sync();
+            
+              // Move the cursor to this paragraph (now it's outside the bookmark)
+              afterBookmark.select();
+            }
+
+            if (start) start.insertText('', Word.InsertLocation.replace);
+            if (end) end.insertText('', Word.InsertLocation.replace);
+
+            await context.sync();
           }
-        });
+        }
 
         for (const { range, tag } of tableInsertPositions) {
           const parser = new DOMParser();
           const doc = parser.parseFromString(tag.EditorValue, 'text/html');
-
           const bodyNodes = Array.from(doc.body.childNodes);
 
           for (const node of bodyNodes) {
@@ -860,8 +884,7 @@ export async function applyAITagFn() {
                 await context.sync();
 
                 const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
-
+                table.style = "Grid Table 4 - Accent 1";
                 await context.sync();
 
                 const rowspanTracker: number[] = new Array(maxCols).fill(0);
@@ -890,12 +913,7 @@ export async function applyAITagFn() {
 
                     const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
                     const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                    // if (rowIndex === 0) {
-                    //   const cell = table.getCell(rowIndex, cellIndex);
-                    //   const paragraph = cell.body.paragraphs.getFirst();
-                    //   paragraph.font.bold = true;
-                    //   paragraph.font.highlightColor = "lightGray";  // This works!
-                    // }
+
                     table.getCell(rowIndex, cellIndex).value = cellText;
 
                     for (let i = 1; i < colspan; i++) {
@@ -927,22 +945,17 @@ export async function applyAITagFn() {
               }
             }
           }
-        }
 
-        // Additional sync after each replacement
-        await context.sync();
+          await context.sync();
+        }
       }
 
-      // Final sync to apply all changes
       await context.sync();
     } catch (err) {
       console.error("Error during tag application:", err);
     }
   });
 }
-
-
-
 
 async function onRadioChange(tag, tagIndex, chatIndex) {
   if (!isTagUpdating) {
@@ -2294,3 +2307,4 @@ async function logBookmarksInSelection() {
     }
   });
 }
+
