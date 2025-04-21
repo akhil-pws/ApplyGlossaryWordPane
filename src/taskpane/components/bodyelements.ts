@@ -1,7 +1,9 @@
+import { theme } from "../taskpane";
+
 function addtagbody(sponsorOptions) {
   const body = `<div class="modal-dialog">
   <div class="modal-content">
-    <div class="modal-body p-3">
+    <div class="modal-body p-3 pt-0">
       <form id="genai-form" autocomplete="off" novalidate>
         <!-- Name Field -->
         <div class="mb-3">
@@ -80,35 +82,39 @@ function addtagbody(sponsorOptions) {
 }
 
 function logoheader(storedUrl) {
+  const themeicon=theme==='Dark'?'fa-sun':'fa-moon'
   const body = `
     <img id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo">
     <div class="icon-nav me-3">
-    <i class="fa fa-home c-pointer me-3" title="Home" id="home"></i>
-<div class="dropdown d-inline">
-  <i class="fa fa-tools c-pointer me-3" id="settingsDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Settings"></i>
-  <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
-    <li>
-      <a class="dropdown-item" href="#" id="define-formatting">
-        <i class="fa fa-sliders-h me-2" aria-hidden="true"></i> Define Formatting
-      </a>
-    </li>
-    <li>
-      <a class="dropdown-item disabled-link" href="#" id="glossary" tabindex="-1" aria-disabled="true">
-        <i class="fa fa-book me-2" aria-hidden="true"></i> Apply Glossary
-      </a>
-    </li>
-    <li>
-      <a class="dropdown-item disabled-link" href="#" id="removeFormatting" tabindex="-1" aria-disabled="true">
-        <i class="fa fa-eraser me-2" aria-hidden="true"></i> Remove Formatting
-      </a>
-    </li>
-  </ul>
-</div>
+      <i class="fa fa-home c-pointer me-3" title="Home" id="home"></i>
+      <div class="dropdown d-inline">
+        <i class="fa fa-tools c-pointer me-3" id="settingsDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Settings"></i>
+        <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
+          <li>
+            <a class="dropdown-item" href="#" id="define-formatting">
+              <i class="fa fa-sliders-h me-2" aria-hidden="true"></i> Define Formatting
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item disabled-link" href="#" id="glossary" tabindex="-1" aria-disabled="true">
+              <i class="fa fa-book me-2" aria-hidden="true"></i> Apply Glossary
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item disabled-link" href="#" id="removeFormatting" tabindex="-1" aria-disabled="true">
+              <i class="fa fa-eraser me-2" aria-hidden="true"></i> Remove Formatting
+            </a>
+          </li>
+        </ul>
+      </div>
 
-    <i class="fa fa-sign-out c-pointer me-3" id="logout" title="Logout"></i>
+      <!-- Theme Toggle Icon -->
+      <span id="theme-toggle"><i class="fa ${themeicon} c-pointer me-3" title="Toggle Theme"></i></span>
+
+      <i class="fa fa-sign-out c-pointer me-3" id="logout" title="Logout"></i>
     </div>    
-`
-  return body
+  `
+  return body;
 }
 
 const navTabs = `<ul class="nav nav-tabs" id="tabList" role="tablist">

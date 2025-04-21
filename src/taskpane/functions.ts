@@ -1,4 +1,5 @@
 import { generateCheckboxHistory } from "./components/home";
+import { theme } from "./taskpane";
 
 export function insertLineWithHeadingStyle(range: Word.Range, line: string) {
   let style = "Normal";
@@ -305,6 +306,8 @@ export async function insertTagPrompt(tag: any) {
 
 
 export function generateChatHistoryHtml(chatList: any[]): string {
+      const promptclass= theme==='Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+  
   return chatList.map((chat, index) =>
     `<div class="row chat-entry m-0 p-0">
             <div class="col-md-12 mt-2 p-2">
@@ -312,7 +315,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
                     <i class="fa fa-copy text-secondary c-pointer" title="Copy Prompt" id="copyPrompt-${index}"></i>
                 </span>
                 <span class="float-end w-75 me-2">
-                    <div class="form-control h-34 d-flex align-items-center dynamic-height prompt-text">
+                    <div class="form-control h-34 d-flex align-items-center dynamic-height prompt-text ${promptclass}">
                         ${chat.Prompt}
                     </div>
                 </span>
@@ -338,13 +341,14 @@ export function generateChatHistoryHtml(chatList: any[]): string {
 
 
 export function chatfooter(tag: any) {
+  const promptclass= theme==='Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
-  return ` <textarea class="form-control"
+  return ` <textarea class="form-control ${promptclass}"
                       rows="5"
                       id="chatInput"
-                      placeholder="Type here"></textarea>
+                      ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
             <div class="d-flex flex-column align-self-end me-3">
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insertTagButton">
@@ -363,10 +367,17 @@ export function chatfooter(tag: any) {
 }
 
 export function renderSelectedTags(selectedNames, availableKeys) {
-
   const badgeWrapper = document.getElementById('tag-badge-wrapper');
-  badgeWrapper.innerHTML='';
-  selectedNames.forEach(name => {
+  badgeWrapper.innerHTML = '';
+
+  // Filter out duplicates (case-insensitive)
+  const uniqueNames = [...new Set(
+    selectedNames.map(name => name.toLowerCase())
+  )].map(lowerName => 
+    selectedNames.find(name => name.toLowerCase() === lowerName)
+  );
+
+  uniqueNames.forEach(name => {
     const badge = document.createElement('span');
     badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
     badge.style.cursor = 'pointer';
@@ -380,7 +391,7 @@ export function renderSelectedTags(selectedNames, availableKeys) {
       if (aiTag) {
         const appBody = document.getElementById('app-body');
         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-      
+
         generateCheckboxHistory(aiTag).then(html => {
           appBody.innerHTML = html;
         });
@@ -391,3 +402,57 @@ export function renderSelectedTags(selectedNames, availableKeys) {
   });
 }
 
+
+export function applyThemeClasses(theme) {
+  const isDark = theme === 'Dark';
+  const isLight = theme === 'Light';
+
+  const safeApplyClass = (selector, darkClasses, lightClasses) => {
+    const elements = document.querySelectorAll(selector);
+    const darkClassList = darkClasses.split(' ');
+    const lightClassList = lightClasses.split(' ');
+
+    elements.forEach(elem => {
+      if (!elem) return;
+      // Remove all related theme classes
+      elem.classList.remove(...darkClassList);
+      elem.classList.remove(...lightClassList);
+      // Add only the relevant set
+      if (isDark) elem.classList.add(...darkClassList);
+      if (isLight) elem.classList.add(...lightClassList);
+    });
+  };
+
+  // Now use it for different elements
+  safeApplyClass('#app-body', 'bg-dark text-light', 'bg-white text-dark');
+  safeApplyClass('#search-box', 'bg-secondary text-light border-0', 'bg-white text-dark border');
+  safeApplyClass('.dropdown-menu', 'bg-dark text-light border-light', 'bg-white text-dark border');
+  safeApplyClass('.list-group-item', 'bg-dark text-light', 'bg-white text-dark');
+  safeApplyClass('.dropdown-toggle', 'bg-dark text-light border-0', 'bg-white text-dark border');
+  safeApplyClass('.dropdown-item', 'bg-dark text-light', 'bg-white text-dark');
+  // container for the suggestion list
+  safeApplyClass(
+    '.list-group-item-action',
+    'bg-dark text-light list-hover-dark',
+    'bg-light text-dark list-hover-light'
+  );
+
+safeApplyClass('#close-ai-window', 'fa-solid fa-circle-xmark bg-dark text-light', 'fa-solid fa-circle-xmark bg-light text-dark');
+safeApplyClass('#chatInput', 'bg-secondary text-light', 'bg-white text-dark');
+safeApplyClass('.prompt-text', 'bg-secondary text-light', 'bg-white text-dark');
+
+
+}
+
+export function swicthThemeIcon(){
+  const themeToggle = document.getElementById('theme-toggle');
+  const icon = themeToggle.querySelector('i');
+
+  if (theme === 'Dark') {
+    icon.classList.remove('fa-moon');
+    icon.classList.add('fa-sun');
+  } else if (theme === 'Light') {
+    icon.classList.remove('fa-sun');
+    icon.classList.add('fa-moon');
+  }
+}

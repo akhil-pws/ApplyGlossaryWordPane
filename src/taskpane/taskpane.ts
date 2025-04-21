@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { chatfooter, copyText, insertTagPrompt, renderSelectedTags, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, copyText, insertTagPrompt, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, logoheader, navTabs, promptbuilderbody } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateAiHistory, updateGroupKey } from "./api";
 export let jwt = '';
@@ -33,6 +33,7 @@ let sourceList;
 let filteredGlossaryTerm;
 export let selectedNames = [];
 export let isPendingResponse = false;
+export let theme = 'Light';
 
 
 /* global document, Office, Word */
@@ -110,9 +111,15 @@ async function login() {
 
 function loadLoginPage() {
 
+  document.getElementById('logo-header').innerHTML = `
+  <img id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo">
+  <div class="icon-nav me-3">
+    <span id="theme-toggle"><i class="fa fa-moon c-pointer me-3"  title="Toggle Theme"></i><span>
+  </div>
+`;
 
   document.getElementById('app-body').innerHTML = `
-    <div class="container">
+    <div class="container pt-2">
       <form id="login-form" class="p-4 border rounded">
         <div class="mb-3">
           <label for="organization" class="form-label fw-bold">Organization</label>
@@ -134,7 +141,15 @@ function loadLoginPage() {
       </form>
     </div>
   `;
-
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    theme = theme === 'Light' ? 'Dark' : 'Light';
+    applyThemeClasses(theme)
+    
+    document.body.classList.toggle('dark-theme', theme === 'Dark');
+    document.body.classList.toggle('light-theme', theme === 'Light');
+    swicthThemeIcon()
+  }
+  );
   document.getElementById('login-form').addEventListener('submit', handleLogin);
 }
 
@@ -279,6 +294,17 @@ async function fetchDocument(action) {
       }
     });
 
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      theme = theme === 'Light' ? 'Dark' : 'Light';
+      applyThemeClasses(theme)
+      
+      document.body.classList.toggle('dark-theme', theme === 'Dark');
+      document.body.classList.toggle('light-theme', theme === 'Light');
+      swicthThemeIcon()
+    }
+    );
+
     document.getElementById('logout').addEventListener('click', async () => {
       if (!isPendingResponse) {
         if (isGlossaryActive) {
@@ -319,7 +345,7 @@ export async function formatOptionsDisplay() {
       await removeMatchingContentControls();
     }
     const htmlBody = `
-      <div class="container mt-3">
+      <div class="container pt-3">
         <div class="card">
           <div class="card-header">
                <!-- Buttons for Capture and Empty Format -->
@@ -509,7 +535,7 @@ async function removeOptionsConfirmation() {
       await removeMatchingContentControls();
     } // Check if isTagUpdating is false
     const htmlBody = `
-      <div class="container mt-3">
+      <div class="container pt-3">
         <div class="card">
           <div class="card-header">
             <h5 class="card-title">Are you sure you want to remove formatted text ?</h5>
@@ -522,9 +548,10 @@ async function removeOptionsConfirmation() {
              
             </div>
                <!-- Buttons for Capture and Empty Format -->
-            <div class="d-flex justify-content-end mt-2">
-              <button id="change-ft-btn" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
-              <button id="clear-ft-btn" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Yes</button>
+
+            <div class="mt-3 d-flex justify-content-between">
+              <span id="change-ft-btn" class="fw-bold text-primary my-auto c-pointer">Cancel</span>
+              <button id="clear-ft-btn" class="btn btn-primary px-3"><i class="fa fa-check-circle me-2"></i>Yes</button>
 
             </div>
 
@@ -2016,16 +2043,20 @@ function transformDocumentName(value: string): string {
 
 
 export function createMultiSelectDropdown(tag) {
-
-  // Get the current scroll position
+  const isDark = theme === 'Dark';
+  const btnClass = isDark ? 'btn-dark text-light border-0' : 'btn-light text-dark border';
+  const dropdownMenuClass = isDark ? 'bg-dark text-light border-light' : 'bg-white text-dark border';
+  const itemClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
+  const cancelBtnClass = isDark ? 'btn-danger bg-danger-clr text-light' : 'btn-danger bg-danger-clr text-white';
+  const saveBtnClass = isDark ? 'btn-success bg-success-clr text-light' : 'btn-success bg-success-clr text-white';
 
   const multiSelectHTML = `
-  <div class='p-3 bg-light w-100'>
+  <div class='p-3 w-100'>
     <div class="mb-3">
       <label for="source-select" class="form-label"><span class="text-danger">*</span> Select Sources</label>
       <div class="dropdown w-100">
         <button 
-          class="btn btn-light border w-100 text-start d-flex justify-content-between align-items-start dropdown-toggle dropdown-toggle-sources" 
+          class="btn ${btnClass} w-100 text-start d-flex justify-content-between align-items-start dropdown-toggle dropdown-toggle-sources" 
           type="button" 
           id="sourceDropdown" 
           data-bs-toggle="dropdown" 
@@ -2033,138 +2064,117 @@ export function createMultiSelectDropdown(tag) {
           <span id="sourceDropdownLabel" class='sourceDropdownLabel'></span>
           <span class="dropdown-toggle-icon dropdown-toggle-icon-s"></span>
         </button>
-        <ul class="dropdown-menu w-100 p-2" aria-labelledby="sourceDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000;">
-          <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="selectAll">
+        <ul class="dropdown-menu ${dropdownMenuClass} w-100 p-2" aria-labelledby="sourceDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000;">
+          <li class="dropdown-item p-2 ${itemClass}" style="cursor: pointer;" data-checkbox-id="selectAll">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll">
               <label class="form-check-label w-100" for="selectAll">Select All</label>
             </div>
           </li>
           ${sourceList
-      .map(
-        (source, index) => `
-              <li class="dropdown-item p-2" style="cursor: pointer;" data-checkbox-id="source-${index}">
+            .map(
+              (source, index) => `
+              <li class="dropdown-item p-2 ${itemClass}" style="cursor: pointer;" data-checkbox-id="source-${index}">
                 <div class="form-check">
                   <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${index}">
                   <label class="form-check-label w-100 text-prewrap" for="source-${index}">${source.SourceName}</label>
                 </div>
               </li>
             `
-      )
-      .join('')}
+            )
+            .join('')}
         </ul>
       </div>
     </div>
-    <div class="d-flex justify-content-end mt-2">
-      <button id="cancel-src-btn" class="btn btn-danger bg-danger-clr px-3 me-2"><i class="fa fa-reply me-2"></i>Cancel</button>
-      <button id="ok-src-btn" class="btn btn-success bg-success-clr px-3"><i class="fa fa-check-circle me-2"></i>Save</button>
+    <div class="mt-3 d-flex justify-content-between">
+          <span id="cancel-src-btn" class="fw-bold text-primary my-auto c-pointer">Cancel</span>
+      <button id="ok-src-btn" class="btn btn-primary">Save</button>
     </div>
   </div>
   `;
 
-  // Get the accordion body element
   const accordionBody = document.getElementById(`chatFooter`);
-
-  // Set height to ensure the dropdown button appears with some space
-
-  // Clear existing content and insert the dropdown
   accordionBody.innerHTML = multiSelectHTML;
 
-  // Temporary array to hold the selected sources
   let selectedSources = [];
 
-  // Get "Select All" checkbox and individual source checkboxes
   const selectAllCheckbox = document.getElementById(`selectAll`);
   const individualCheckboxes = document.querySelectorAll(`.source-checkbox`);
   const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel`);
 
-  // Function to update the dropdown label based on selected checkboxes
   function updateLabel() {
     const selectedSourceNames = selectedSources;
     if (selectedSourceNames.length > 0) {
-      sourceDropdownLabel.innerText = selectedSourceNames.join(', ');  // Display selected sources as comma-separated
+      sourceDropdownLabel.innerText = selectedSourceNames.join(', ');
     } else {
-      sourceDropdownLabel.innerText = ' ';  // Default text when no sources are selected
+      sourceDropdownLabel.innerText = ' ';
     }
   }
 
-  // Handle "Select All" functionality
   selectAllCheckbox.addEventListener("change", function () {
     const checkboxes = document.querySelectorAll(`.source-checkbox`);
     checkboxes.forEach((checkbox) => {
-      checkbox.checked = this.checked;  // If "Select All" is checked, all checkboxes are checked, and vice versa
-      // Update the temporary array based on the state of the checkboxes
+      checkbox.checked = this.checked;
       if (checkbox.checked) {
         if (!selectedSources.includes(checkbox.value)) {
-          selectedSources.push(checkbox.value);  // Add source to the array if checked
+          selectedSources.push(checkbox.value);
         }
       } else {
-        selectedSources = selectedSources.filter((source) => source !== checkbox.value);  // Remove unchecked sources
+        selectedSources = selectedSources.filter((source) => source !== checkbox.value);
       }
     });
 
-    updateLabel();  // Update the label when "Select All" changes
+    updateLabel();
   });
-
 
   const selectAllItem = document.querySelector(`.dropdown-item[data-checkbox-id="selectAll"]`);
   selectAllItem.addEventListener("click", function (event) {
-    event.stopPropagation();  // Prevent dropdown from closing when clicking on the "Select All" item
+    event.stopPropagation();
   });
 
-  // Handle individual checkbox state change
   individualCheckboxes.forEach((checkbox) => {
     checkbox.addEventListener("change", function () {
       if (checkbox.checked) {
         if (!selectedSources.includes(checkbox.value)) {
-          selectedSources.push(checkbox.value);  // Add source to the array if checked
+          selectedSources.push(checkbox.value);
         }
       } else {
-        selectedSources = selectedSources.filter((source) => source !== checkbox.value);  // Remove unchecked sources
+        selectedSources = selectedSources.filter((source) => source !== checkbox.value);
       }
 
-      // Check if all individual checkboxes are checked
       const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
-      selectAllCheckbox.checked = allChecked;  // Update "Select All" checkbox based on individual selections
+      selectAllCheckbox.checked = allChecked;
 
-      updateLabel();  // Update the label when an individual checkbox is changed
+      updateLabel();
     });
 
-    // Add click event listener to the whole list item (not just the checkbox)
     const listItem = checkbox.closest("li");
     listItem.addEventListener("click", function (event) {
-      event.stopPropagation();  // Prevent dropdown from closing when clicking on list item
+      event.stopPropagation();
     });
   });
 
-  // Prevent the dropdown from closing when clicking on the "Select All" checkbox label
-
-  // Initialize checkboxes based on tag.Sources
   if (tag.Sources && tag.Sources.length > 0) {
     individualCheckboxes.forEach((checkbox) => {
       if (tag.Sources.includes(checkbox.value)) {
-        checkbox.checked = true;  // Check the checkbox if its value is in tag.Sources
-        selectedSources.push(checkbox.value);  // Add the source to the temporary array
+        checkbox.checked = true;
+        selectedSources.push(checkbox.value);
       }
     });
 
-    // Also check "Select All" if all checkboxes are selected
     const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
     selectAllCheckbox.checked = allChecked;
-    updateLabel();  // Update the label when "Select All" changes
-
+    updateLabel();
   }
 
-  // Handle "OK" button click
   document.getElementById(`ok-src-btn`).addEventListener("click", function () {
-    tag.Sources = [...selectedSources];  // Add selected sources to tag.Sources when "OK" is clicked
+    tag.Sources = [...selectedSources];
     tag.SourceValue = sourceList
-      .filter(source => selectedSources.includes(source.SourceName))  // Find the sources with matching SourceNames
+      .filter(source => selectedSources.includes(source.SourceName))
       .map(source => source.SourceValue);
 
     accordionBody.innerHTML = chatfooter(tag);
     initializeAIHistoryEvents(tag, jwt, availableKeys);
-
   });
 
   document.getElementById(`cancel-src-btn`).addEventListener("click", function () {
@@ -2172,6 +2182,7 @@ export function createMultiSelectDropdown(tag) {
     initializeAIHistoryEvents(tag, jwt, availableKeys);
   });
 }
+
 
 
 
@@ -2252,21 +2263,34 @@ async function logBookmarksInSelection() {
     let range = context.document.getSelection();
     await context.sync(); // Ensure selection is ready
 
+
     // Get bookmarks in the selection
     let bookmarks = range.getBookmarks(); // Returns ClientResult<string[]>
 
     await context.sync(); // Ensure bookmarks are retrieved
     if (bookmarks.value.length > 0) {
       selectedNames = []
+      const badgeWrapper = document.getElementById('tags-in-selected-text');
+      if (badgeWrapper) {
+        badgeWrapper.classList.remove('d-none');
+        badgeWrapper.classList.add('d-block');
+      }
       bookmarks.value.forEach((bookmarkName) => {
         let processedName = bookmarkName.split("_Split_")[0];
         processedName = processedName.replace(/_/g, " ");
         selectedNames.push(processedName)
         const container = document.getElementById('tags-in-selected-text');
-        if(container){
-          renderSelectedTags(selectedNames,availableKeys)// Trigger function when selection changes
+        if (container) {
+          renderSelectedTags(selectedNames, availableKeys)// Trigger function when selection changes
         }
       });
+    } else {
+      const badgeWrapper = document.getElementById('tags-in-selected-text');
+      if (badgeWrapper) {
+        badgeWrapper.classList.remove('d-block');
+        badgeWrapper.classList.add('d-none');
+      }
+
     }
   });
 }

@@ -147,8 +147,8 @@ ul {
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
 }
 
 #loader {
@@ -183,7 +183,6 @@ ul {
   border-radius: 4px;
   padding: 5px;
   margin-top: 5px;
-  background-color: #ffffff;
 }
 
 .sub-box p {
@@ -334,15 +333,17 @@ ul {
 }
 
 #chatFooter {
-  position: relative; /* So absolute positioning inside works */
+  position: relative;
+  /* So absolute positioning inside works */
 }
 
-.prompt-box{
-  position: relative; 
+.prompt-box {
+  position: relative;
 }
 
 #mention-dropdown {
-  position: absolute; /* ⬅️ This is the key change */
+  position: absolute;
+  /* ⬅️ This is the key change */
   display: none;
   z-index: 1000;
   background-color: white;
@@ -356,7 +357,9 @@ ul {
 
 .list-group {
   overflow: auto;
-  max-height: 130px;
+  max-height: 300px;
+  z-index: 10;
+  position: relative;
 }
 
 .form-switch {
@@ -396,11 +399,11 @@ ul {
   flex-wrap: wrap;
 }
 
-.chat-body{
+.chat-body {
   min-height: calc(100vh - 210px);
 }
 
-.selected-text-box{
+.selected-text-box {
   position: absolute;
   top: 270px;
 }
