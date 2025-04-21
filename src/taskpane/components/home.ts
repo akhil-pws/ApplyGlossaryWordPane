@@ -1,61 +1,58 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory } from "../api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, insertSingleBookmark, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
-import { addGenAITags, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt } from "../taskpane";
+import { addGenAITags, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
 
 let preview = '';
 
 
-export function loadHomepage(availableKeys) {
+export function loadHomepage(availableKeys, selectedNames = []) {
+    const searchBoxClass = theme==='Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+
     document.getElementById('app-body').innerHTML = `
     <div class="container pt-3">
-  <div class="d-flex justify-content-end px-2">
-    <div class="dropdown">
-      <button class="btn btn-default dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        Action
-      </button>
-      <ul class="dropdown-menu">
-        <li>
-          <a class="dropdown-item" href="#" id="add-btn-tag">
-            <i class="fa fa-plus me-2" aria-hidden="true"></i> Add
-          </a>
-        </li>
-        <li>
-          <a class="dropdown-item" href="#" id="apply-btn-tag">
-            <i class="fa-solid fa-circle-check me-2"></i> Apply
-          </a>
-        </li>
-      </ul>
-    </div>
-  </div>
+        <div class="d-flex justify-content-end px-2">
+            <div class="dropdown">
+                <button class="btn btn-default dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Action
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a class="dropdown-item" href="#" id="add-btn-tag">
+                            <i class="fa fa-plus me-2" aria-hidden="true"></i> Add
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#" id="apply-btn-tag">
+                            <i class="fa-solid fa-circle-check me-2"></i> Apply
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
 
-  <div class="form-group px-2 pt-2">
-    <input
-      type="text"
-      id="search-box"
-      class="form-control"
-      placeholder="Search Tags..."
-      autocomplete="off"
-    />
-  </div>
+        <div class="form-group px-2 pt-2">
+            <input type="text" id="search-box" class="form-control ${searchBoxClass}" placeholder="Search Tags..." autocomplete="off" />
+        </div>
 
-  <ul id="suggestion-list" class="list-group mt-2 px-2"></ul>
-  <div id="tags-in-selected-text" class="mt-2 px-2 selected-text-box">
-      <label class="form-label mb-2 fw-bold">Tags in Selected Text</label>
-    <div class="d-flex flex-wrap gap-2" id="tag-badge-wrapper"></div></div>
-
-</div>
-    `
-
+        <ul id="suggestion-list" class="list-group mt-2 px-2"></ul>
+        
+        <div id="tags-in-selected-text" class="mt-2 px-2 selected-text-box d-none">
+            <label class="form-label mb-2 fw-bold">Tags in Selected Text</label>
+            <div class="d-flex flex-wrap gap-2" id="tag-badge-wrapper"></div>
+        </div>
+    </div>`;
 
     const searchBox = document.getElementById('search-box');
     const suggestionList = document.getElementById('suggestion-list');
-    renderSelectedTags(selectedNames,availableKeys);
-    // Function to filter and display suggestions
+    renderSelectedTags(selectedNames, availableKeys);
+
     function updateSuggestions() {
         const searchTerm = searchBox.value.trim().toLowerCase();
         suggestionList.replaceChildren(); // Clear previous results
-
-        if (searchTerm === '') return;
+        if (searchTerm === '') {
+            suggestionList.innerHTML=''
+            return;
+        }
 
         const filteredMentions = availableKeys.filter(mention =>
             mention.DisplayName.toLowerCase().includes(searchTerm)
@@ -64,30 +61,40 @@ export function loadHomepage(availableKeys) {
         const nonAITags = filteredMentions.filter(m => m.AIFlag === 0);
         const aiTags = filteredMentions.filter(m => m.AIFlag === 1);
 
-        // Helper to create section
         const createSection = (labelText, mentions, isAISection = false) => {
             if (mentions.length === 0) return;
-
+        
+            // Define the theme classes based on the current theme
+            const themeClasses = theme === 'Dark'
+            ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
+            : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
+          
+        
+            // Create the section label
             const label = document.createElement('li');
-            label.className = 'list-group-item fw-bold text-secondary bg-light';
+            label.className = `list-group-item fw-bold text-secondary ${themeClasses.labelClass}`;
             label.textContent = labelText;
             suggestionList.appendChild(label);
-
+        
+            // Loop through mentions and create the list items
             mentions.forEach(mention => {
                 const listItem = document.createElement('li');
-                listItem.className = 'list-group-item list-group-item-action';
-
+                listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`; // Apply the theme classes
+        
+                // Create the icon for AI or non-AI tags
                 const icon = isAISection
                     ? `<i class="fa-solid fa-robot text-muted me-2"></i>`
                     : `<i class="fa-solid fa-layer-group text-muted me-2"></i>`;
-
+        
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
-
+        
                 listItem.onclick = () => {
                     if (isAISection) {
                         const appBody = document.getElementById('app-body');
                         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                        generateCheckboxHistory(mention).then(html => {
+                        generateCheckboxHistory(mention).catch(error => {
+                            appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>';
+                        }).then(html => {
                             appBody.innerHTML = html;
                         });
                     } else {
@@ -95,19 +102,24 @@ export function loadHomepage(availableKeys) {
                         suggestionList.replaceChildren();
                     }
                 };
-
+        
                 suggestionList.appendChild(listItem);
             });
         };
-
-        // Render both sections
+        
+        // Call the function for each section
         createSection('Properties', nonAITags, false);
         createSection('AI Tags', aiTags, true);
+        
     }
 
-
     // Add input event listener to the search box
-    searchBox.addEventListener('input', updateSuggestions);
+    let debounceTimeout;
+    searchBox.addEventListener('input', () => {
+        clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(updateSuggestions, 300); // Delay input handling by 300ms
+    });
+
     document.getElementById('add-btn-tag').addEventListener('click', () => {
         if (!isPendingResponse) {
             addGenAITags();
@@ -120,6 +132,7 @@ export function loadHomepage(availableKeys) {
         }
     });
 }
+
 
 
 export async function replaceMention(word: any, type: any) {
@@ -298,40 +311,48 @@ export async function generateCheckboxHistory(tag) {
         await fetchAIHistory(tag);
     }
 
-    if (tag.FilteredReportHeadAIHistoryList.length > 0) {
-        const closeBar = `<div class="d-flex justify-content-between align-items-center px-2 mt-3">
-    <div class="d-flex align-items-center ms-3">
-        <i class="fa fa-robot text-muted me-2"></i>
-        <span class="fw-bold">${tag.DisplayName}</span>
-    </div>
-    <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
-         <i class="fa-solid fa-circle-xmark bg-light text-dark"></i>
+    const history = tag.FilteredReportHeadAIHistoryList;
 
-    </div>
-</div>
-<hr class="mt-2 mb-1 mx-3">
-`;
-        const chats = generateChatHistoryHtml(tag.FilteredReportHeadAIHistoryList)
-
-        const chatHistoryHtml = `
-        <div class="chat-body">
-        ${chats}
-        </div>`
-
-        const chatFooter = chatfooter(tag);
-        const chatInputFooter = `
-         <div class="d-flex align-items-end justify-content-end chatbox p-2" id="chatFooter">
-            ${chatFooter}
-          </div>`;
-
-        const finalHtml = `${closeBar}${chatHistoryHtml}${chatInputFooter}`;
-
-        initializeAIHistoryEvents(tag, jwt, availableKeys)
-        return finalHtml;
-    } else {
+    if (history.length === 0) {
         return '<div>No AI history available.</div>';
     }
+
+    // Check current theme
+    const isDark = theme === 'Dark';
+    const closeBtnClass = isDark
+        ? 'fa-solid fa-circle-xmark bg-dark text-light'
+        : 'fa-solid fa-circle-xmark bg-light text-dark';
+
+    const closeBar = `
+        <div class="d-flex justify-content-between align-items-center px-2 pt-3">
+            <div class="d-flex align-items-center ms-3">
+                <i class="fa fa-robot text-muted me-2"></i>
+                <span class="fw-bold">${tag.DisplayName}</span>
+            </div>
+            <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
+                <i class="${closeBtnClass}" id="close-ai-window"></i>
+            </div>
+        </div>
+        <hr class="mt-2 mb-1 mx-3">
+    `;
+
+    const chatBody = `
+        <div class="chat-body">
+            ${generateChatHistoryHtml(history)}
+        </div>
+    `;
+
+    const chatFooterHtml = `
+        <div class="d-flex align-items-end justify-content-end chatbox p-2" id="chatFooter">
+            ${chatfooter(tag)}
+        </div>
+    `;
+
+    initializeAIHistoryEvents(tag, jwt, availableKeys);  // Make sure jwt and availableKeys are in scope
+
+    return `${closeBar}${chatBody}${chatFooterHtml}`;
 }
+
 
 
 
@@ -347,8 +368,8 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
     // Create the form container
     // Create the form container
     container.innerHTML = `
-  <div class="form-group mb-3">
-    <label><span class="mandatory-field">*</span>Prompt Builder Template</label>
+  <div class="form-group mb-3 p-3 pt-0">
+    <label class='form-label'><span class="text-danger">*</span> Prompt Builder Template</label>
     <select id="promptBuilderTemplate" class="form-control">
       <option value="" disabled selected>Select a template</option>
     </select>
@@ -357,7 +378,7 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
   <div id="fieldsContainer"></div>
 
-  <div class="form-group mb-3" id="previewContainer" style="display: none;">
+  <div class="form-group mb-3 p-3 pt-0" id="previewContainer" style="display: none;">
     <label class="mb-2">Preview</label>
     <div id="preview" class="form-control"></div>
   </div>
@@ -412,7 +433,7 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
         fieldsList.forEach((field) => {
             const div = document.createElement('div');
-            div.className = 'form-group mb-3';
+            div.className = 'form-group mb-3 p-3 pt-0';
 
             const label = document.createElement('label');
             label.textContent = field.Label;
