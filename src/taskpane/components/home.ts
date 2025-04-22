@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, insertSingleBookmark, removeQuotes, switchToAddTag, updateEditorFinalTable } from "../functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, insertSingleBookmark, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
 import { addGenAITags, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
 
 let preview = '';
@@ -44,7 +44,7 @@ export function loadHomepage(availableKeys) {
 
     const searchBox = document.getElementById('search-box');
     const suggestionList = document.getElementById('suggestion-list');
-
+     
     function updateSuggestions() {
         const searchTerm = searchBox.value.trim().toLowerCase();
         suggestionList.replaceChildren(); // Clear previous results
@@ -111,7 +111,13 @@ export function loadHomepage(availableKeys) {
         createSection('AI Tags', aiTags, true);
 
     }
-
+    if(selectedNames.length>0){
+        const badgeWrapper = document.getElementById('tags-in-selected-text');
+        badgeWrapper.classList.remove('d-none');
+        badgeWrapper.classList.add('d-block');
+        renderSelectedTags(selectedNames ,availableKeys);
+    }
+    
     // Add input event listener to the search box
     let debounceTimeout;
     searchBox.addEventListener('input', () => {
