@@ -1,33 +1,80 @@
 import { generateCheckboxHistory } from "./components/home";
 import { theme } from "./taskpane";
 
-export function insertLineWithHeadingStyle(range: Word.Range, line: string) {
-  let style = "Normal";
-  let text = line;
+export async function insertLineWithHeadingStyle(range: Word.Range, line: string) {
+  await Word.run(async (context) => {
+    let style = "Normal";
+    let text = line;
 
-  if (line.startsWith('###### ')) {
-    style = "Heading 6";
-    text = line.substring(7).trim();
-  } else if (line.startsWith('##### ')) {
-    style = "Heading 5";
-    text = line.substring(6).trim();
-  } else if (line.startsWith('#### ')) {
-    style = "Heading 4";
-    text = line.substring(5).trim();
-  } else if (line.startsWith('### ')) {
-    style = "Heading 3";
-    text = line.substring(4).trim();
-  } else if (line.startsWith('## ')) {
-    style = "Heading 2";
-    text = line.substring(3).trim();
-  } else if (line.startsWith('# ')) {
-    style = "Heading 1";
-    text = line.substring(2).trim();
-  }
+    if (line.startsWith('###### ')) {
+      style = "Heading 6";
+      text = line.substring(7).trim();
+    } else if (line.startsWith('##### ')) {
+      style = "Heading 5";
+      text = line.substring(6).trim();
+    } else if (line.startsWith('#### ')) {
+      style = "Heading 4";
+      text = line.substring(5).trim();
+    } else if (line.startsWith('### ')) {
+      style = "Heading 3";
+      text = line.substring(4).trim();
+    } else if (line.startsWith('## ')) {
+      style = "Heading 2";
+      text = line.substring(3).trim();
+    } else if (line.startsWith('# ')) {
+      style = "Heading 1";
+      text = line.substring(2).trim();
+    }
 
-  const paragraph = range.insertParagraph(text, Word.InsertLocation.before);
-  paragraph.style = style;
+    // Create an empty paragraph with the desired style
+    const paragraph = range.insertParagraph("", Word.InsertLocation.before);
+    paragraph.style = style;
+
+    // Combine all markdown patterns in a single regex
+    const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(_(.+?)_)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      // Insert plain text before the match
+      if (match.index > lastIndex) {
+        paragraph.insertText(text.substring(lastIndex, match.index), Word.InsertLocation.end);
+      }
+
+      // Extract the actual content and formatting
+      let content = "";
+      let bold = false;
+      let italic = false;
+      let underline = false;
+
+      if (match[1]) { // **bold**
+        content = match[2];
+        bold = true;
+      } else if (match[3]) { // *italic*
+        content = match[4];
+        italic = true;
+      } else if (match[5]) { // _underline_
+        content = match[6];
+        underline = true;
+      }
+
+      const formattedRange = paragraph.insertText(content, Word.InsertLocation.end);
+      formattedRange.font.bold = bold;
+      formattedRange.font.italic = italic;
+      formattedRange.font.underline = underline ? Word.UnderlineType.single : Word.UnderlineType.none;
+
+      lastIndex = regex.lastIndex;
+    }
+
+    // Insert any remaining text after last formatting
+    if (lastIndex < text.length) {
+      paragraph.insertText(text.substring(lastIndex), Word.InsertLocation.end);
+    }
+
+    await context.sync();
+  });
 }
+
 
 
 export function removeQuotes(value: string): string {
