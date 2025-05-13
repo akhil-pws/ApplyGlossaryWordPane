@@ -639,7 +639,8 @@ async function insertTagPrompt(tag: any) {
                     let content = removeQuotes(tag.EditorValue);
                     let lines = content.split(/\r?\n/);
                     lines.forEach(line => {
-                        selection.insertParagraph(line, Word.InsertLocation.before);
+                        insertLineWithHeadingStyle(selection,line)
+                        // selection.insertParagraph(line, Word.InsertLocation.before);
                     });
                 }
             }

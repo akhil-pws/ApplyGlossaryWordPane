@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, copyText, insertTagPrompt, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, copyText, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, logoheader, navTabs, promptbuilderbody } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateAiHistory, updateGroupKey } from "./api";
 export let jwt = '';
@@ -2197,66 +2197,6 @@ export function createMultiSelectDropdown(tag) {
 }
 
 
-
-
-function appendAccordionBody(i, tag, radioButtonsHTML, textareaValue, scrollPosition) {
-
-  const tooltipButton = tag.Sources && tag.Sources.length > 0
-    ? `  <span class="tooltiptext">${tag.Sources}</span>`
-    : '<span class="tooltiptext">Source</span>';
-
-
-  const accordionBody = document.getElementById(`box-bottom-${i}`);
-  // Clear existing content and insert the dropdown
-  accordionBody.innerHTML =
-    `
-           <textarea class="form-control"
-                      rows="5"
-                      id="chatbox-${i}"
-                      placeholder="Type here">${textareaValue}</textarea>
-              <div id="mention-dropdown-${i}" class="dropdown-menu"></div>
-              <div class="d-flex flex-column align-self-end me-3">
-                <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insert-tag-${i}">
-                <span class="tooltiptext">Insert</span>
-                <i class="fa fa-plus text-light c-pointer" ></i>
-                </button>
-
-                <button
-                    class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip"
-                    id="changeSource-${i}">
-                    ${tooltipButton}
-                 <i class="fa fa-file-lines text-white"></i>
-                </button>
-                <button type="submit"
-                    class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip"
-                    id="sendPrompt-${i}">
-                    <span class="tooltiptext">Send</span>
-                  <i class="fa fa-paper-plane text-white"></i>
-               </button>
-             </div>`;
-
-  const cardContainer = document.getElementById('card-container');
-
-  cardContainer.scrollTop = scrollPosition;
-  mentionDropdownFn(`chatbox-${i}`, `mention-dropdown-${i}`, 'edit');
-
-  document.getElementById(`sendPrompt-${i}`)?.addEventListener('click', () => {
-    const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
-
-    sendPrompt(tag, textareaValue,)
-  });
-
-
-  document.getElementById(`insert-tag-${i}`)?.addEventListener('click', () => {
-    insertTagPrompt(i)
-  })
-
-  document.getElementById(`changeSource`)?.addEventListener('click', () => {
-    const textareaValue = (document.getElementById(`chatbox-${i}`) as HTMLTextAreaElement).value;
-    // const accordionbody=document.getElementById(`accordion-body-${i}`).innerHTML=''
-    createMultiSelectDropdown(tag)
-  })
-}
 
 async function loadPromptTemplates() {
   try {
