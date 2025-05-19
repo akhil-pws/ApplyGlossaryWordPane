@@ -717,6 +717,26 @@ export async function sendPrompt(tag, prompt) {
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
 
+        const chat = tag.ReportHeadAIHistoryList[0];
+        aiTagList.forEach((currentTag) => {
+          if (currentTag.ID === tag.ID) {
+            if (chat.FormattedResponse === '') {
+              currentTag.ComponentKeyDataType = 'TEXT';
+            } else {
+              currentTag.ComponentKeyDataType = 'TABLE';
+            }
+            currentTag.UserValue = chat.FormattedResponse
+              ? '\n' + chat.FormattedResponse
+              : chat.Response;
+            currentTag.EditorValue = chat.FormattedResponse
+              ? '\n' + chat.FormattedResponse
+              : chat.Response;
+            currentTag.text = chat.FormattedResponse
+              ? '\n' + chat.FormattedResponse
+              : chat.Response;
+          }
+        })
+
         const appbody = document.getElementById('app-body')
         appbody.innerHTML = await generateCheckboxHistory(tag);
         isPendingResponse = false;
