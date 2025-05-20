@@ -144,7 +144,7 @@ function loadLoginPage() {
   document.getElementById('theme-toggle').addEventListener('click', () => {
     theme = theme === 'Light' ? 'Dark' : 'Light';
     applyThemeClasses(theme)
-    
+
     document.body.classList.toggle('dark-theme', theme === 'Dark');
     document.body.classList.toggle('light-theme', theme === 'Light');
     swicthThemeIcon()
@@ -298,7 +298,7 @@ async function fetchDocument(action) {
     document.getElementById('theme-toggle').addEventListener('click', () => {
       theme = theme === 'Light' ? 'Dark' : 'Light';
       applyThemeClasses(theme)
-      
+
       document.body.classList.toggle('dark-theme', theme === 'Dark');
       document.body.classList.toggle('light-theme', theme === 'Light');
       swicthThemeIcon()
@@ -596,7 +596,7 @@ async function removeFormattedText() {
 
       // Iterate through each paragraph in the document body
       for (const paragraph of paragraphs.items) {
-        
+
         // Check if the paragraph contains text
         if (paragraph.text.trim() !== "") {
           const textRanges = paragraph.split([" "]); // Split paragraph into individual words/segments
@@ -718,24 +718,30 @@ export async function sendPrompt(tag, prompt) {
         });
 
         const chat = tag.ReportHeadAIHistoryList[0];
-        aiTagList.forEach((currentTag) => {
+        aiTagList.forEach(currentTag => {
           if (currentTag.ID === tag.ID) {
-            if (chat.FormattedResponse === '') {
-              currentTag.ComponentKeyDataType = 'TEXT';
-            } else {
-              currentTag.ComponentKeyDataType = 'TABLE';
-            }
-            currentTag.UserValue = chat.FormattedResponse
-              ? '\n' + chat.FormattedResponse
-              : chat.Response;
-            currentTag.EditorValue = chat.FormattedResponse
-              ? '\n' + chat.FormattedResponse
-              : chat.Response;
-            currentTag.text = chat.FormattedResponse
-              ? '\n' + chat.FormattedResponse
-              : chat.Response;
+            const isTable = chat.FormattedResponse !== '';
+            const responseText = isTable ? '\n' + chat.FormattedResponse : chat.Response;
+
+            currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+            currentTag.UserValue = responseText;
+            currentTag.EditorValue = responseText;
+            currentTag.text = responseText;
+          }
+        });
+
+        availableKeys.forEach(currentTag => {
+          if (currentTag.ID === tag.ID) {
+            const isTable = chat.FormattedResponse !== '';
+            const responseText = isTable ? '\n' + chat.FormattedResponse : chat.Response;
+
+            currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+            currentTag.UserValue = responseText;
+            currentTag.EditorValue = responseText;
+            currentTag.text = responseText;
           }
         })
+
 
         const appbody = document.getElementById('app-body')
         appbody.innerHTML = await generateCheckboxHistory(tag);
@@ -856,7 +862,7 @@ export async function applyAITagFn() {
               console.log(`Bookmark added: ${bookmarkName}`);
               const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
               await context.sync();
-            
+
               // Move the cursor to this paragraph (now it's outside the bookmark)
               afterBookmark.select();
             }
@@ -2105,8 +2111,8 @@ export function createMultiSelectDropdown(tag) {
             </div>
           </li>
           ${sourceList
-            .map(
-              (source, index) => `
+      .map(
+        (source, index) => `
               <li class="dropdown-item p-2 ${itemClass}" style="cursor: pointer;" data-checkbox-id="source-${index}">
                 <div class="form-check">
                   <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${index}">
@@ -2114,8 +2120,8 @@ export function createMultiSelectDropdown(tag) {
                 </div>
               </li>
             `
-            )
-            .join('')}
+      )
+      .join('')}
         </ul>
       </div>
     </div>
