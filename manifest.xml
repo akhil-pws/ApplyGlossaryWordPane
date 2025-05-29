@@ -10,7 +10,7 @@
   <HighResolutionIconUrl DefaultValue="https://akhil-pws.github.io/ApplyGlossaryWordPane/assets/icon-64.png"/>
   <SupportUrl DefaultValue="https://www.contoso.com/help"/>
   <AppDomains>
-    <AppDomain>https://trialassurelink-qualityui.azurewebsites.net</AppDomain>
+    <AppDomain>https://trialassurelink-pace.azurewebsites.net</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Document"/>
