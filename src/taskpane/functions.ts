@@ -75,8 +75,6 @@ export async function insertLineWithHeadingStyle(range: Word.Range, line: string
   });
 }
 
-
-
 export function removeQuotes(value: string): string {
   return value
     ? value
@@ -87,31 +85,6 @@ export function removeQuotes(value: string): string {
     : '';
 }
 
-
-export async function insertSingleBookmark(text: any, DisplayName: any) {
-  return Word.run(async (context) => {
-    let range = context.document.getSelection();
-    await context.sync(); // Ensure selection is ready
-
-    // Replace spaces with underscores in DisplayName
-    let cleanDisplayName = DisplayName.replace(/\s+/g, "_");
-
-    let uniqueStr = new Date().getTime();
-    let splitString = 'Split';
-    let bookmarkName = `${cleanDisplayName}_${splitString}_${uniqueStr}`;
-
-    // Insert text and get the range of inserted content
-    let insertedTextRange = range.insertText(text, Word.InsertLocation.replace);
-
-    await context.sync(); // Ensure text is inserted
-
-    // Expand the range to cover the newly inserted text and apply bookmark
-    insertedTextRange.insertBookmark(bookmarkName);
-
-    await context.sync(); // Ensure bookmark is inserted
-    console.log(`Single bookmark added: ${bookmarkName}`);
-  });
-}
 
 
 export function copyText(text: string) {
@@ -214,9 +187,10 @@ function jsonToHtmlTable(jsonData) {
 }
 
 
+
 export function generateChatHistoryHtml(chatList: any[]): string {
-      const promptclass= theme==='Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
-  
+  const promptclass = theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+
   return chatList.map((chat, index) =>
     `<div class="row chat-entry m-0 p-0">
             <div class="col-md-12 mt-2 p-2">
@@ -250,7 +224,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
 
 
 export function chatfooter(tag: any) {
-  const promptclass= theme==='Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+  const promptclass = theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
@@ -278,37 +252,44 @@ export function chatfooter(tag: any) {
 export function renderSelectedTags(selectedNames, availableKeys) {
   const badgeWrapper = document.getElementById('tag-badge-wrapper');
   badgeWrapper.innerHTML = '';
-
   // Filter out duplicates (case-insensitive)
   const uniqueNames = [...new Set(
     selectedNames.map(name => name.toLowerCase())
-  )].map(lowerName => 
+  )].map(lowerName =>
     selectedNames.find(name => name.toLowerCase() === lowerName)
   );
 
+
   uniqueNames.forEach(name => {
+    let aiTag;
+
+    if (/^ID\d+$/i.test(name)) {
+      aiTag = availableKeys.find(
+        mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
+      );
+    }else{
+      aiTag = availableKeys.find(
+        mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
+      );
+    }
     const badge = document.createElement('span');
     badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
     badge.style.cursor = 'pointer';
-    badge.innerHTML = `${name} <i class="fa-solid fa-robot ms-2 text-muted" aria-label="AI Suggested"></i>`;
+    badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-robot ms-2 text-muted" aria-label="AI Suggested"></i>`;
 
     badge.addEventListener('click', async () => {
       await selectMatchingBookmarkFromSelection(name);
-    
-      const aiTag = availableKeys.find(
-        mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
-      );
-    
+
       if (aiTag) {
         const appBody = document.getElementById('app-body');
         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-    
+
         generateCheckboxHistory(aiTag).then(html => {
           appBody.innerHTML = html;
         });
       }
     });
-    
+
 
     badgeWrapper.appendChild(badge);
   });
@@ -350,14 +331,14 @@ export function applyThemeClasses(theme) {
     'bg-light text-dark list-hover-light'
   );
 
-safeApplyClass('#close-ai-window', 'fa-solid fa-circle-xmark bg-dark text-light', 'fa-solid fa-circle-xmark bg-light text-dark');
-safeApplyClass('#chatInput', 'bg-secondary text-light', 'bg-white text-dark');
-safeApplyClass('.prompt-text', 'bg-secondary text-light', 'bg-white text-dark');
+  safeApplyClass('#close-ai-window', 'fa-solid fa-circle-xmark bg-dark text-light', 'fa-solid fa-circle-xmark bg-light text-dark');
+  safeApplyClass('#chatInput', 'bg-secondary text-light', 'bg-white text-dark');
+  safeApplyClass('.prompt-text', 'bg-secondary text-light', 'bg-white text-dark');
 
 
 }
 
-export function swicthThemeIcon(){
+export function swicthThemeIcon() {
   const themeToggle = document.getElementById('theme-toggle');
   const icon = themeToggle.querySelector('i');
 

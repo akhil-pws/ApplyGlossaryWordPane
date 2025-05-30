@@ -716,7 +716,6 @@ export async function sendPrompt(tag, prompt) {
           historyList.Response = removeQuotes(historyList.Response);
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
-
         const chat = tag.ReportHeadAIHistoryList[0];
         aiTagList.forEach(currentTag => {
           if (currentTag.ID === tag.ID) {
@@ -812,7 +811,9 @@ export async function applyAITagFn() {
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
+      
       context.load(body, 'text');
+      
       await context.sync();
 
       for (let i = 0; i < aiTagList.length; i++) {
@@ -831,9 +832,9 @@ export async function applyAITagFn() {
 
         for (const item of searchResults.items) {
           if (tag.EditorValue !== "" && !tag.IsApplied) {
-            const cleanDisplayName = tag.DisplayName.replace(/[^\w\s]/gi, "").replace(/\s+/g, "_");
+            const cleanDisplayName = tag.ID;
             const uniqueStr = new Date().getTime();
-            const bookmarkName = `${cleanDisplayName}_Split_${uniqueStr}`;
+            const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
 
             const startMarker = item.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
             await context.sync();
@@ -2223,7 +2224,6 @@ export function createMultiSelectDropdown(tag) {
 }
 
 
-
 async function loadPromptTemplates() {
   try {
     const data = await getAllPromptTemplates(jwt);
@@ -2273,4 +2273,3 @@ async function logBookmarksInSelection() {
     }
   });
 }
-
