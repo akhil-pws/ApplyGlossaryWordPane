@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, insertSingleBookmark, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
 import { addGenAITags, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
 
 let preview = '';
@@ -38,7 +38,7 @@ export function loadHomepage(availableKeys) {
         
         <div id="tags-in-selected-text" class="mt-2 px-2 selected-text-box d-none">
             <label class="form-label mb-2 fw-bold">Tags in Selected Text</label>
-            <div class="d-flex flex-wrap gap-2" id="tag-badge-wrapper"></div>
+            <div class="tag-panel d-flex flex-wrap gap-2" id="tag-badge-wrapper"></div>
         </div>
     </div>`;
 
@@ -528,10 +528,11 @@ async function insertTagPrompt(tag: any) {
             if (!selection) {
                 throw new Error('Selection is invalid or not found.');
             }
+    
 
-            const cleanDisplayName = tag.DisplayName.replace(/\s+/g, "_");
+            const cleanDisplayName = tag.ID;
             const uniqueStr = new Date().getTime();
-            const bookmarkName = `${cleanDisplayName}_Split_${uniqueStr}`;
+            const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
 
             const startMarker = selection.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
             await context.sync();
@@ -675,6 +676,7 @@ async function insertTagPrompt(tag: any) {
         }
     });
 }
+
 
 
 export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any) {

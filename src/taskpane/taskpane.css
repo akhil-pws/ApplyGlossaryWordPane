@@ -407,3 +407,8 @@ ul {
   position: absolute;
   top: 270px;
 }
+
+.tag-panel {
+  max-height: 12rem;
+  overflow: auto;
+}
