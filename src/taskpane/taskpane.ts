@@ -11,7 +11,7 @@ export let jwt = '';
 let storedUrl = storeUrl
 let documentID = ''
 let organizationName = ''
-let aiTagList = [];
+export let aiTagList = [];
 let initialised = true;
 export let availableKeys = [];
 let promptBuilderList = [];
@@ -988,72 +988,6 @@ export async function applyAITagFn() {
     }
   });
 }
-
-async function onRadioChange(tag, tagIndex, chatIndex) {
-  if (!isTagUpdating) {
-    isTagUpdating = true;
-    const iconelement = document.getElementById(`sendPrompt-${tagIndex}`)
-    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`
-    const chat = tag.FilteredReportHeadAIHistoryList[chatIndex];
-    let payload = JSON.parse(JSON.stringify(chat));
-    payload.Container = dataList.Container;
-    payload.Selected = 1;
-    const matchingKey = availableKeys.find(prop => prop.DisplayName === tag.DisplayName);
-    if (matchingKey) {
-      matchingKey.EditorValue = payload.Response;
-    }
-    try {
-
-      const data = await updateAiHistory(payload, jwt);
-
-      if (data['Data']) {
-        tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
-        tag.FilteredReportHeadAIHistoryList = [];
-
-        tag.ReportHeadAIHistoryList.forEach((historyList) => {
-          historyList.Response = removeQuotes(historyList.Response);
-          tag.FilteredReportHeadAIHistoryList.unshift(historyList);
-        });
-
-        const selectedParent = document.getElementById(`selected-response-parent-${tagIndex}`);
-        const allSelectedDivs = selectedParent.querySelectorAll('.ai-selected-reply');
-        allSelectedDivs.forEach(div => {
-          div.classList.remove('ai-selected-reply');
-          div.classList.add('bg-light');
-        });
-
-        const selectElement = document.getElementById(`selected-response-${tagIndex}${chatIndex}`);
-        if (selectElement) {
-          selectElement.classList.remove('bg-light');
-          selectElement.classList.add('ai-selected-reply');
-        }
-
-        const finalResponse = chat.FormattedResponse
-          ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-          : chat.Response;
-
-        tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-        tag.UserValue = finalResponse;
-        tag.EditorValue = finalResponse;
-        tag.text = finalResponse;
-      }
-
-    } catch (error) {
-      console.error('Error updating AI data:', error);
-    } finally {
-      const iconelement = document.getElementById(`sendPrompt-${tagIndex}`);
-      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
-      isTagUpdating = false;
-    }
-  }
-}
-
-
-function selectResponse(tagIndex, chatIndex) {
-  // Handle the response selection logic here
-  console.log(`Response selected for tagIndex ${tagIndex}, chatIndex ${chatIndex}`);
-}
-
 
 async function fetchGlossary() {
   if (!isTagUpdating) {

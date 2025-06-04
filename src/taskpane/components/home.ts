@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory } from "../api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
-import { addGenAITags, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
+import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
 
 let preview = '';
 
@@ -742,6 +742,33 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
                             const currentlySelected = tag.FilteredReportHeadAIHistoryList.some((item: any) => item.Selected === 1);
                             tag.IsApplied = !currentlySelected;
+                                   availableKeys.forEach(currentTag => {
+                                if (currentTag.ID === tag.ID) {
+                                    const isTable = chat.FormattedResponse !== '';
+                                    const finalResponse = chat.FormattedResponse
+                                        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                                        : chat.Response;
+                                    currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+                                    currentTag.UserValue = finalResponse;
+                                    currentTag.EditorValue = finalResponse;
+                                    currentTag.text = finalResponse;
+                                }
+                            })
+                            
+                            aiTagList.forEach(currentTag => {
+                                if (currentTag.ID === tag.ID) {
+                                    const isTable = chat.FormattedResponse !== '';
+                                    const finalResponse = chat.FormattedResponse
+                                        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                                        : chat.Response;
+
+
+                                    currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+                                    currentTag.UserValue = finalResponse;
+                                    currentTag.EditorValue = finalResponse;
+                                    currentTag.text = finalResponse;
+                                }
+                            });
                         }
                     } catch (err) {
                         console.error('Failed to update AI history:', err);
