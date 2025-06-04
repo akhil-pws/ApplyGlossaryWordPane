@@ -412,3 +412,8 @@ ul {
   max-height: 12rem;
   overflow: auto;
 }
+
+.badge-clickable {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

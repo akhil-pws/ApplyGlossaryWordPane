@@ -717,7 +717,7 @@ export async function sendPrompt(tag, prompt) {
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
         const chat = tag.ReportHeadAIHistoryList[0];
-          aiTagList.forEach(currentTag => {
+        aiTagList.forEach(currentTag => {
           if (currentTag.ID === tag.ID) {
             const isTable = chat.FormattedResponse !== '';
             const finalResponse = chat.FormattedResponse
@@ -816,9 +816,9 @@ export async function applyAITagFn() {
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
-      
+
       context.load(body, 'text');
-      
+
       await context.sync();
 
       for (let i = 0; i < aiTagList.length; i++) {
@@ -852,6 +852,107 @@ export async function applyAITagFn() {
               item.insertText(tag.EditorValue, Word.InsertLocation.replace);
             }
 
+
+            for (const { range, tag } of tableInsertPositions) {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(tag.EditorValue, 'text/html');
+              const bodyNodes = Array.from(doc.body.childNodes);
+
+              for (const node of bodyNodes) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                  const textContent = node.textContent?.trim();
+                  if (textContent) {
+                    textContent.split('\n').forEach(line => {
+                      if (line.trim()) {
+                        insertLineWithHeadingStyle(range, line);
+                      }
+                    });
+                  }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                  const element = node as HTMLElement;
+
+                  if (element.tagName.toLowerCase() === 'table') {
+                    const rows = Array.from(element.querySelectorAll('tr'));
+
+                    if (rows.length === 0) {
+                      range.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                      continue;
+                    }
+
+                    const maxCols = Math.max(...rows.map(row => {
+                      return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                        return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                      }, 0);
+                    }));
+
+                    const paragraph = range.insertParagraph("", Word.InsertLocation.before);
+                    await context.sync();
+
+                    const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                    table.style = "Grid Table 4 - Accent 1";
+                    await context.sync();
+
+                    const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+                    rows.forEach((row, rowIndex) => {
+                      const cells = Array.from(row.querySelectorAll('td, th'));
+                      let cellIndex = 0;
+
+                      cells.forEach((cell) => {
+                        while (rowspanTracker[cellIndex] > 0) {
+                          rowspanTracker[cellIndex]--;
+                          cellIndex++;
+                        }
+
+                        const cellText = Array.from(cell.childNodes)
+                          .map(node => {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                              return node.textContent?.trim() || '';
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                              return (node as HTMLElement).innerText.trim();
+                            }
+                            return '';
+                          })
+                          .filter(text => text.length > 0)
+                          .join(' ');
+
+                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+
+                        table.getCell(rowIndex, cellIndex).value = cellText;
+
+                        for (let i = 1; i < colspan; i++) {
+                          if (cellIndex + i < maxCols) {
+                            table.getCell(rowIndex, cellIndex + i).value = "";
+                          }
+                        }
+
+                        if (rowspan > 1) {
+                          for (let i = 0; i < colspan; i++) {
+                            if (cellIndex + i < maxCols) {
+                              rowspanTracker[cellIndex + i] = rowspan - 1;
+                            }
+                          }
+                        }
+
+                        cellIndex += colspan;
+                      });
+                    });
+                  } else {
+                    const elementText = element.innerText.trim();
+                    if (elementText) {
+                      elementText.split('\n').forEach(line => {
+                        if (line.trim()) {
+                          insertLineWithHeadingStyle(range, line);
+                        }
+                      });
+                    }
+                  }
+                }
+              }
+
+              await context.sync();
+            }
             const endMarker = item.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
             await context.sync();
 
@@ -880,106 +981,6 @@ export async function applyAITagFn() {
           }
         }
 
-        for (const { range, tag } of tableInsertPositions) {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(tag.EditorValue, 'text/html');
-          const bodyNodes = Array.from(doc.body.childNodes);
-
-          for (const node of bodyNodes) {
-            if (node.nodeType === Node.TEXT_NODE) {
-              const textContent = node.textContent?.trim();
-              if (textContent) {
-                textContent.split('\n').forEach(line => {
-                  if (line.trim()) {
-                    insertLineWithHeadingStyle(range, line);
-                  }
-                });
-              }
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as HTMLElement;
-
-              if (element.tagName.toLowerCase() === 'table') {
-                const rows = Array.from(element.querySelectorAll('tr'));
-
-                if (rows.length === 0) {
-                  range.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                  continue;
-                }
-
-                const maxCols = Math.max(...rows.map(row => {
-                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                  }, 0);
-                }));
-
-                const paragraph = range.insertParagraph("", Word.InsertLocation.before);
-                await context.sync();
-
-                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                table.style = "Grid Table 4 - Accent 1";
-                await context.sync();
-
-                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-                rows.forEach((row, rowIndex) => {
-                  const cells = Array.from(row.querySelectorAll('td, th'));
-                  let cellIndex = 0;
-
-                  cells.forEach((cell) => {
-                    while (rowspanTracker[cellIndex] > 0) {
-                      rowspanTracker[cellIndex]--;
-                      cellIndex++;
-                    }
-
-                    const cellText = Array.from(cell.childNodes)
-                      .map(node => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                          return node.textContent?.trim() || '';
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                          return (node as HTMLElement).innerText.trim();
-                        }
-                        return '';
-                      })
-                      .filter(text => text.length > 0)
-                      .join(' ');
-
-                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                    table.getCell(rowIndex, cellIndex).value = cellText;
-
-                    for (let i = 1; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
-                        table.getCell(rowIndex, cellIndex + i).value = "";
-                      }
-                    }
-
-                    if (rowspan > 1) {
-                      for (let i = 0; i < colspan; i++) {
-                        if (cellIndex + i < maxCols) {
-                          rowspanTracker[cellIndex + i] = rowspan - 1;
-                        }
-                      }
-                    }
-
-                    cellIndex += colspan;
-                  });
-                });
-              } else {
-                const elementText = element.innerText.trim();
-                if (elementText) {
-                  elementText.split('\n').forEach(line => {
-                    if (line.trim()) {
-                      insertLineWithHeadingStyle(range, line);
-                    }
-                  });
-                }
-              }
-            }
-          }
-
-          await context.sync();
-        }
       }
 
       await context.sync();
