@@ -717,29 +717,34 @@ export async function sendPrompt(tag, prompt) {
           tag.FilteredReportHeadAIHistoryList.unshift(historyList);
         });
         const chat = tag.ReportHeadAIHistoryList[0];
-        aiTagList.forEach(currentTag => {
+          aiTagList.forEach(currentTag => {
           if (currentTag.ID === tag.ID) {
             const isTable = chat.FormattedResponse !== '';
-            const responseText = isTable ? '\n' + chat.FormattedResponse : chat.Response;
+            const finalResponse = chat.FormattedResponse
+              ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+              : chat.Response;
+
 
             currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-            currentTag.UserValue = responseText;
-            currentTag.EditorValue = responseText;
-            currentTag.text = responseText;
+            currentTag.UserValue = finalResponse;
+            currentTag.EditorValue = finalResponse;
+            currentTag.text = finalResponse;
           }
         });
 
         availableKeys.forEach(currentTag => {
           if (currentTag.ID === tag.ID) {
             const isTable = chat.FormattedResponse !== '';
-            const responseText = isTable ? '\n' + chat.FormattedResponse : chat.Response;
-
+            const finalResponse = chat.FormattedResponse
+              ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+              : chat.Response;
             currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-            currentTag.UserValue = responseText;
-            currentTag.EditorValue = responseText;
-            currentTag.text = responseText;
+            currentTag.UserValue = finalResponse;
+            currentTag.EditorValue = finalResponse;
+            currentTag.text = finalResponse;
           }
         })
+
 
 
         const appbody = document.getElementById('app-body')
@@ -2269,7 +2274,6 @@ async function logBookmarksInSelection() {
         badgeWrapper.classList.remove('d-block');
         badgeWrapper.classList.add('d-none');
       }
-
     }
   });
 }
