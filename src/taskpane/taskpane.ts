@@ -729,6 +729,8 @@ export async function sendPrompt(tag, prompt) {
             currentTag.UserValue = finalResponse;
             currentTag.EditorValue = finalResponse;
             currentTag.text = finalResponse;
+            currentTag.IsApplied = tag.IsApplied;
+
           }
         });
 
@@ -742,6 +744,8 @@ export async function sendPrompt(tag, prompt) {
             currentTag.UserValue = finalResponse;
             currentTag.EditorValue = finalResponse;
             currentTag.text = finalResponse;
+            currentTag.IsApplied = tag.IsApplied;
+
           }
         })
 
