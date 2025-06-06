@@ -44,7 +44,7 @@ export function loadHomepage(availableKeys) {
 
     const searchBox = document.getElementById('search-box');
     const suggestionList = document.getElementById('suggestion-list');
-     
+
     function updateSuggestions() {
         const searchTerm = searchBox.value.trim().toLowerCase();
         suggestionList.replaceChildren(); // Clear previous results
@@ -111,13 +111,13 @@ export function loadHomepage(availableKeys) {
         createSection('AI Tags', aiTags, true);
 
     }
-    if(selectedNames.length>0){
+    if (selectedNames.length > 0) {
         const badgeWrapper = document.getElementById('tags-in-selected-text');
         badgeWrapper.classList.remove('d-none');
         badgeWrapper.classList.add('d-block');
-        renderSelectedTags(selectedNames ,availableKeys);
+        renderSelectedTags(selectedNames, availableKeys);
     }
-    
+
     // Add input event listener to the search box
     let debounceTimeout;
     searchBox.addEventListener('input', () => {
@@ -142,147 +142,147 @@ export function loadHomepage(availableKeys) {
 
 export async function replaceMention(word: any, type: any) {
     return Word.run(async (context) => {
-      try {
-        const selection = context.document.getSelection();
-        await context.sync();
-  
-        if (!selection) {
-          throw new Error('Selection is invalid or not found.');
-        }
-  
-        let newSelection = selection;
-  
-        if (type === 'TABLE') {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(word.EditorValue, 'text/html');
-          const bodyNodes = Array.from(doc.body.childNodes);
-  
-          await context.sync();
-  
-          for (const node of bodyNodes) {
-            if (node.nodeType === Node.TEXT_NODE) {
-              const textContent = node.textContent?.trim();
-              if (textContent) {
-                textContent.split('\n').forEach(line => {
-                  if (line.trim()) {
-                    insertLineWithHeadingStyle(selection, line);
-                  }
-                });
-              }
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as HTMLElement;
-  
-              if (element.tagName.toLowerCase() === 'table') {
-                const rows = Array.from(element.querySelectorAll('tr'));
-  
-                if (rows.length === 0) {
-                  selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                  continue;
-                }
-  
-                const maxCols = Math.max(...rows.map(row => {
-                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                  }, 0);
-                }));
-  
-                const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-                await context.sync();
-  
-                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
-  
-                await context.sync();
-  
-                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-  
-                rows.forEach((row, rowIndex) => {
-                  const cells = Array.from(row.querySelectorAll('td, th'));
-                  let cellIndex = 0;
-  
-                  cells.forEach((cell) => {
-                    while (rowspanTracker[cellIndex] > 0) {
-                      rowspanTracker[cellIndex]--;
-                      cellIndex++;
-                    }
-  
-                    const cellText = Array.from(cell.childNodes)
-                      .map(node => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                          return node.textContent?.trim() || '';
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                          return (node as HTMLElement).innerText.trim();
-                        }
-                        return '';
-                      })
-                      .filter(text => text.length > 0)
-                      .join(' ');
-  
-                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                    table.getCell(rowIndex, cellIndex).value = cellText;
-  
-                    for (let i = 1; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
-                        table.getCell(rowIndex, cellIndex + i).value = "";
-                      }
-                    }
-  
-                    if (rowspan > 1) {
-                      for (let i = 0; i < colspan; i++) {
-                        if (cellIndex + i < maxCols) {
-                          rowspanTracker[cellIndex + i] = rowspan - 1;
-                        }
-                      }
-                    }
-  
-                    cellIndex += colspan;
-                  });
-                });
-  
-                newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
-              } else {
-                const elementText = element.innerText.trim();
-                if (elementText) {
-                  elementText.split('\n').forEach(line => {
-                    if (line.trim()) {
-                      insertLineWithHeadingStyle(selection, line);
-                    }
-                  });
-                }
-                newSelection = selection; // If it's not a table, just use the existing selection.
-              }
+        try {
+            const selection = context.document.getSelection();
+            await context.sync();
+
+            if (!selection) {
+                throw new Error('Selection is invalid or not found.');
             }
-          }
-        } else {
-          if (word.EditorValue === '' || word.IsApplied) {
-            selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
-          } else {
-            let content = removeQuotes(word.EditorValue);
-            let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-            lines.forEach(line => {
-              selection.insertParagraph(line, Word.InsertLocation.before);
-            });
-          }
-          newSelection = selection; // After inserting the text, set selection to it.
+
+            let newSelection = selection;
+
+            if (type === 'TABLE') {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(word.EditorValue, 'text/html');
+                const bodyNodes = Array.from(doc.body.childNodes);
+
+                await context.sync();
+
+                for (const node of bodyNodes) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        const textContent = node.textContent?.trim();
+                        if (textContent) {
+                            textContent.split('\n').forEach(line => {
+                                if (line.trim()) {
+                                    insertLineWithHeadingStyle(selection, line);
+                                }
+                            });
+                        }
+                    } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        const element = node as HTMLElement;
+
+                        if (element.tagName.toLowerCase() === 'table') {
+                            const rows = Array.from(element.querySelectorAll('tr'));
+
+                            if (rows.length === 0) {
+                                selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                                continue;
+                            }
+
+                            const maxCols = Math.max(...rows.map(row => {
+                                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                                }, 0);
+                            }));
+
+                            const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
+                            await context.sync();
+
+                            const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                            table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
+
+                            await context.sync();
+
+                            const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+                            rows.forEach((row, rowIndex) => {
+                                const cells = Array.from(row.querySelectorAll('td, th'));
+                                let cellIndex = 0;
+
+                                cells.forEach((cell) => {
+                                    while (rowspanTracker[cellIndex] > 0) {
+                                        rowspanTracker[cellIndex]--;
+                                        cellIndex++;
+                                    }
+
+                                    const cellText = Array.from(cell.childNodes)
+                                        .map(node => {
+                                            if (node.nodeType === Node.TEXT_NODE) {
+                                                return node.textContent?.trim() || '';
+                                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                                return (node as HTMLElement).innerText.trim();
+                                            }
+                                            return '';
+                                        })
+                                        .filter(text => text.length > 0)
+                                        .join(' ');
+
+                                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+                                    table.getCell(rowIndex, cellIndex).value = cellText;
+
+                                    for (let i = 1; i < colspan; i++) {
+                                        if (cellIndex + i < maxCols) {
+                                            table.getCell(rowIndex, cellIndex + i).value = "";
+                                        }
+                                    }
+
+                                    if (rowspan > 1) {
+                                        for (let i = 0; i < colspan; i++) {
+                                            if (cellIndex + i < maxCols) {
+                                                rowspanTracker[cellIndex + i] = rowspan - 1;
+                                            }
+                                        }
+                                    }
+
+                                    cellIndex += colspan;
+                                });
+                            });
+
+                            newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
+                        } else {
+                            const elementText = element.innerText.trim();
+                            if (elementText) {
+                                elementText.split('\n').forEach(line => {
+                                    if (line.trim()) {
+                                        insertLineWithHeadingStyle(selection, line);
+                                    }
+                                });
+                            }
+                            newSelection = selection; // If it's not a table, just use the existing selection.
+                        }
+                    }
+                }
+            } else {
+                if (word.EditorValue === '' || word.IsApplied) {
+                    selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
+                } else {
+                    let content = removeQuotes(word.EditorValue);
+                    let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+                    lines.forEach(line => {
+                        selection.insertParagraph(line, Word.InsertLocation.before);
+                    });
+                }
+                newSelection = selection; // After inserting the text, set selection to it.
+            }
+
+            // Move the cursor to the next line after content insertion
+            const nextLineParagraph = selection.insertParagraph("", Word.InsertLocation.after);
+            await context.sync();
+
+            // Set the new cursor position after content
+            newSelection = nextLineParagraph;
+            selection.select(); // Select the new paragraph where the cursor will be
+            await context.sync();
+
+        } catch (error) {
+            console.error('Detailed error:', error);
         }
-  
-        // Move the cursor to the next line after content insertion
-        const nextLineParagraph = selection.insertParagraph("", Word.InsertLocation.after);
-        await context.sync();
-  
-        // Set the new cursor position after content
-        newSelection = nextLineParagraph;
-        selection.select(); // Select the new paragraph where the cursor will be
-        await context.sync();
-  
-      } catch (error) {
-        console.error('Detailed error:', error);
-      }
     });
-  }
-  
-  
+}
+
+
 export async function openAITag(tag) {
     tag.ReportHeadAIHistoryList.forEach((historyList) => {
         historyList.Response = removeQuotes(historyList.Response);
@@ -528,7 +528,7 @@ async function insertTagPrompt(tag: any) {
             if (!selection) {
                 throw new Error('Selection is invalid or not found.');
             }
-    
+
 
             const cleanDisplayName = tag.ID;
             const uniqueStr = new Date().getTime();
@@ -640,7 +640,7 @@ async function insertTagPrompt(tag: any) {
                     let content = removeQuotes(tag.EditorValue);
                     let lines = content.split(/\r?\n/);
                     lines.forEach(line => {
-                        insertLineWithHeadingStyle(selection,line)
+                        insertLineWithHeadingStyle(selection, line)
                         // selection.insertParagraph(line, Word.InsertLocation.before);
                     });
                 }
@@ -742,7 +742,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
                             const currentlySelected = tag.FilteredReportHeadAIHistoryList.some((item: any) => item.Selected === 1);
                             tag.IsApplied = !currentlySelected;
-                                   availableKeys.forEach(currentTag => {
+                            availableKeys.forEach(currentTag => {
                                 if (currentTag.ID === tag.ID) {
                                     const isTable = chat.FormattedResponse !== '';
                                     const finalResponse = chat.FormattedResponse
@@ -752,9 +752,11 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                     currentTag.UserValue = finalResponse;
                                     currentTag.EditorValue = finalResponse;
                                     currentTag.text = finalResponse;
+                                    currentTag.IsApplied = tag.IsApplied;
+
                                 }
                             })
-                            
+
                             aiTagList.forEach(currentTag => {
                                 if (currentTag.ID === tag.ID) {
                                     const isTable = chat.FormattedResponse !== '';
@@ -767,6 +769,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                     currentTag.UserValue = finalResponse;
                                     currentTag.EditorValue = finalResponse;
                                     currentTag.text = finalResponse;
+                                    currentTag.IsApplied = tag.IsApplied;
+
                                 }
                             });
                         }
