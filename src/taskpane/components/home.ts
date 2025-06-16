@@ -664,6 +664,8 @@ async function insertTagPrompt(tag: any) {
 
                 // Move the cursor to this paragraph (now it's outside the bookmark)
                 afterBookmark.select();
+                start.delete();
+                end.delete();
                 afterBookmark.delete();
                 await context.sync();
 
