@@ -972,16 +972,19 @@ export async function applyAITagFn() {
               bookmarkRange.insertBookmark(bookmarkName);
               console.log(`Bookmark added: ${bookmarkName}`);
               const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
-              await context.sync();
-
+              start.delete();
+              end.delete();
               // Move the cursor to this paragraph (now it's outside the bookmark)
               afterBookmark.select();
+
+              afterBookmark.delete();
+              await context.sync();
+
+
             }
 
-            if (start) start.insertText('', Word.InsertLocation.replace);
-            if (end) end.insertText('', Word.InsertLocation.replace);
 
-            await context.sync();
+
           }
         }
 
