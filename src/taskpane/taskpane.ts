@@ -822,7 +822,6 @@ export async function applyAITagFn() {
       const body = context.document.body;
 
       context.load(body, 'text');
-
       await context.sync();
 
       for (let i = 0; i < aiTagList.length; i++) {
@@ -837,7 +836,6 @@ export async function applyAITagFn() {
         await context.sync();
 
         console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
-        const tableInsertPositions: { range: Word.Range, tag: any }[] = [];
 
         for (const item of searchResults.items) {
           if (tag.EditorValue !== "" && !tag.IsApplied) {
@@ -850,17 +848,11 @@ export async function applyAITagFn() {
 
             if (tag.ComponentKeyDataType === 'TABLE') {
               const range = item.getRange();
-              tableInsertPositions.push({ range, tag });
-              range.delete();
-            } else {
-              item.insertText(tag.EditorValue, Word.InsertLocation.replace);
-            }
-
-
-            for (const { range, tag } of tableInsertPositions) {
               const parser = new DOMParser();
               const doc = parser.parseFromString(tag.EditorValue, 'text/html');
               const bodyNodes = Array.from(doc.body.childNodes);
+
+              range.delete();
 
               for (const node of bodyNodes) {
                 if (node.nodeType === Node.TEXT_NODE) {
@@ -956,7 +948,11 @@ export async function applyAITagFn() {
               }
 
               await context.sync();
+            } else {
+              item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+              await context.sync();
             }
+
             const endMarker = item.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
             await context.sync();
 
@@ -972,22 +968,15 @@ export async function applyAITagFn() {
               bookmarkRange.insertBookmark(bookmarkName);
               console.log(`Bookmark added: ${bookmarkName}`);
               const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
+
+              afterBookmark.select();
               start.delete();
               end.delete();
-              // Move the cursor to this paragraph (now it's outside the bookmark)
-              afterBookmark.select();
-
               afterBookmark.delete();
               await context.sync();
-
-
             }
-
-
-
           }
         }
-
       }
 
       await context.sync();
