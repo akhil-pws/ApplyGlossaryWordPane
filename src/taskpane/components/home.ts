@@ -1,6 +1,7 @@
-import { getPromptTemplateById, updateGroupKey, updateAiHistory } from "../api";
+import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
 import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
+import { Confirmationpopup, toaster } from "./bodyelements";
 
 let preview = '';
 
@@ -662,19 +663,18 @@ async function insertTagPrompt(tag: any) {
                 console.log(`Bookmark added: ${bookmarkName}`);
                 const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
 
-                // Move the cursor to this paragraph (now it's outside the bookmark)
                 afterBookmark.select();
-                start.delete();
+                start.delete()
                 end.delete();
                 afterBookmark.delete();
                 await context.sync();
 
             }
-
-            // if (start) start.insertText('', Word.InsertLocation.replace);
-            // if (end) end.insertText('', Word.InsertLocation.replace);
+            toaster('Inserted successfully', 'success');
 
         } catch (error) {
+            toaster('Something went wrong', 'error');
+
             console.error('Detailed error:', error);
         }
     });
@@ -687,6 +687,48 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         tag.FilteredReportHeadAIHistoryList.forEach((chat: any, index: number) => {
             // Copy buttons
             document.getElementById(`copyPrompt-${index}`)?.addEventListener('click', () => copyText(chat.Prompt));
+            const savePromptele = document.getElementById(`savePrompt-${index}`);
+            if (savePromptele) {
+                document.getElementById(`savePrompt-${index}`)?.addEventListener('click', () => {
+                    const container = document.getElementById('confirmation-popup');
+                    if (container) {
+                        container.innerHTML = Confirmationpopup('Do you want to save the current prompt as a global default?');
+
+                        // Wait for DOM to update and then attach cancel button listener
+                        setTimeout(() => {
+                            document.getElementById('confirmation-popup-cancel')?.addEventListener('click', () => {
+                                container.innerHTML = '';
+                            });
+
+                            document.getElementById('confirmation-popup-confirm')?.addEventListener('click', async () => {
+                                try {
+                                    document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'true');
+                                    document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'true');
+                                    let updatedTag = JSON.parse(JSON.stringify(tag));
+                                    updatedTag.Prompt = chat.Prompt;
+                                    const data = await updatePromptTemplate(updatedTag, jwt);
+                                    if (data['Status']) {
+                                        toaster('Updated Succesfully', 'success');
+                                        container.innerHTML = '';
+                                    } else {
+                                        document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'false');
+                                        document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'false');
+                                        toaster('Something went wrong', 'error');
+
+
+                                    }
+                                } catch (error) {
+                                    document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'false');
+                                    document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'false');
+                                    toaster('Something went wrong', 'error');
+                                }
+                            });
+                        }, 0);
+                    }
+                });
+            }
+
+
             document.getElementById(`copyResponse-${index}`)?.addEventListener('click', () => copyText(chat.Response));
 
             // Close button
@@ -756,7 +798,6 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                     currentTag.EditorValue = finalResponse;
                                     currentTag.text = finalResponse;
                                     currentTag.IsApplied = tag.IsApplied;
-
                                 }
                             })
 
@@ -773,7 +814,6 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                     currentTag.EditorValue = finalResponse;
                                     currentTag.text = finalResponse;
                                     currentTag.IsApplied = tag.IsApplied;
-
                                 }
                             });
                         }

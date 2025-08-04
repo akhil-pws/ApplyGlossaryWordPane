@@ -81,8 +81,52 @@ function addtagbody(sponsorOptions) {
   return body
 }
 
+
+function Confirmationpopup(content: string) {
+  const body = `<div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Confirmation</h5>
+      </div>
+
+      <div class="modal-body">
+        <p>${content}</p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link text-primary" id="confirmation-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmation-popup-confirm">Ok</button>
+      </div>
+
+    </div>
+  </div>
+</div>`
+
+
+  return body;
+}
+
+
+function toaster(message: string, type:string) {
+  const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+  // const color = type === 'success' ? '#28a745' : '#dc3545';
+  const color = `#ffffff`
+  const body = `<div class="toast show" style="position: fixed; top: 10px; right: 10px; z-index: 1050; max-width: fit-content; background-color: #808080; color: #ffffff;">
+    <div class="toast-body">
+         <i class="fa ${icon} me-2" style="color: ${color};"></i> ${message}
+    </div>
+  </div>`;
+
+  document.getElementById('toastr').innerHTML = body;
+  setTimeout(() => {
+    document.getElementById('toastr').innerHTML = ``;
+  }, 4000);
+}
+
 function logoheader(storedUrl) {
-  const themeicon=theme==='Dark'?'fa-sun':'fa-moon'
+  const themeicon = theme === 'Dark' ? 'fa-sun' : 'fa-moon'
   const body = `
     <img id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo">
     <div class="icon-nav me-3">
@@ -136,7 +180,6 @@ const navTabs = `<ul class="nav nav-tabs" id="tabList" role="tablist">
 
 
 
-const promptbuilderbody = `<div>hi</div>`
 
 
-export { navTabs, addtagbody, promptbuilderbody, logoheader };
+export { navTabs, addtagbody, logoheader, Confirmationpopup,toaster };

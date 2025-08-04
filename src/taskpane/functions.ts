@@ -1,5 +1,6 @@
+import { toaster } from "./components/bodyelements";
 import { generateCheckboxHistory } from "./components/home";
-import { theme } from "./taskpane";
+import { theme, UserRole } from "./taskpane";
 
 export async function insertLineWithHeadingStyle(range: Word.Range, line: string) {
   await Word.run(async (context) => {
@@ -95,6 +96,7 @@ export function copyText(text: string) {
   tempTextArea.select();
   document.execCommand('copy');
   document.body.removeChild(tempTextArea);
+  toaster('Copied to clipboard successfully!', 'success')
 
 }
 
@@ -190,37 +192,49 @@ function jsonToHtmlTable(jsonData) {
 
 export function generateChatHistoryHtml(chatList: any[]): string {
   const promptclass = theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+  const globalPromptUpdate = UserRole.UserRoleEntityAccessList.find(
+    (item: any) => item.UserRoleEntity === 'Global Prompt Update'
+  );
 
-  return chatList.map((chat, index) =>
-    `<div class="row chat-entry m-0 p-0">
-            <div class="col-md-12 mt-2 p-2">
-                <span class="float-end me-1">
-                    <i class="fa fa-copy text-secondary c-pointer" title="Copy Prompt" id="copyPrompt-${index}"></i>
-                </span>
-                <span class="float-end w-75 me-2">
-                    <div class="form-control h-34 d-flex align-items-center dynamic-height prompt-text ${promptclass}">
-                        ${chat.Prompt}
-                    </div>
-                </span>
+  return chatList.map((chat, index) => {
+    const includeSaveIcon = globalPromptUpdate?.UserRoleAccessID === 3;
+
+    return `
+      <div class="row chat-entry m-0 p-0">
+        <div class="col-md-12 mt-2 p-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <!-- Prompt Box -->
+            <div class="form-control h-34 d-flex align-items-center dynamic-height prompt-text ${promptclass}" style="width: 95%;">
+              ${chat.Prompt}
             </div>
-            <div class="col-md-12 mb-2 p-2 d-flex">
-                <span class="d-flex align-items-baseline w-100">
-                    <div class="flex-grow-1 c-pointer ai-response-container px-2 pe-3 pt-3 ai-selected-response" id="responseContainer-${index}">
-                        <input
-                            class="form-check-input c-pointer me-2 response-checkbox"
-                            type="checkbox"
-                            id="checkbox-${index}"
-                            ${chat.Selected === 1 ? 'checked' : ''}>
-                        <span id="responseText-${index}">${chat.Response}</span>
-                        <i class="fa fa-copy text-secondary c-pointer ms-2"
-                           title="Copy Response"
-                           id="copyResponse-${index}"></i>
-                    </div>
-                </span>
+
+            <!-- Icons Stack -->
+            <div class="d-flex flex-column align-items-center ms-2">
+              <i class="fa fa-copy text-secondary c-pointer mb-2" title="Copy Prompt" id="copyPrompt-${index}"></i>
+              ${includeSaveIcon ? `<i class="fa fa-save text-secondary c-pointer" title="Save Prompt" id="savePrompt-${index}"></i>` : ''}
             </div>
-        </div>`
-  ).join('');
+          </div>
+        </div>
+
+        <div class="col-md-12 mb-2 p-2 d-flex">
+          <span class="d-flex align-items-baseline w-100">
+            <div class="flex-grow-1 c-pointer ai-response-container px-2 pe-3 pt-3 ai-selected-response" id="responseContainer-${index}">
+              <input
+                class="form-check-input c-pointer me-2 response-checkbox"
+                type="checkbox"
+                id="checkbox-${index}"
+                ${chat.Selected === 1 ? 'checked' : ''}>
+              <span id="responseText-${index}">${chat.Response}</span>
+              <i class="fa fa-copy text-secondary c-pointer ms-2"
+                title="Copy Response"
+                id="copyResponse-${index}"></i>
+            </div>
+          </span>
+        </div>
+      </div>`;
+  }).join('');
 }
+
 
 
 export function chatfooter(tag: any) {
@@ -267,7 +281,7 @@ export function renderSelectedTags(selectedNames, availableKeys) {
       aiTag = availableKeys.find(
         mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
       );
-    }else{
+    } else {
       aiTag = availableKeys.find(
         mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
       );
@@ -373,3 +387,4 @@ async function selectMatchingBookmarkFromSelection(displayName) {
     }
   });
 }
+
