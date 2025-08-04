@@ -5,9 +5,10 @@
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
 import { applyThemeClasses, chatfooter, copyText, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
-import { addtagbody, logoheader, navTabs, promptbuilderbody } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateAiHistory, updateGroupKey } from "./api";
+import { addtagbody, logoheader, navTabs, toaster } from "./components/bodyelements";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
 export let jwt = '';
+export let UserRole :any= {};
 let storedUrl = storeUrl
 let documentID = ''
 let organizationName = ''
@@ -100,8 +101,8 @@ async function retrieveDocumentProperties() {
 async function login() {
   // document.getElementById('header').innerHTML = ``
   const sessionToken = sessionStorage.getItem('token');
-  console.log(sessionToken)
   if (sessionToken) {
+    UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
     jwt = sessionToken;
     window.location.hash = '#/dashboard';
   } else {
@@ -172,10 +173,12 @@ async function handleLogin(event) {
       if (data.Status === true && data['Data']) {
         if (data['Data'].ResponseStatus) {
           jwt = data.Data.Token;
+          UserRole = data.Data.UserRole;
+          sessionStorage.setItem('userRole', JSON.stringify(data.Data.UserRole));
           sessionStorage.setItem('token', jwt)
           sessionStorage.setItem('userId', data.Data.ID);
+          toaster('You are successfully logged in', 'success');
           window.location.hash = '#/dashboard';
-
         } else {
           showLoginError("An error occurred during login. Please try again.")
         }
@@ -214,7 +217,7 @@ async function fetchDocument(action) {
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-    sourceList = dataList.SourceTypeList.filter(
+    sourceList = dataList?.SourceTypeList?.filter(
       (item) => item.SourceValue !== ''
         && item.AIFlag === 1
     ) // Filter items with an extension
@@ -986,6 +989,13 @@ export async function applyAITagFn() {
   });
 }
 
+
+function selectResponse(tagIndex, chatIndex) {
+  // Handle the response selection logic here
+  console.log(`Response selected for tagIndex ${tagIndex}, chatIndex ${chatIndex}`);
+}
+
+
 async function fetchGlossary() {
   if (!isTagUpdating) {
 
@@ -1438,7 +1448,7 @@ export async function addGenAITags() {
     }).join('');
 
     document.getElementById('app-body').innerHTML = navTabs;
-    // Add modal HTML to the DOM
+    // Add modal HTML to the DOM 
     document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions);
     const promptTemplateElement = document.getElementById('add-prompt-template')
     setupPromptBuilderUI(promptTemplateElement, promptBuilderList)
@@ -1657,14 +1667,17 @@ async function createTextGenTag(payload) {
 
     if (data['Data'] && data['Status']) {
       fetchDocument('AIpanel');
+      toaster('Saved successfully', 'success');
     } else {
       (cancelBtnGenAi as HTMLButtonElement).disabled = false;
       (iconelement as HTMLButtonElement).disabled = false;
       iconelement.innerHTML = `<i class="fa fa-check-circle me-2"></i>Save`;
-      showAddTagError(data['Data']);
+      toaster('Something went wrong', 'error');
+      // showAddTagError(data['Data']);
     }
 
   } catch (error) {
+    toaster('Something went wrong', 'error');
     console.error('Error creating text generation tag:', error);
   }
 }
