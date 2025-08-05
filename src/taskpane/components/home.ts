@@ -83,7 +83,7 @@ export function loadHomepage(availableKeys) {
 
                 // Create the icon for AI or non-AI tags
                 const icon = isAISection
-                    ? `<i class="fa-solid fa-robot text-muted me-2"></i>`
+                    ? `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`
                     : `<i class="fa-solid fa-layer-group text-muted me-2"></i>`;
 
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
@@ -313,7 +313,7 @@ export async function generateCheckboxHistory(tag) {
     const closeBar = `
         <div class="d-flex justify-content-between align-items-center px-2 pt-3">
             <div class="d-flex align-items-center ms-3">
-                <i class="fa fa-robot text-muted me-2"></i>
+                <i class="fa fa-microchip-ai text-muted me-2"></i>
                 <span class="fw-bold">${tag.DisplayName}</span>
             </div>
             <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
