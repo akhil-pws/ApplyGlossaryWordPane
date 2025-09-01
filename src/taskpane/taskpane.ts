@@ -4,11 +4,11 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, copyText, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
 export let jwt = '';
-export let UserRole :any= {};
+export let UserRole: any = {};
 let storedUrl = storeUrl
 let documentID = ''
 let organizationName = ''
@@ -661,6 +661,20 @@ export async function fetchAIHistory(tag) {
     if (data.Status && data.Data) {
       tag.ReportHeadAIHistoryList = data['Data'] || [];
       tag.FilteredReportHeadAIHistoryList = [];
+      tag.SourceValueID = tag.ReportHeadAIHistoryList[0].SourceValue;
+      const selectedSources = sourceList.filter((list) =>
+        tag.SourceValueID.includes(String(list.VectorID))
+      );
+
+      tag.SourceName = selectedSources.map((item) => {
+        return item.SourceName;
+      });
+      tag.Sources = tag.SourceName.join(',');
+      tag.TempSourceValue = selectedSources.map((item) => {
+        return item.VectorID ? String(item.VectorID) : item.SourceValue;
+      });
+
+
       tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
         historyList.Response = removeQuotes(historyList.Response);
         tag.FilteredReportHeadAIHistoryList.unshift(historyList);
@@ -704,7 +718,7 @@ export async function sendPrompt(tag, prompt) {
       VectorID: dataList.VectorID,
       Selected: 0,
       ID: 0,
-      SourceValue: tag.SourceValue ? tag.SourceValue : []
+      SourceValue: tag.TempSourceValue ? tag.TempSourceValue : []
     };
 
     try {
@@ -2036,8 +2050,13 @@ export function createMultiSelectDropdown(tag) {
   const btnClass = isDark ? 'btn-dark text-light border-0' : 'btn-light text-dark border';
   const dropdownMenuClass = isDark ? 'bg-dark text-light border-light' : 'bg-white text-dark border';
   const itemClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
-  const cancelBtnClass = isDark ? 'btn-danger bg-danger-clr text-light' : 'btn-danger bg-danger-clr text-white';
-  const saveBtnClass = isDark ? 'btn-success bg-success-clr text-light' : 'btn-success bg-success-clr text-white';
+
+  // Group sources by SourceType
+  const groupedSources = sourceList.reduce((groups, source) => {
+    if (!groups[source.SourceType]) groups[source.SourceType] = [];
+    groups[source.SourceType].push(source);
+    return groups;
+  }, {});
 
   const multiSelectHTML = `
   <div class='p-3 w-100'>
@@ -2053,30 +2072,49 @@ export function createMultiSelectDropdown(tag) {
           <span id="sourceDropdownLabel" class='sourceDropdownLabel'></span>
           <span class="dropdown-toggle-icon dropdown-toggle-icon-s"></span>
         </button>
-        <ul class="dropdown-menu ${dropdownMenuClass} w-100 p-2" aria-labelledby="sourceDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000;">
-          <li class="dropdown-item p-2 ${itemClass}" style="cursor: pointer;" data-checkbox-id="selectAll">
+        <ul class="dropdown-menu ${dropdownMenuClass} w-100 p-2" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000; max-height: 300px; overflow-y: auto;">
+          
+          <!-- Select All -->
+          <li class="dropdown-item p-2 ${itemClass}" data-checkbox-id="selectAll">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll">
               <label class="form-check-label w-100" for="selectAll">Select All</label>
             </div>
           </li>
-          ${sourceList
-      .map(
-        (source, index) => `
-              <li class="dropdown-item p-2 ${itemClass}" style="cursor: pointer;" data-checkbox-id="source-${index}">
-                <div class="form-check">
-                  <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${index}">
-                  <label class="form-check-label w-100 text-prewrap" for="source-${index}">${source.SourceName}</label>
-                </div>
-              </li>
-            `
-      )
+
+          <!-- Grouped Sources -->
+          ${Object.keys(groupedSources)
+      .map((group, groupIndex) => {
+        const groupItems = groupedSources[group]
+          .map(
+            (source, index) => `
+                  <li class="dropdown-item ps-4 ${itemClass}" style="cursor: pointer;" data-checkbox-id="source-${groupIndex}-${index}">
+                    <div class="form-check">
+                      <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${groupIndex}-${index}">
+                      <label class="form-check-label w-100 text-prewrap" for="source-${groupIndex}-${index}">${source.SourceName}</label>
+                    </div>
+                  </li>
+                `
+          )
+          .join('');
+
+        return `
+                <!-- Group Header -->
+                <li class="dropdown-item p-2 ${itemClass}" data-group-id="group-${groupIndex}">
+                  <div class="form-check">
+                    <input class="form-check-input group-checkbox" type="checkbox" value="${group}" id="group-${groupIndex}">
+                    <label class="form-check-label fw-bold" for="group-${groupIndex}">${group}</label>
+                  </div>
+                </li>
+                ${groupItems}
+              `;
+      })
       .join('')}
         </ul>
       </div>
     </div>
     <div class="mt-3 d-flex justify-content-between">
-          <span id="cancel-src-btn" class="fw-bold text-primary my-auto c-pointer">Cancel</span>
+      <span id="cancel-src-btn" class="fw-bold text-primary my-auto c-pointer">Cancel</span>
       <button id="ok-src-btn" class="btn btn-primary">Save</button>
     </div>
   </div>
@@ -2088,89 +2126,125 @@ export function createMultiSelectDropdown(tag) {
   let selectedSources = [];
 
   const selectAllCheckbox = document.getElementById(`selectAll`);
+  const groupCheckboxes = document.querySelectorAll(`.group-checkbox`);
   const individualCheckboxes = document.querySelectorAll(`.source-checkbox`);
   const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel`);
 
   function updateLabel() {
-    const selectedSourceNames = selectedSources;
-    if (selectedSourceNames.length > 0) {
-      sourceDropdownLabel.innerText = selectedSourceNames.join(', ');
-    } else {
-      sourceDropdownLabel.innerText = ' ';
-    }
+    sourceDropdownLabel.innerText = selectedSources.length > 0 ? selectedSources.join(', ') : ' ';
   }
 
+  // Select All logic
   selectAllCheckbox.addEventListener("change", function () {
-    const checkboxes = document.querySelectorAll(`.source-checkbox`);
-    checkboxes.forEach((checkbox) => {
-      checkbox.checked = this.checked;
-      if (checkbox.checked) {
-        if (!selectedSources.includes(checkbox.value)) {
-          selectedSources.push(checkbox.value);
-        }
-      } else {
-        selectedSources = selectedSources.filter((source) => source !== checkbox.value);
+    const checked = this.checked;
+    groupCheckboxes.forEach(cb => cb.checked = checked);
+    individualCheckboxes.forEach(cb => {
+      cb.checked = checked;
+      if (checked && !selectedSources.includes(cb.value)) {
+        selectedSources.push(cb.value);
+      }
+      if (!checked) {
+        selectedSources = [];
       }
     });
-
     updateLabel();
   });
 
-  const selectAllItem = document.querySelector(`.dropdown-item[data-checkbox-id="selectAll"]`);
-  selectAllItem.addEventListener("click", function (event) {
-    event.stopPropagation();
+  // Group checkbox logic
+  groupCheckboxes.forEach(groupCb => {
+    groupCb.addEventListener("change", function () {
+      const groupIndex = this.id.split('-')[1];
+      const groupItems = document.querySelectorAll(`[data-checkbox-id^="source-${groupIndex}-"] .source-checkbox`);
+
+      groupItems.forEach(cb => {
+        cb.checked = this.checked;
+        if (this.checked && !selectedSources.includes(cb.value)) {
+          selectedSources.push(cb.value);
+        }
+        if (!this.checked) {
+          selectedSources = selectedSources.filter(s => s !== cb.value);
+        }
+      });
+
+      // Update Select All state
+      selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => child.checked);
+      updateLabel();
+    });
   });
 
-  individualCheckboxes.forEach((checkbox) => {
-    checkbox.addEventListener("change", function () {
-      if (checkbox.checked) {
-        if (!selectedSources.includes(checkbox.value)) {
-          selectedSources.push(checkbox.value);
-        }
+  // Individual checkbox logic
+  individualCheckboxes.forEach(cb => {
+    cb.addEventListener("change", function () {
+      if (cb.checked) {
+        if (!selectedSources.includes(cb.value)) selectedSources.push(cb.value);
       } else {
-        selectedSources = selectedSources.filter((source) => source !== checkbox.value);
+        selectedSources = selectedSources.filter(s => s !== cb.value);
       }
 
-      const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
-      selectAllCheckbox.checked = allChecked;
+      // Update parent group checkbox
+      const groupIndex = cb.id.split("-")[1];
+      const groupItems = document.querySelectorAll(`[data-checkbox-id^="source-${groupIndex}-"] .source-checkbox`);
+      const groupCheckbox = document.getElementById(`group-${groupIndex}`);
+      groupCheckbox.checked = Array.from(groupItems).every(child => child.checked);
+
+      // Update Select All checkbox
+      selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => child.checked);
 
       updateLabel();
     });
-
-    const listItem = checkbox.closest("li");
-    listItem.addEventListener("click", function (event) {
-      event.stopPropagation();
-    });
   });
 
+  // Initialize with pre-selected sources
   if (tag.Sources && tag.Sources.length > 0) {
-    individualCheckboxes.forEach((checkbox) => {
-      if (tag.Sources.includes(checkbox.value)) {
-        checkbox.checked = true;
-        selectedSources.push(checkbox.value);
+    individualCheckboxes.forEach(cb => {
+      if (tag.Sources.includes(cb.value)) {
+        cb.checked = true;
+        selectedSources.push(cb.value);
       }
     });
 
-    const allChecked = Array.from(individualCheckboxes).every((checkbox) => checkbox.checked);
-    selectAllCheckbox.checked = allChecked;
+    // Update group checkboxes
+    groupCheckboxes.forEach(groupCb => {
+      const groupIndex = groupCb.id.split("-")[1];
+      const groupItems = document.querySelectorAll(`[data-checkbox-id^="source-${groupIndex}-"] .source-checkbox`);
+      groupCb.checked = Array.from(groupItems).every(child => child.checked);
+    });
+
+    // Update Select All
+    selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => child.checked);
     updateLabel();
   }
 
+  // Save
   document.getElementById(`ok-src-btn`).addEventListener("click", function () {
     tag.Sources = [...selectedSources];
-    tag.SourceValue = sourceList
-      .filter(source => selectedSources.includes(source.SourceName))
-      .map(source => source.SourceValue);
+    const receivedEntry = sourceList.filter(source => selectedSources.includes(source.SourceName));
+    tag.TempSourceValue = receivedEntry.map((item) => {
+      return item.VectorID ? String(item.VectorID) : item.SourceValue;
+    });
 
+    tag.SourceName = receivedEntry.map((item) => {
+      return item.SourceName;
+    });
+
+    tag.SourceValueID = receivedEntry.map((item) => {
+      return String(item.VectorID);
+    });
+    debugger
+
+    tag.SourceValue = receivedEntry
+      .map(source => source.SourceValue);
     accordionBody.innerHTML = chatfooter(tag);
     initializeAIHistoryEvents(tag, jwt, availableKeys);
   });
 
+  // Cancel
   document.getElementById(`cancel-src-btn`).addEventListener("click", function () {
     accordionBody.innerHTML = chatfooter(tag);
     initializeAIHistoryEvents(tag, jwt, availableKeys);
   });
 }
+
 
 
 async function loadPromptTemplates() {
