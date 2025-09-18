@@ -228,6 +228,10 @@ export function generateChatHistoryHtml(chatList: any[]): string {
               <i class="fa fa-copy text-secondary c-pointer ms-2"
                 title="Copy Response"
                 id="copyResponse-${index}"></i>
+
+              <i class="fa fa-folder-gear text-secondary c-pointer ms-2"
+                title="Open Refferance"
+                id="openRefferance-${index}"></i>
             </div>
           </span>
         </div>
@@ -359,9 +363,11 @@ export function swicthThemeIcon() {
   if (theme === 'Dark') {
     icon.classList.remove('fa-moon');
     icon.classList.add('fa-sun');
+    sessionStorage.setItem('theme', 'Dark');
   } else if (theme === 'Light') {
     icon.classList.remove('fa-sun');
     icon.classList.add('fa-moon');
+    sessionStorage.setItem('theme', 'Light');
   }
 }
 

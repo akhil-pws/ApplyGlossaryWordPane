@@ -1,7 +1,7 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
-import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, theme } from "../taskpane";
-import { Confirmationpopup, toaster } from "./bodyelements";
+import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, theme } from "../taskpane";
+import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
 let preview = '';
 
@@ -335,7 +335,7 @@ export async function generateCheckboxHistory(tag) {
         </div>
     `;
 
-    initializeAIHistoryEvents(tag, jwt, availableKeys);  // Make sure jwt and availableKeys are in scope
+    initializeAIHistoryEvents(tag, jwt, availableKeys);
 
     return `${closeBar}${chatBody}${chatFooterHtml}`;
 }
@@ -723,6 +723,65 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                     toaster('Something went wrong', 'error');
                                 }
                             });
+                        }, 0);
+                    }
+                });
+            }
+
+            const openRefferance = document.getElementById(`openRefferance-${index}`);
+            if (openRefferance) {
+                document.getElementById(`openRefferance-${index}`)?.addEventListener('click', () => {
+                    const container = document.getElementById('confirmation-popup');
+                    if (container) {
+                        const chatSources = chat.SourceValue.map((item: any) => {
+                            return sourceList.find(
+                                (source: any) => Number(item) === source.VectorID
+                            );
+                        });
+
+                        const sources = chatSources.filter((src: any) => !!src);
+                        const popupData = {
+                            Data: chat.Evidences,
+                            Name: tag.DisplayName,
+                            UserValue: chat.Response,
+                            Sources: sources
+                        }
+
+                        container.innerHTML = DataModalPopup(popupData);
+
+                        // Wait for DOM to update and then attach cancel button listener
+                        setTimeout(() => {
+                            document.getElementById('confirmation-popup-cancel')?.addEventListener('click', () => {
+                                container.innerHTML = '';
+                            });
+
+                            document.getElementById('confirmation-popup-confirm')?.addEventListener('click', async () => {
+                                try {
+                                    document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'true');
+                                    document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'true');
+                                    let updatedTag = JSON.parse(JSON.stringify(tag));
+                                    updatedTag.Prompt = chat.Prompt;
+                                    const data = await updatePromptTemplate(updatedTag, jwt);
+                                    if (data['Status']) {
+                                        toaster('Updated Succesfully', 'success');
+                                        container.innerHTML = '';
+                                    } else {
+                                        document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'false');
+                                        document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'false');
+                                        toaster('Something went wrong', 'error');
+
+
+                                    }
+                                } catch (error) {
+                                    document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'false');
+                                    document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'false');
+                                    toaster('Something went wrong', 'error');
+                                }
+                            });
+
+                            document.getElementById('datamodel-popup-ok')?.addEventListener('click',async() =>{
+                                container.innerHTML=''
+                            })
                         }, 0);
                     }
                 });

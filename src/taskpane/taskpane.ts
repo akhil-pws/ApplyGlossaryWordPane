@@ -30,7 +30,7 @@ let userId = 0;
 let clientList = [];
 let version = versionLink;
 let currentYear = new Date().getFullYear();
-let sourceList;
+export let sourceList;
 let filteredGlossaryTerm;
 export let selectedNames = [];
 export let isPendingResponse = false;
@@ -223,7 +223,7 @@ async function fetchDocument(action) {
     ) // Filter items with an extension
       .map((item) => ({
         ...item, // Spread the existing properties
-        SourceName: transformDocumentName(item.SourceValue)
+        SourceName:decodeURIComponent(transformDocumentName(item.SourceValue))
       }));
     clientId = dataList.ClientID;
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
@@ -2230,7 +2230,6 @@ export function createMultiSelectDropdown(tag) {
     tag.SourceValueID = receivedEntry.map((item) => {
       return String(item.VectorID);
     });
-    debugger
 
     tag.SourceValue = receivedEntry
       .map(source => source.SourceValue);
