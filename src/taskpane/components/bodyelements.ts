@@ -83,33 +83,83 @@ function addtagbody(sponsorOptions) {
 
 
 function Confirmationpopup(content: string) {
-  const body = `<div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-  <div class="modal-dialog">
-    <div class="modal-content">
+  const isDark = theme === 'Dark';
+  const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
 
-      <div class="modal-header">
-        <h5 class="modal-title fw-bold">Confirmation</h5>
+  const body = `
+<div class="modal show d-block" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold">Confirmation</h5>
       </div>
 
       <div class="modal-body">
         <p>${content}</p>
       </div>
 
-      <div class="modal-footer">
-        <button type="button" class="btn btn-link text-primary" id="confirmation-popup-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="confirmation-popup-confirm">Ok</button>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-link ${isDark ? 'text-info' : 'text-primary'}" id="confirmation-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-white" id="confirmation-popup-confirm">Ok</button>
       </div>
-
     </div>
   </div>
-</div>`
-
-
+</div>`;
   return body;
 }
 
+function DataModalPopup(selectedData) {
+  const isDark = theme === 'Dark';
+  const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
 
-function toaster(message: string, type:string) {
+  return `
+<div class="modal show d-block" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header flex-column align-items-start border-0">
+        <span class="fw-bold mb-3">${selectedData?.Name || ''}</span>
+        <span class="d-block list-height">${selectedData?.UserValue || ''}</span>
+        ${selectedData?.Sources ? `
+        <hr class="${isDark ? 'border-light' : 'border-dark'}">
+        <div class="d-flex align-items-start flex-wrap">
+          <span class="fw-bold me-2">Selected Sources :</span>
+          <div class="d-flex flex-wrap gap-1">
+            ${selectedData.Sources.map(source => `
+              <span class="badge ${isDark ? 'text-bg-secondary' : 'text-bg-info'}">${source.FileName}</span>
+            `).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+
+      <div class="modal-body p-3 add-ai-gen">
+        <div class="row g-2 list-height">
+          ${selectedData?.Data?.map(item => `
+            <div class="col-md-12 mt-3">
+              <div class="border rounded p-2 ${isDark ? 'bg-secondary text-light' : 'bg-light text-dark'} shadow-sm h-100">
+                <div class="fw-bold small text-truncate" title="${item.FileName}">
+                  ${item.FileName}
+                </div>
+                <div class="text-muted small mb-1">Page: ${item.PageNumber}</div>
+                <div class="small" style="white-space: normal;">
+                  ${item.Sentence}
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="d-flex w-100 justify-content-end mt-3 align-items-center">
+          <button type="button" class="btn btn-primary text-white" id="datamodel-popup-ok">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+
+
+function toaster(message: string, type: string) {
   const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
   // const color = type === 'success' ? '#28a745' : '#dc3545';
   const color = `#ffffff`
@@ -180,6 +230,7 @@ const navTabs = `<ul class="nav nav-tabs" id="tabList" role="tablist">
 
 
 
+const promptbuilderbody = `<div>hi</div>`
 
 
-export { navTabs, addtagbody, logoheader, Confirmationpopup,toaster };
+export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup };
