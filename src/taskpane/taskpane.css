@@ -254,7 +254,7 @@ ul {
   font-weight: 400;
   position: absolute;
   z-index: 1;
-  right: 25px;
+  right: 50px;
 }
 
 .ngb-tooltip:hover .tooltiptext {

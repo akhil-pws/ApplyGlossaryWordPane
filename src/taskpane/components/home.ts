@@ -686,6 +686,29 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
     setTimeout(() => {
         tag.FilteredReportHeadAIHistoryList.forEach((chat: any, index: number) => {
             // Copy buttons
+            if (tag.textareavalue) {
+                (document.getElementById(`chatInput`) as HTMLTextAreaElement).value = tag.textareavalue;
+                delete (tag.textareavalue)
+            }
+
+
+            // After initializing buttons inside setTimeout
+            const chatInput = document.getElementById("chatInput") as HTMLTextAreaElement;
+            const changeSourceButton = document.getElementById("changeSourceButton") as HTMLButtonElement;
+
+            if (chatInput && changeSourceButton) {
+                // Run once on load
+                changeSourceButton.disabled = chatInput.value.trim().length === 0;
+
+                // Listen for changes in textarea
+                chatInput.addEventListener("input", () => {
+                    if (chatInput.value.trim().length > 0) {
+                        changeSourceButton.disabled = false;
+                    } else {
+                        changeSourceButton.disabled = true;
+                    }
+                });
+            };
             document.getElementById(`copyPrompt-${index}`)?.addEventListener('click', () => copyText(chat.Prompt));
             const savePromptele = document.getElementById(`savePrompt-${index}`);
             if (savePromptele) {
@@ -779,8 +802,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                 }
                             });
 
-                            document.getElementById('datamodel-popup-ok')?.addEventListener('click',async() =>{
-                                container.innerHTML=''
+                            document.getElementById('datamodel-popup-ok')?.addEventListener('click', async () => {
+                                container.innerHTML = ''
                             })
                         }, 0);
                     }
@@ -898,6 +921,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
         // Button: Change Source
         document.getElementById(`changeSourceButton`)?.addEventListener('click', () => {
+            const textareaValue = (document.getElementById(`chatInput`) as HTMLTextAreaElement).value;
+            tag.textareavalue = textareaValue;
             createMultiSelectDropdown(tag);
         });
 
