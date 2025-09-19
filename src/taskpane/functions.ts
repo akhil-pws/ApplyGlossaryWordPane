@@ -256,10 +256,13 @@ export function chatfooter(tag: any) {
                 <span class="tooltiptext">Insert</span>
                 <i class="fa fa-plus text-light c-pointer"></i>
               </button>
-              <button class="btn btn-secondary ms-2 mb-2 text-white ngb-tooltip" id="changeSourceButton">
-              ${tooltipButton}
-                <i class="fa fa-file-lines text-white"></i>
-              </button>
+             <div class="ngb-tooltip d-inline-block">
+                 ${tooltipButton}
+                <button class="btn btn-secondary ms-2 mb-2 text-white" id="changeSourceButton">
+                  <i class="fa fa-file-lines text-white"></i>
+                </button>
+              </div>
+
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton">
                 <span class="tooltiptext">Send</span>
                 <i class="fa fa-paper-plane text-white"></i>
