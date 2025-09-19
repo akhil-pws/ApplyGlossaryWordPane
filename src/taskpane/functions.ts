@@ -230,7 +230,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
                 id="copyResponse-${index}"></i>
 
               <i class="fa fa-folder-gear text-secondary c-pointer ms-2"
-                title="Open Refferance"
+                title="Open Reference"
                 id="openRefferance-${index}"></i>
             </div>
           </span>
