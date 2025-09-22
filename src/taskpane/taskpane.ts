@@ -107,6 +107,11 @@ async function login() {
     UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
     jwt = sessionToken;
     window.location.hash = '#/dashboard';
+    const style = localStorage.getItem('tableStyle');
+    if (style) {
+      tableStyle = style;
+    }
+
   } else {
     loadLoginPage();
   }
@@ -175,6 +180,10 @@ async function handleLogin(event) {
       if (data.Status === true && data['Data']) {
         if (data['Data'].ResponseStatus) {
           jwt = data.Data.Token;
+          const style = localStorage.getItem('tableStyle');
+          if (style) {
+            tableStyle = style;
+          }
           UserRole = data.Data.UserRole;
           sessionStorage.setItem('userRole', JSON.stringify(data.Data.UserRole));
           sessionStorage.setItem('token', jwt)
@@ -1710,6 +1719,7 @@ export async function customizeTable() {
   if (okBtn && dropdown) {
     okBtn.addEventListener('click', () => {
       tableStyle = dropdown.value; // update current style
+      localStorage.setItem('tableStyle', tableStyle)
       container.innerHTML = '';
     });
   }
