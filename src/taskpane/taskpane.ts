@@ -5,8 +5,9 @@
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
 import { applyThemeClasses, chatfooter, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
-import { addtagbody, logoheader, navTabs, toaster } from "./components/bodyelements";
+import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
+import { wordTableStyles } from "./components/tablestyles";
 export let jwt = '';
 export let UserRole: any = {};
 let storedUrl = storeUrl
@@ -35,6 +36,7 @@ let filteredGlossaryTerm;
 export let selectedNames = [];
 export let isPendingResponse = false;
 export let theme = 'Light';
+export let tableStyle = 'Grid Table 4 - Accent 1';
 
 
 /* global document, Office, Word */
@@ -223,7 +225,7 @@ async function fetchDocument(action) {
     ) // Filter items with an extension
       .map((item) => ({
         ...item, // Spread the existing properties
-        SourceName:decodeURIComponent(transformDocumentName(item.SourceValue))
+        SourceName: decodeURIComponent(transformDocumentName(item.SourceValue))
       }));
     clientId = dataList.ClientID;
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
@@ -902,9 +904,8 @@ export async function applyAITagFn() {
                     await context.sync();
 
                     const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                    table.style = "Grid Table 4 - Accent 1";
+                    table.style = tableStyle;
                     await context.sync();
-
                     const rowspanTracker: number[] = new Array(maxCols).fill(0);
 
                     rows.forEach((row, rowIndex) => {
@@ -1664,6 +1665,58 @@ export async function addGenAITags() {
   }
 }
 
+export async function customizeTable() {
+  const container = document.getElementById('confirmation-popup');
+  if (!container) return;
+
+  container.innerHTML = customizeTablePopup(tableStyle);
+
+  const cancelBtn = document.getElementById('confirmation-popup-cancel');
+  const okBtn = document.getElementById('confirmation-popup-confirm');
+  const dropdown = document.getElementById('confirmation-popup-dropdown') as HTMLSelectElement;
+  const tablePreview = document.getElementById('confirmation-popup-table-preview') as HTMLTableElement;
+
+  const applyStyle = () => {
+    if (!dropdown || !tablePreview) return;
+
+    const selectedStyle = dropdown.value;
+    const styleObj = wordTableStyles.find(s => s.style === selectedStyle);
+
+    if (styleObj) {
+      // Apply main table style
+      if (styleObj.tableClass) {
+        tablePreview.style.cssText = styleObj.tableClass;
+      }
+
+      // Apply row style to odd rows (1,3,5...)
+      if (styleObj.rowClass) {
+        Array.from(tablePreview.rows).forEach((row, index) => {
+          if (index % 2 === 1) { // 0-based index => 0,2,4 = 1st,3rd,5th row
+            (row as HTMLTableRowElement).style.cssText = styleObj.rowClass!;
+          }
+        });
+      }
+    }
+  };
+
+  // Initial preview
+  applyStyle();
+
+  // Live preview on dropdown change
+  dropdown?.addEventListener('change', applyStyle);
+
+  if (cancelBtn) cancelBtn.addEventListener('click', () => (container.innerHTML = ''));
+
+  if (okBtn && dropdown) {
+    okBtn.addEventListener('click', () => {
+      tableStyle = dropdown.value; // update current style
+      container.innerHTML = '';
+    });
+  }
+}
+
+
+
 
 async function createTextGenTag(payload) {
   try {
@@ -1894,7 +1947,7 @@ export async function replaceMention(word: any, type: any) {
               await context.sync();
 
               const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-              table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
+              table.style = tableStyle;  // Apply built-in Word table style
 
               await context.sync();
 
