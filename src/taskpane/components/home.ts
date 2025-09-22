@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
-import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, theme } from "../taskpane";
+import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
 import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
 let preview = '';
@@ -25,6 +25,11 @@ export function loadHomepage(availableKeys) {
                     <li>
                         <a class="dropdown-item" href="#" id="apply-btn-tag">
                             <i class="fa-solid fa-circle-check me-2"></i> Apply
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#" id="customize-table">
+                            <i class="fa fa-brush me-2" aria-hidden="true"></i> Customize Table
                         </a>
                     </li>
                 </ul>
@@ -132,6 +137,12 @@ export function loadHomepage(availableKeys) {
         }
     });
 
+    document.getElementById('customize-table').addEventListener('click', () => {
+        if (!isPendingResponse) {
+            customizeTable();
+        }
+    })
+
     document.getElementById('apply-btn-tag').addEventListener('click', () => {
         if (!isPendingResponse) {
             applyAITagFn();
@@ -191,7 +202,7 @@ export async function replaceMention(word: any, type: any) {
                             await context.sync();
 
                             const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            table.style = "Grid Table 4 - Accent 1";  // Apply built-in Word table style
+                            table.style = tableStyle;  // Apply built-in Word table style
 
                             await context.sync();
 
@@ -577,7 +588,7 @@ async function insertTagPrompt(tag: any) {
                                 await context.sync();
 
                                 const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                                table.style = "Grid Table 4 - Accent 1";
+                                table.style = tableStyle;
                                 await context.sync();
 
                                 const rowspanTracker: number[] = new Array(maxCols).fill(0);

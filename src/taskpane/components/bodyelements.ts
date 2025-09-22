@@ -1,4 +1,5 @@
 import { theme } from "../taskpane";
+import { wordTableStyles } from "./tablestyles";
 
 function addtagbody(sponsorOptions) {
   const body = `<div class="modal-dialog">
@@ -108,6 +109,80 @@ function Confirmationpopup(content: string) {
   return body;
 }
 
+
+function customizeTablePopup(selectedValue: string) {
+  const isDark = theme === 'Dark';
+  const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
+
+  const dropdown = `
+  
+    <select class="form-select mb-3 ${popupClass}" id="confirmation-popup-dropdown">
+      ${wordTableStyles
+      .map(
+        opt =>
+          `<option value="${opt.style}" ${opt.style === selectedValue ? 'selected' : ''}>
+              ${opt.style}
+            </option>`
+      )
+      .join('')}
+    </select>
+  `;
+
+  const tablePreview = `
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm" id="confirmation-popup-table-preview">
+        <thead>
+          <tr>
+            <th>Header 1</th>
+            <th>Header 2</th>
+            <th>Header 3</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="color:black;">
+            <td>Data 1</td>
+            <td>Data 2</td>
+            <td>Data 3</td>
+          </tr>
+          <tr style="background-color:white;color:black;">
+            <td>Data 4</td>
+            <td>Data 5</td>
+            <td>Data 6</td>
+          </tr>
+          <tr style="color:black;" >
+            <td>Data 7</td>
+            <td>Data 8</td>
+            <td>Data 9</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  return `
+<div class="modal show d-block" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold">Customize Table</h5>
+      </div>
+
+      <div class="modal-body">
+        ${dropdown}
+        ${tablePreview}
+      </div>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-link ${isDark ? 'text-info' : 'text-primary'}" id="confirmation-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-white" id="confirmation-popup-confirm">Ok</button>
+      </div>
+    </div>
+  </div>
+</div>
+  `;
+}
+
+
 function DataModalPopup(selectedData) {
   const isDark = theme === 'Dark';
   const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
@@ -184,7 +259,8 @@ function logoheader(storedUrl) {
       <div class="dropdown d-inline">
         <i class="fa fa-tools c-pointer me-3" id="settingsDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Settings"></i>
         <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
-          <li>
+        <li>
+        <li>
             <a class="dropdown-item" href="#" id="define-formatting">
               <i class="fa fa-sliders-h me-2" aria-hidden="true"></i> Define Formatting
             </a>
@@ -233,4 +309,4 @@ const navTabs = `<ul class="nav nav-tabs" id="tabList" role="tablist">
 const promptbuilderbody = `<div>hi</div>`
 
 
-export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup };
+export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup };
