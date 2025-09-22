@@ -121,7 +121,7 @@ function customizeTablePopup(selectedValue: string) {
       .map(
         opt =>
           `<option value="${opt.style}" ${opt.style === selectedValue ? 'selected' : ''}>
-              ${opt.style}
+              ${opt.name}
             </option>`
       )
       .join('')}
