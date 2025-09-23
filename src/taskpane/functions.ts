@@ -198,6 +198,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
 
   return chatList.map((chat, index) => {
     const includeSaveIcon = globalPromptUpdate?.UserRoleAccessID === 3;
+    const includeReferenceIcon = chat.Evidences && chat.Evidences.length > 0;
 
     return `
       <div class="row chat-entry m-0 p-0">
@@ -228,16 +229,18 @@ export function generateChatHistoryHtml(chatList: any[]): string {
               <i class="fa fa-copy text-secondary c-pointer ms-2"
                 title="Copy Response"
                 id="copyResponse-${index}"></i>
-
-              <i class="fa fa-folder-gear text-secondary c-pointer ms-2"
-                title="Open Reference"
-                id="openRefferance-${index}"></i>
+              ${includeReferenceIcon
+                ? `<i class="fa fa-folder-gear text-secondary c-pointer ms-2"
+                    title="Open Reference"
+                    id="openRefferance-${index}"></i>`
+                : ''}
             </div>
           </span>
         </div>
       </div>`;
   }).join('');
 }
+
 
 
 
