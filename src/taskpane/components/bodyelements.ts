@@ -190,7 +190,7 @@ function DataModalPopup(selectedData) {
   return `
 <div class="modal show d-block" tabindex="-1">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content ${popupClass}">
+    <div class="modal-content p-3 ${popupClass}">
       <div class="modal-header flex-column align-items-start border-0">
         <span class="fw-bold mb-3">${selectedData?.Name || ''}</span>
         <span class="d-block list-height">${selectedData?.UserValue || ''}</span>
