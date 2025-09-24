@@ -1692,21 +1692,76 @@ export async function customizeTable() {
     const styleObj = wordTableStyles.find(s => s.style === selectedStyle);
 
     if (styleObj) {
+      // Remove existing styles
+      Array.from(tablePreview.rows).forEach(row => {
+        Array.from(row.cells).forEach(cell => {
+          (cell as HTMLTableCellElement).removeAttribute('style');
+        });
+      });
+
       // Apply main table style
       if (styleObj.tableClass) {
         tablePreview.style.cssText = styleObj.tableClass;
       }
 
-      // Apply row style to odd rows (1,3,5...)
-      if (styleObj.rowClass) {
+      // Apply header style if present
+      if (styleObj.headerClass) {
+        const thead = tablePreview.querySelector('thead');
+        if (thead) {
+          Array.from(thead.rows).forEach(row => {
+            Array.from(row.cells).forEach(cell => {
+              (cell as HTMLTableCellElement).style.cssText = styleObj.headerClass!;
+            });
+          });
+        }
+      }
+
+      if (styleObj.sideHeader && styleObj.rowClass) {
+        const headerStyle = 'font-weight:bold;'
         Array.from(tablePreview.rows).forEach((row, index) => {
-          if (index % 2 === 1) { // 0-based index => 0,2,4 = 1st,3rd,5th row
+          Array.from(row.cells).forEach((cell, cellIndex) => {
+            if (cellIndex === 0 && index !== 0) {
+              (cell as HTMLTableCellElement).style.cssText = headerStyle;
+            }
+          });
+        });
+      }
+      // Apply row/column styles based on format
+      if (styleObj.format === "empty" && styleObj.rowClass) {
+        Array.from(tablePreview.rows).forEach((row, index) => {
+          if (index % 2 === 1) {
             (row as HTMLTableRowElement).style.cssText = styleObj.rowClass!;
           }
+        });
+      } else if (styleObj.format === "partial" && styleObj.rowClass) {
+        Array.from(tablePreview.rows).forEach((row, index) => {
+          Array.from(row.cells).forEach((cell, cellIndex) => {
+            if (cellIndex === 0) {
+              if (styleObj.sideHeader) {
+                (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + 'font-weight:bold;';
+              } else {
+                (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass!;
+              }
+            } else if (index % 2 === 1) {
+              (cell as HTMLTableCellElement).style.cssText = styleObj.rowClass!;
+            }
+          });
+        });
+      } else if (styleObj.format === "full") {
+        Array.from(tablePreview.rows).forEach((row, index) => {
+          Array.from(row.cells).forEach((cell, cellIndex) => {
+            const headerClass = index === 0 ? styleObj.headerClass! : '';
+            if (cellIndex === 0 && styleObj.sideHeader) {
+              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + 'font-weight:bold;' +headerClass;
+            } else {
+              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass!+headerClass;
+            }
+          });
         });
       }
     }
   };
+
 
   // Initial preview
   applyStyle();
