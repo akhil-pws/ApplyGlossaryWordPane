@@ -218,7 +218,7 @@ export const wordTableStyles = [
 
   {
     "name": "Black Header Table with Light Gray Alternating Rows - Side header same color",
-    "style": "Grid Table 5",
+    "style": "Grid Table 5 Dark",
     "headerClass": "",
     "tableClass": "background-color:#000000;border:1px solid #f2f2f2;color:#ffffff;",
     "rowClass": "background-color:#f2f2f2;color:#000000;",
@@ -227,7 +227,7 @@ export const wordTableStyles = [
   },
   {
     "name": "Blue Header Table with Light Blue Alternating Rows - Side header same color",
-    "style": "Grid Table 5 - Accent 1",
+    "style": "Grid Table 5 Dark - Accent 1",
     "headerClass": "",
     "tableClass": "background-color:#4F81BD;border:1px solid #d4d4d1ff;color:#ffffff;",
     "rowClass": "background-color:#dbe5f1;color:#000000;",
@@ -236,7 +236,7 @@ export const wordTableStyles = [
   },
   {
     "name": "Red Header Table with Pink Alternating Rows - Side header same color",
-    "style": "Grid Table 5 - Accent 2",
+    "style": "Grid Table 5 Dark - Accent 2",
     "headerClass": "",
     "tableClass": "background-color:#c0504d;border:1px solid #d4d4d1ff;color:#ffffff;",
     "rowClass": "background-color:#f2dbdb;color:#000000;",
@@ -245,7 +245,7 @@ export const wordTableStyles = [
   },
   {
     "name": "Green Header Table with Light Green Alternating Rows - Side header same color",
-    "style": "Grid Table 5 - Accent 3",
+    "style": "Grid Table 5 Dark - Accent 3",
     "headerClass": "",
     "tableClass": "background-color:#9bbb59;border:1px solid #d4d4d1ff;color:#ffffff;",
     "rowClass": "background-color:#eaf1dd;color:#000000;",
@@ -254,7 +254,7 @@ export const wordTableStyles = [
   },
   {
     "name": "Purple Header Table with Light Purple Alternating Rows - Side header same color",
-    "style": "Grid Table 5 - Accent 4",
+    "style": "Grid Table 5 Dark - Accent 4",
     "headerClass": "",
     "tableClass": "background-color:#8064a2;border:1px solid #d4d4d1ff;color:#ffffff;",
     "rowClass": "background-color:#e5dfec;color:#000000;",
@@ -263,7 +263,7 @@ export const wordTableStyles = [
   },
   {
     "name": "Teal Header Table with Light Teal Alternating Rows - Side header same color",
-    "style": "Grid Table 5 - Accent 5",
+    "style": "Grid Table 5 Dark - Accent 5",
     "headerClass": "",
     "tableClass": "background-color:#4bacc6;border:1px solid #d4d4d1ff;color:#ffffff;",
     "rowClass": "background-color:#daeef3;color:#000000;",
@@ -272,7 +272,7 @@ export const wordTableStyles = [
   },
   {
     "name": "Orange Header Table with Light Orange Alternating Rows - Side header same color",
-    "style": "Grid Table 5 - Accent 6",
+    "style": "Grid Table 5 Dark - Accent 6",
     "headerClass": "",
     "tableClass": "background-color:#f79646;border:1px solid #d4d4d1ff;color:#ffffff;",
     "rowClass": "background-color:#fde9d9;color:#000000;",
