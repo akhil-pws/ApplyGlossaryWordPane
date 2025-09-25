@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -37,6 +37,12 @@ export let selectedNames = [];
 export let isPendingResponse = false;
 export let theme = 'Light';
 export let tableStyle = 'Grid Table 4 - Accent 1';
+export let colorPallete: any = {
+  "Header": '#FFFFFF',
+  "Primary": '#FFFFFF',
+  "Secondary": '#FFFFFF',
+  "Customize": false
+};
 
 
 /* global document, Office, Word */
@@ -111,6 +117,10 @@ async function login() {
     if (style) {
       tableStyle = style;
     }
+    const localPallete = localStorage.getItem('colorPallete');
+    if (localPallete) {
+      colorPallete = JSON.parse(localPallete);
+    }
 
   } else {
     loadLoginPage();
@@ -183,6 +193,11 @@ async function handleLogin(event) {
           const style = localStorage.getItem('tableStyle');
           if (style) {
             tableStyle = style;
+          }
+
+          const localPallete = localStorage.getItem('colorPallete');
+          if (localPallete) {
+            colorPallete = JSON.parse(localPallete);
           }
           UserRole = data.Data.UserRole;
           sessionStorage.setItem('userRole', JSON.stringify(data.Data.UserRole));
@@ -915,6 +930,9 @@ export async function applyAITagFn() {
                     const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
                     table.style = tableStyle;
                     await context.sync();
+                    if (colorPallete.Customize) {
+                      await colorTable(table, rows, context);
+                    }
                     const rowspanTracker: number[] = new Array(maxCols).fill(0);
 
                     rows.forEach((row, rowIndex) => {
@@ -1685,26 +1703,38 @@ export async function customizeTable() {
   const dropdown = document.getElementById('confirmation-popup-dropdown') as HTMLSelectElement;
   const tablePreview = document.getElementById('confirmation-popup-table-preview') as HTMLTableElement;
 
+  const customizeCheckbox = document.getElementById('confirmation-popup-customize') as HTMLInputElement;
+  const colorPicker = document.getElementById('confirmation-popup-colorpicker') as HTMLInputElement;
+
+  const headerDisplay = document.getElementById('header-color-display')!;
+  const primaryDisplay = document.getElementById('primary-color-display')!;
+  const secondaryDisplay = document.getElementById('secondary-color-display')!;
+
+  const copyHeaderBtn = document.getElementById('copy-header-color')!;
+  const copyPrimaryBtn = document.getElementById('copy-primary-color')!;
+  const copySecondaryBtn = document.getElementById('copy-secondary-color')!;
+
+  customizeCheckbox.checked = !!colorPallete.Customize;
+
+  // Keep colorPallete.customize updated when user toggles checkbox
+  customizeCheckbox.addEventListener('change', () => {
+    colorPallete.Customize = customizeCheckbox.checked;
+  });
+
+  // Existing style application
   const applyStyle = () => {
     if (!dropdown || !tablePreview) return;
-
     const selectedStyle = dropdown.value;
     const styleObj = wordTableStyles.find(s => s.style === selectedStyle);
 
     if (styleObj) {
-      // Remove existing styles
+      // Clear existing styles
       Array.from(tablePreview.rows).forEach(row => {
-        Array.from(row.cells).forEach(cell => {
-          (cell as HTMLTableCellElement).removeAttribute('style');
-        });
+        Array.from(row.cells).forEach(cell => (cell as HTMLTableCellElement).removeAttribute('style'));
       });
 
-      // Apply main table style
-      if (styleObj.tableClass) {
-        tablePreview.style.cssText = styleObj.tableClass;
-      }
+      if (styleObj.tableClass) tablePreview.style.cssText = styleObj.tableClass;
 
-      // Apply header style if present
       if (styleObj.headerClass) {
         const thead = tablePreview.querySelector('thead');
         if (thead) {
@@ -1717,31 +1747,26 @@ export async function customizeTable() {
       }
 
       if (styleObj.sideHeader && styleObj.rowClass) {
-        const headerStyle = 'font-weight:bold;'
         Array.from(tablePreview.rows).forEach((row, index) => {
           Array.from(row.cells).forEach((cell, cellIndex) => {
             if (cellIndex === 0 && index !== 0) {
-              (cell as HTMLTableCellElement).style.cssText = headerStyle;
+              (cell as HTMLTableCellElement).style.cssText = 'font-weight:bold;';
             }
           });
         });
       }
-      // Apply row/column styles based on format
+
       if (styleObj.format === "empty" && styleObj.rowClass) {
         Array.from(tablePreview.rows).forEach((row, index) => {
-          if (index % 2 === 1) {
-            (row as HTMLTableRowElement).style.cssText = styleObj.rowClass!;
-          }
+          if (index % 2 === 1) (row as HTMLTableRowElement).style.cssText = styleObj.rowClass!;
         });
       } else if (styleObj.format === "partial" && styleObj.rowClass) {
         Array.from(tablePreview.rows).forEach((row, index) => {
           Array.from(row.cells).forEach((cell, cellIndex) => {
             if (cellIndex === 0) {
-              if (styleObj.sideHeader) {
-                (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + 'font-weight:bold;';
-              } else {
-                (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass!;
-              }
+              (cell as HTMLTableCellElement).style.cssText = styleObj.sideHeader
+                ? styleObj.tableClass! + 'font-weight:bold;'
+                : styleObj.tableClass!;
             } else if (index % 2 === 1) {
               (cell as HTMLTableCellElement).style.cssText = styleObj.rowClass!;
             }
@@ -1752,9 +1777,9 @@ export async function customizeTable() {
           Array.from(row.cells).forEach((cell, cellIndex) => {
             const headerClass = index === 0 ? styleObj.headerClass! : '';
             if (cellIndex === 0 && styleObj.sideHeader) {
-              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + 'font-weight:bold;' +headerClass;
+              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + 'font-weight:bold;' + headerClass;
             } else {
-              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass!+headerClass;
+              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + headerClass;
             }
           });
         });
@@ -1762,25 +1787,39 @@ export async function customizeTable() {
     }
   };
 
-
   // Initial preview
   applyStyle();
-
-  // Live preview on dropdown change
   dropdown?.addEventListener('change', applyStyle);
 
-  if (cancelBtn) cancelBtn.addEventListener('click', () => (container.innerHTML = ''));
+  copyHeaderBtn.addEventListener('click', () => {
+    const hex = colorPicker.value.slice(0, 7); // # + 6 chars
+    colorPallete.Header = hex;
+    headerDisplay.textContent = hex;
+  });
 
+  copyPrimaryBtn.addEventListener('click', () => {
+    const hex = colorPicker.value.slice(0, 7);
+    colorPallete.Primary = hex;
+    primaryDisplay.textContent = hex;
+  });
+
+  copySecondaryBtn.addEventListener('click', () => {
+    const hex = colorPicker.value.slice(0, 7);
+    colorPallete.Secondary = hex;
+    secondaryDisplay.textContent = hex;
+  });
+
+
+  if (cancelBtn) cancelBtn.addEventListener('click', () => (container.innerHTML = ''));
   if (okBtn && dropdown) {
     okBtn.addEventListener('click', () => {
-      tableStyle = dropdown.value; // update current style
-      localStorage.setItem('tableStyle', tableStyle)
+      tableStyle = dropdown.value;
+      localStorage.setItem('colorPallete', JSON.stringify(colorPallete));
+      localStorage.setItem('tableStyle', tableStyle);
       container.innerHTML = '';
     });
   }
 }
-
-
 
 
 async function createTextGenTag(payload) {
@@ -2015,6 +2054,9 @@ export async function replaceMention(word: any, type: any) {
               table.style = tableStyle;  // Apply built-in Word table style
 
               await context.sync();
+              if (colorPallete.Customize) {
+                await colorTable(table, rows, context);
+              }
 
               const rowspanTracker: number[] = new Array(maxCols).fill(0);
 

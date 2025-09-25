@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable } from "../functions";
-import { addGenAITags, aiTagList, applyAITagFn, availableKeys, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable } from "../functions";
+import { addGenAITags, aiTagList, applyAITagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
 import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
 let preview = '';
@@ -205,7 +205,9 @@ export async function replaceMention(word: any, type: any) {
                             table.style = tableStyle;  // Apply built-in Word table style
 
                             await context.sync();
-
+                            if (colorPallete.Customize) {
+                                await colorTable(table, rows, context);
+                            }
                             const rowspanTracker: number[] = new Array(maxCols).fill(0);
 
                             rows.forEach((row, rowIndex) => {
@@ -590,6 +592,9 @@ async function insertTagPrompt(tag: any) {
                                 const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
                                 table.style = tableStyle;
                                 await context.sync();
+                                if (colorPallete.Customize) {
+                                    await colorTable(table, rows, context);
+                                }
 
                                 const rowspanTracker: number[] = new Array(maxCols).fill(0);
 

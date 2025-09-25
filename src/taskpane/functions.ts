@@ -1,6 +1,6 @@
 import { toaster } from "./components/bodyelements";
 import { generateCheckboxHistory } from "./components/home";
-import { theme, UserRole } from "./taskpane";
+import { colorPallete, tableStyle, theme, UserRole } from "./taskpane";
 
 export async function insertLineWithHeadingStyle(range: Word.Range, line: string) {
   await Word.run(async (context) => {
@@ -230,17 +230,16 @@ export function generateChatHistoryHtml(chatList: any[]): string {
                 title="Copy Response"
                 id="copyResponse-${index}"></i>
               ${includeReferenceIcon
-                ? `<i class="fa fa-folder-gear text-secondary c-pointer ms-2"
+        ? `<i class="fa fa-folder-gear text-secondary c-pointer ms-2"
                     title="Open Reference"
                     id="openRefferance-${index}"></i>`
-                : ''}
+        : ''}
             </div>
           </span>
         </div>
       </div>`;
   }).join('');
 }
-
 
 
 
@@ -400,3 +399,124 @@ async function selectMatchingBookmarkFromSelection(displayName) {
   });
 }
 
+
+export async function colorTable(table: any, rows: any, context) {
+  rows.forEach((row, rowIndex) => {
+    const cells = Array.from(row.querySelectorAll("td, th"));
+    let cellIndex = 0;
+
+    cells.forEach((cell) => {
+      const text = cell.innerText.trim();
+      table.getCell(rowIndex, cellIndex).value = text;
+      cellIndex++;
+    });
+  });
+  await context.sync();
+
+  // Now format
+  table.rows.load("items");
+  await context.sync();
+
+
+  // remove trailing " - Accent X" if present
+  const base = tableStyle.split(" - ")[0].trim();
+
+  if (base.startsWith("Table Grid")) {
+    table.rows.items.forEach((row, i) => {
+      row.shadingColor = colorPallete.Header
+    });
+  }
+  if (base.startsWith("Plain Table") || base.startsWith("Grid Table 2")) {
+    table.rows.items.forEach((row, i) => {
+      row.shadingColor = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
+    });
+  }
+
+  if (base.startsWith("Grid Table 4")) {
+    const headerRow = table.rows.items[0];
+    headerRow.shadingColor = colorPallete.Header;
+    // headerRow.font.color = "white";
+    // headerRow.font.bold = true;
+
+    // Alternate row shading
+    table.rows.items.forEach((row, i) => {
+      if (i > 0) {
+        row.shadingColor = i % 2 === 0 ? colorPallete.Secondary : colorPallete.Primary;
+      }
+    });
+  }
+  if (base.startsWith("Grid Table 5 Dark")) {
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.load("items");
+    });
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        if (rowIndex > 0) {
+          if (cellIndex === 0) {
+            // Side header (first column)
+            cell.shadingColor = colorPallete.Header;
+          } else if (rowIndex % 2 === 1) {
+            // Odd rows get alternate color
+            cell.shadingColor = colorPallete.Primary;
+          } else {
+            // Even rows (non-header, non-side header)
+            cell.shadingColor = colorPallete.Secondary;
+          }
+        }else{
+          cell.shadingColor=colorPallete.Header
+        }
+      });
+
+    });
+  }
+
+  if (base.startsWith("List Table 3")) {
+    const headerRow = table.rows.items[0];
+    headerRow.shadingColor = colorPallete.Header;
+    table.rows.items.forEach((row, i) => {
+      if (i > 0) {
+        row.shadingColor = colorPallete.Primary;
+      }
+    });
+
+  }
+if (base.startsWith("List Table 5 Dark")) {
+  table.rows.items.forEach((row, i) => {
+    row.shadingColor = colorPallete.Header;
+    row.cells.load("items");
+  });
+  await context.sync();
+
+  const lastRowIndex = table.rows.items.length - 1;
+
+  table.rows.items.forEach((row, rowIndex) => {
+    const lastCellIndex = row.cells.items.length - 1;
+
+    row.cells.items.forEach((cell, cellIndex) => {
+      // Top border (only for first row)
+      if (rowIndex === 0) {
+        cell.getBorder("Top").type = "None";
+      }
+
+      // Bottom border (only for last row)
+      if (rowIndex === lastRowIndex) {
+        cell.getBorder("Bottom").type = "None";
+      }
+
+      // Left border (only for first column)
+      if (cellIndex === 0) {
+        cell.getBorder("Left").type = "None";
+      }
+
+      // Right border (only for last column)
+      if (cellIndex === lastCellIndex) {
+        cell.getBorder("Right").type = "None";
+      }
+    });
+  });
+}
+
+  await context.sync();
+}
