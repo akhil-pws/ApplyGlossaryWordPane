@@ -1,4 +1,4 @@
-import { theme } from "../taskpane";
+import { colorPallete, theme } from "../taskpane";
 import { wordTableStyles } from "./tablestyles";
 
 function addtagbody(sponsorOptions) {
@@ -115,17 +115,45 @@ function customizeTablePopup(selectedValue: string) {
   const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
 
   const dropdown = `
-  
-    <select class="form-select mb-3 ${popupClass}" id="confirmation-popup-dropdown">
+    <select class="form-select mb-2 ${popupClass}" id="confirmation-popup-dropdown">
       ${wordTableStyles
-      .map(
-        opt =>
-          `<option value="${opt.style}" ${opt.style === selectedValue ? 'selected' : ''}>
+        .map(
+          opt =>
+            `<option value="${opt.style}" ${opt.style === selectedValue ? 'selected' : ''}>
               ${opt.name}
             </option>`
-      )
-      .join('')}
+        )
+        .join('')}
     </select>
+  `;
+
+  const customizeCheckbox = `
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" value="" id="confirmation-popup-customize">
+      <label class="form-check-label" for="confirmation-popup-customize">
+        Customize the table
+      </label>
+    </div>
+  `;
+
+  const colorPicker = `
+    <input type="text" data-coloris id="confirmation-popup-colorpicker" autocomplete="off" />
+  `;
+  
+
+  const colorLines = `
+    <div class="mb-1 d-flex align-items-center justify-content-between">
+      <span>Header Color: <span id="header-color-display">${colorPallete.Header}</span></span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-header-color">Copy Hex</button>
+    </div>
+    <div class="mb-1 d-flex align-items-center justify-content-between">
+      <span>Primary Color: <span id="primary-color-display">${colorPallete.Primary}</span></span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-primary-color">Copy Hex</button>
+    </div>
+    <div class="mb-2 d-flex align-items-center justify-content-between">
+      <span>Secondary Color: <span id="secondary-color-display">${colorPallete.Secondary}</span></span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-secondary-color">Copy Hex</button>
+    </div>
   `;
 
   const tablePreview = `
@@ -169,6 +197,9 @@ function customizeTablePopup(selectedValue: string) {
 
       <div class="modal-body">
         ${dropdown}
+        ${customizeCheckbox}
+        ${colorPicker}
+        ${colorLines}
         ${tablePreview}
       </div>
 
@@ -190,7 +221,7 @@ function DataModalPopup(selectedData) {
   return `
 <div class="modal show d-block" tabindex="-1">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content p-3 ${popupClass}">
+    <div class="modal-content p-2 ${popupClass}">
       <div class="modal-header flex-column align-items-start border-0">
         <span class="fw-bold mb-3">${selectedData?.Name || ''}</span>
         <span class="d-block list-height">${selectedData?.UserValue || ''}</span>

@@ -419,6 +419,13 @@ ul {
 }
 
 .list-height {
-    max-height: calc(100vh - 250px);
-    overflow-y: auto;
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+}
+
+/* Ensure the color picker appears above modals */
+.clr-picker {
+  z-index: 20000 !important;
+  position: absolute !important;
+  /* just in case */
 }
