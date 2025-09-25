@@ -1705,6 +1705,7 @@ export async function customizeTable() {
 
   const customizeCheckbox = document.getElementById('confirmation-popup-customize') as HTMLInputElement;
   const colorPicker = document.getElementById('confirmation-popup-colorpicker') as HTMLInputElement;
+  const customizeContainer = document.getElementById("customize-container")!;
 
   const headerDisplay = document.getElementById('header-color-display')!;
   const primaryDisplay = document.getElementById('primary-color-display')!;
@@ -1715,10 +1716,12 @@ export async function customizeTable() {
   const copySecondaryBtn = document.getElementById('copy-secondary-color')!;
 
   customizeCheckbox.checked = !!colorPallete.Customize;
+  customizeContainer.classList.toggle("d-none", !customizeCheckbox.checked);
 
-  // Keep colorPallete.customize updated when user toggles checkbox
-  customizeCheckbox.addEventListener('change', () => {
+  // Keep colorPallete.Customize updated when user toggles checkbox
+  customizeCheckbox.addEventListener("change", () => {
     colorPallete.Customize = customizeCheckbox.checked;
+    customizeContainer.classList.toggle("d-none", !customizeCheckbox.checked);
   });
 
   // Existing style application

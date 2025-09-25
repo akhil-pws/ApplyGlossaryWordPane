@@ -198,8 +198,10 @@ function customizeTablePopup(selectedValue: string) {
       <div class="modal-body">
         ${dropdown}
         ${customizeCheckbox}
+        <div class="d-none" id="customize-container">
         ${colorPicker}
         ${colorLines}
+        </div>
         ${tablePreview}
       </div>
 
