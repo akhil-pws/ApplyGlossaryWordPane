@@ -400,7 +400,8 @@ async function selectMatchingBookmarkFromSelection(displayName) {
 }
 
 
-export async function colorTable(table: any, rows: any, context) {
+export async function colorTable(table: any, rows: any, context: any) {
+  // Copy cell values from DOM table to Word table
   rows.forEach((row, rowIndex) => {
     const cells = Array.from(row.querySelectorAll("td, th"));
     let cellIndex = 0;
@@ -413,110 +414,89 @@ export async function colorTable(table: any, rows: any, context) {
   });
   await context.sync();
 
-  // Now format
+  // Load rows for formatting
   table.rows.load("items");
   await context.sync();
 
+  // Helper to check if color is dark
+  const isColorDark = (hexColor: string): boolean => {
+    const hex = hexColor.replace("#", "");
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+  };
 
-  // remove trailing " - Accent X" if present
+  // Helper to apply shading, font color, and border to a row or cell
+  const applyColor = (cellOrRow: any, bgColor: string) => {
+    cellOrRow.shadingColor = bgColor;
+    try {
+      cellOrRow.font.color = isColorDark(bgColor) ? "#FFFFFF" : "#000000";
+
+      // Apply thin light grey border for all sides
+      const borderColor = "#D3D3D3"; // light grey
+      if (cellOrRow.getBorder) {
+        ["Top", "Bottom", "Left", "Right"].forEach((side) => {
+          cellOrRow.getBorder(side).type = "Single";
+          cellOrRow.getBorder(side).color = borderColor;
+          cellOrRow.getBorder(side).width = 1; // 1pt thin
+        });
+      }
+    } catch (e) {
+      // row objects might not have font directly
+    }
+  };
+
+  // Determine base table type
   const base = tableStyle.split(" - ")[0].trim();
 
-  if (base.startsWith("Table Grid")) {
+  // Plain Table or Grid Table 2
+  if (base.startsWith("Plain Table")) {
     table.rows.items.forEach((row, i) => {
-      row.shadingColor = colorPallete.Header
+      const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
+      applyColor(row, bg);
     });
   }
-  if (base.startsWith("Plain Table") || base.startsWith("Grid Table 2")) {
-    table.rows.items.forEach((row, i) => {
-      row.shadingColor = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
-    });
-  }
-
-  if (base.startsWith("Grid Table 4")) {
+  // Grid Table 4
+  else if (base.startsWith("Grid Table 4")) {
     const headerRow = table.rows.items[0];
-    headerRow.shadingColor = colorPallete.Header;
-    // headerRow.font.color = "white";
-    // headerRow.font.bold = true;
+    applyColor(headerRow, colorPallete.Header);
 
-    // Alternate row shading
     table.rows.items.forEach((row, i) => {
       if (i > 0) {
-        row.shadingColor = i % 2 === 0 ? colorPallete.Secondary : colorPallete.Primary;
+        const bg = i % 2 === 0 ? colorPallete.Secondary : colorPallete.Primary;
+        applyColor(row, bg);
       }
     });
   }
-  if (base.startsWith("Grid Table 5 Dark")) {
-    table.rows.items.forEach((row, rowIndex) => {
-      row.cells.load("items");
-    });
+  // Grid Table 5 Dark
+  else if (base.startsWith("Grid Table 5 Dark")) {
+    table.rows.items.forEach((row) => row.cells.load("items"));
     await context.sync();
 
     table.rows.items.forEach((row, rowIndex) => {
       row.cells.items.forEach((cell, cellIndex) => {
-        if (rowIndex > 0) {
-          if (cellIndex === 0) {
-            // Side header (first column)
-            cell.shadingColor = colorPallete.Header;
-          } else if (rowIndex % 2 === 1) {
-            // Odd rows get alternate color
-            cell.shadingColor = colorPallete.Primary;
-          } else {
-            // Even rows (non-header, non-side header)
-            cell.shadingColor = colorPallete.Secondary;
-          }
-        }else{
-          cell.shadingColor=colorPallete.Header
-        }
+        let bgColor = colorPallete.Primary;
+        if (rowIndex === 0 || cellIndex === 0) bgColor = colorPallete.Header;
+        else bgColor = rowIndex % 2 === 1 ? colorPallete.Primary : colorPallete.Secondary;
+
+        applyColor(cell, bgColor);
       });
-
     });
   }
-
-  if (base.startsWith("List Table 3")) {
+  // List Table 3
+  else if (base.startsWith("List Table 3")) {
     const headerRow = table.rows.items[0];
-    headerRow.shadingColor = colorPallete.Header;
+    applyColor(headerRow, colorPallete.Header);
+
     table.rows.items.forEach((row, i) => {
-      if (i > 0) {
-        row.shadingColor = colorPallete.Primary;
-      }
+      if (i > 0) applyColor(row, colorPallete.Primary);
     });
-
   }
-if (base.startsWith("List Table 5 Dark")) {
-  table.rows.items.forEach((row, i) => {
-    row.shadingColor = colorPallete.Header;
-    row.cells.load("items");
-  });
-  await context.sync();
-
-  const lastRowIndex = table.rows.items.length - 1;
-
-  table.rows.items.forEach((row, rowIndex) => {
-    const lastCellIndex = row.cells.items.length - 1;
-
-    row.cells.items.forEach((cell, cellIndex) => {
-      // Top border (only for first row)
-      if (rowIndex === 0) {
-        cell.getBorder("Top").type = "None";
-      }
-
-      // Bottom border (only for last row)
-      if (rowIndex === lastRowIndex) {
-        cell.getBorder("Bottom").type = "None";
-      }
-
-      // Left border (only for first column)
-      if (cellIndex === 0) {
-        cell.getBorder("Left").type = "None";
-      }
-
-      // Right border (only for last column)
-      if (cellIndex === lastCellIndex) {
-        cell.getBorder("Right").type = "None";
-      }
-    });
-  });
-}
-
+  // Fallback for unknown tables
+  else {
+    table.rows.items.forEach((row) => applyColor(row, colorPallete.Primary));
+  }
   await context.sync();
 }

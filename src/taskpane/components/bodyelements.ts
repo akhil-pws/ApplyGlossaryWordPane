@@ -1,4 +1,4 @@
-import { colorPallete, theme } from "../taskpane";
+import { colorPallete, customTableStyle, theme } from "../taskpane";
 import { wordTableStyles } from "./tablestyles";
 
 function addtagbody(sponsorOptions) {
@@ -110,50 +110,26 @@ function Confirmationpopup(content: string) {
 }
 
 
-function customizeTablePopup(selectedValue: string) {
-  const isDark = theme === 'Dark';
-  const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
+function customizeTablePopup(selectedValue: string, type: string) {
+  const isDark = theme === "Dark";
+  const popupClass = isDark ? "bg-dark text-light" : "bg-light text-dark";
+
+  const sourceList = type === "Custom" ? customTableStyle : wordTableStyles;
 
   const dropdown = `
     <select class="form-select mb-2 ${popupClass}" id="confirmation-popup-dropdown">
-      ${wordTableStyles
-        .map(
-          opt =>
-            `<option value="${opt.style}" ${opt.style === selectedValue ? 'selected' : ''}>
-              ${opt.name}
-            </option>`
-        )
-        .join('')}
+      ${sourceList
+        .map(opt => {
+          const value = type === "Custom" ? opt.BaseStyle : opt.style;
+          const isSelected = value === selectedValue;
+          const text = type === "Custom" ? opt.Name : opt.name;
+
+          return `<option value="${value}" ${isSelected ? "selected" : ""}>
+                    ${text}
+                  </option>`;
+        })
+        .join("")}
     </select>
-  `;
-
-  const customizeCheckbox = `
-    <div class="form-check mb-2">
-      <input class="form-check-input" type="checkbox" value="" id="confirmation-popup-customize">
-      <label class="form-check-label" for="confirmation-popup-customize">
-        Customize the table
-      </label>
-    </div>
-  `;
-
-  const colorPicker = `
-    <input type="text" data-coloris id="confirmation-popup-colorpicker" autocomplete="off" />
-  `;
-  
-
-  const colorLines = `
-    <div class="mb-1 d-flex align-items-center justify-content-between">
-      <span>Header Color: <span id="header-color-display">${colorPallete.Header}</span></span>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-header-color">Copy Hex</button>
-    </div>
-    <div class="mb-1 d-flex align-items-center justify-content-between">
-      <span>Primary Color: <span id="primary-color-display">${colorPallete.Primary}</span></span>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-primary-color">Copy Hex</button>
-    </div>
-    <div class="mb-2 d-flex align-items-center justify-content-between">
-      <span>Secondary Color: <span id="secondary-color-display">${colorPallete.Secondary}</span></span>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-secondary-color">Copy Hex</button>
-    </div>
   `;
 
   const tablePreview = `
@@ -197,16 +173,11 @@ function customizeTablePopup(selectedValue: string) {
 
       <div class="modal-body">
         ${dropdown}
-        ${customizeCheckbox}
-        <div class="d-none" id="customize-container">
-        ${colorPicker}
-        ${colorLines}
-        </div>
         ${tablePreview}
       </div>
 
       <div class="modal-footer border-0">
-        <button type="button" class="btn btn-link ${isDark ? 'text-info' : 'text-primary'}" id="confirmation-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-link ${isDark ? "text-info" : "text-primary"}" id="confirmation-popup-cancel">Cancel</button>
         <button type="button" class="btn btn-primary text-white" id="confirmation-popup-confirm">Ok</button>
       </div>
     </div>
@@ -214,6 +185,7 @@ function customizeTablePopup(selectedValue: string) {
 </div>
   `;
 }
+
 
 
 function DataModalPopup(selectedData) {

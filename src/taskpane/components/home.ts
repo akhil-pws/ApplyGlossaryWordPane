@@ -27,9 +27,15 @@ export function loadHomepage(availableKeys) {
                             <i class="fa-solid fa-circle-check me-2"></i> Apply
                         </a>
                     </li>
+
+                     <li>
+                        <a class="dropdown-item" href="#" id="predefined-table">
+                            <i class="fa fa-table me-2" aria-hidden="true"></i> Default Tables
+                        </a>
+                    </li>
                     <li>
-                        <a class="dropdown-item" href="#" id="customize-table">
-                            <i class="fa fa-brush me-2" aria-hidden="true"></i> Customize Table
+                        <a class="dropdown-item" href="#" id="customized-table">
+                            <i class="fa fa-brush me-2" aria-hidden="true"></i> Customized Tables
                         </a>
                     </li>
                 </ul>
@@ -137,9 +143,15 @@ export function loadHomepage(availableKeys) {
         }
     });
 
-    document.getElementById('customize-table').addEventListener('click', () => {
+    document.getElementById('customized-table').addEventListener('click', () => {
         if (!isPendingResponse) {
-            customizeTable();
+            customizeTable('Custom');
+        }
+    })
+
+    document.getElementById('predefined-table').addEventListener('click', () => {
+        if (!isPendingResponse) {
+            customizeTable('Pre');
         }
     })
 

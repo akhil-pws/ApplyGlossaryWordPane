@@ -6,7 +6,7 @@ import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
 import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
 export let jwt = '';
 export let UserRole: any = {};
@@ -44,6 +44,7 @@ export let colorPallete: any = {
   "Customize": false
 };
 
+export let customTableStyle = [];
 
 /* global document, Office, Word */
 
@@ -235,6 +236,11 @@ function displayMenu() {
 
 }
 
+async function getTableStyle() {
+  const tableStyle = await getAllCustomTables(jwt);
+  customTableStyle = tableStyle['Data'];
+}
+
 async function fetchDocument(action) {
   try {
 
@@ -243,6 +249,8 @@ async function fetchDocument(action) {
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
+
+    getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
       (item) => item.SourceValue !== ''
         && item.AIFlag === 1
@@ -1692,54 +1700,37 @@ export async function addGenAITags() {
   }
 }
 
-export async function customizeTable() {
-  const container = document.getElementById('confirmation-popup');
+export async function customizeTable(type: string) {
+  const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  container.innerHTML = customizeTablePopup(tableStyle);
+  container.innerHTML = customizeTablePopup(tableStyle, type);
 
-  const cancelBtn = document.getElementById('confirmation-popup-cancel');
-  const okBtn = document.getElementById('confirmation-popup-confirm');
-  const dropdown = document.getElementById('confirmation-popup-dropdown') as HTMLSelectElement;
-  const tablePreview = document.getElementById('confirmation-popup-table-preview') as HTMLTableElement;
+  const cancelBtn = document.getElementById("confirmation-popup-cancel");
+  const okBtn = document.getElementById("confirmation-popup-confirm");
+  const dropdown = document.getElementById("confirmation-popup-dropdown") as HTMLSelectElement;
+  const tablePreview = document.getElementById("confirmation-popup-table-preview") as HTMLTableElement;
 
-  const customizeCheckbox = document.getElementById('confirmation-popup-customize') as HTMLInputElement;
-  const colorPicker = document.getElementById('confirmation-popup-colorpicker') as HTMLInputElement;
-  const customizeContainer = document.getElementById("customize-container")!;
-
-  const headerDisplay = document.getElementById('header-color-display')!;
-  const primaryDisplay = document.getElementById('primary-color-display')!;
-  const secondaryDisplay = document.getElementById('secondary-color-display')!;
-
-  const copyHeaderBtn = document.getElementById('copy-header-color')!;
-  const copyPrimaryBtn = document.getElementById('copy-primary-color')!;
-  const copySecondaryBtn = document.getElementById('copy-secondary-color')!;
-
-  customizeCheckbox.checked = !!colorPallete.Customize;
-  customizeContainer.classList.toggle("d-none", !customizeCheckbox.checked);
-
-  // Keep colorPallete.Customize updated when user toggles checkbox
-  customizeCheckbox.addEventListener("change", () => {
-    colorPallete.Customize = customizeCheckbox.checked;
-    customizeContainer.classList.toggle("d-none", !customizeCheckbox.checked);
-  });
-
-  // Existing style application
   const applyStyle = () => {
     if (!dropdown || !tablePreview) return;
-    const selectedStyle = dropdown.value;
-    const styleObj = wordTableStyles.find(s => s.style === selectedStyle);
 
-    if (styleObj) {
+    let styleObj: any;
+    if (type === "Custom") {
+      styleObj = customTableStyle.find(s => s.BaseStyle === dropdown.value);
+    } else {
+      styleObj = wordTableStyles.find(s => s.style === dropdown.value);
+    }
+
+    if (styleObj && type === 'Pre') {
       // Clear existing styles
       Array.from(tablePreview.rows).forEach(row => {
-        Array.from(row.cells).forEach(cell => (cell as HTMLTableCellElement).removeAttribute('style'));
+        Array.from(row.cells).forEach(cell => (cell as HTMLTableCellElement).removeAttribute("style"));
       });
 
       if (styleObj.tableClass) tablePreview.style.cssText = styleObj.tableClass;
 
       if (styleObj.headerClass) {
-        const thead = tablePreview.querySelector('thead');
+        const thead = tablePreview.querySelector("thead");
         if (thead) {
           Array.from(thead.rows).forEach(row => {
             Array.from(row.cells).forEach(cell => {
@@ -1753,7 +1744,7 @@ export async function customizeTable() {
         Array.from(tablePreview.rows).forEach((row, index) => {
           Array.from(row.cells).forEach((cell, cellIndex) => {
             if (cellIndex === 0 && index !== 0) {
-              (cell as HTMLTableCellElement).style.cssText = 'font-weight:bold;';
+              (cell as HTMLTableCellElement).style.cssText = "font-weight:bold;";
             }
           });
         });
@@ -1768,7 +1759,7 @@ export async function customizeTable() {
           Array.from(row.cells).forEach((cell, cellIndex) => {
             if (cellIndex === 0) {
               (cell as HTMLTableCellElement).style.cssText = styleObj.sideHeader
-                ? styleObj.tableClass! + 'font-weight:bold;'
+                ? styleObj.tableClass! + "font-weight:bold;"
                 : styleObj.tableClass!;
             } else if (index % 2 === 1) {
               (cell as HTMLTableCellElement).style.cssText = styleObj.rowClass!;
@@ -1778,52 +1769,48 @@ export async function customizeTable() {
       } else if (styleObj.format === "full") {
         Array.from(tablePreview.rows).forEach((row, index) => {
           Array.from(row.cells).forEach((cell, cellIndex) => {
-            const headerClass = index === 0 ? styleObj.headerClass! : '';
+            const headerClass = index === 0 ? styleObj.headerClass! : "";
             if (cellIndex === 0 && styleObj.sideHeader) {
-              (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + 'font-weight:bold;' + headerClass;
+              (cell as HTMLTableCellElement).style.cssText =
+                styleObj.tableClass! + "font-weight:bold;" + headerClass;
             } else {
               (cell as HTMLTableCellElement).style.cssText = styleObj.tableClass! + headerClass;
             }
           });
         });
       }
+    } else if (styleObj) {
+
+      tablePreview.innerHTML = styleObj.Preview;
     }
   };
 
   // Initial preview
   applyStyle();
-  dropdown?.addEventListener('change', applyStyle);
+  dropdown?.addEventListener("change", applyStyle);
 
-  copyHeaderBtn.addEventListener('click', () => {
-    const hex = colorPicker.value.slice(0, 7); // # + 6 chars
-    colorPallete.Header = hex;
-    headerDisplay.textContent = hex;
-  });
-
-  copyPrimaryBtn.addEventListener('click', () => {
-    const hex = colorPicker.value.slice(0, 7);
-    colorPallete.Primary = hex;
-    primaryDisplay.textContent = hex;
-  });
-
-  copySecondaryBtn.addEventListener('click', () => {
-    const hex = colorPicker.value.slice(0, 7);
-    colorPallete.Secondary = hex;
-    secondaryDisplay.textContent = hex;
-  });
-
-
-  if (cancelBtn) cancelBtn.addEventListener('click', () => (container.innerHTML = ''));
+  if (cancelBtn) cancelBtn.addEventListener("click", () => (container.innerHTML = ""));
   if (okBtn && dropdown) {
-    okBtn.addEventListener('click', () => {
-      tableStyle = dropdown.value;
-      localStorage.setItem('colorPallete', JSON.stringify(colorPallete));
-      localStorage.setItem('tableStyle', tableStyle);
-      container.innerHTML = '';
+    okBtn.addEventListener("click", () => {
+      if (type === "Custom") {
+        const styleObj = customTableStyle.find(s => s.BaseStyle === dropdown.value);
+        colorPallete.Header = styleObj.HeaderColor;
+        colorPallete.Primary = styleObj.PrimaryColor;
+        colorPallete.Secondary = styleObj.SecondaryColor;
+        colorPallete.Customize = true;
+        tableStyle = dropdown.value; // stores full object as string
+      } else {
+        colorPallete.Customize = false;
+        tableStyle = dropdown.value; // normal style string
+      }
+
+      localStorage.setItem("colorPallete", JSON.stringify(colorPallete));
+      localStorage.setItem("tableStyle", tableStyle);
+
+      container.innerHTML = "";
     });
   }
 }
-
 
 async function createTextGenTag(payload) {
   try {
