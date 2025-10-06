@@ -886,7 +886,6 @@ export async function applyAITagFn() {
         context.load(searchResults, 'items');
         await context.sync();
 
-        console.log(`Found ${searchResults.items.length} instances of #${tag.DisplayName}#`);
 
         for (const item of searchResults.items) {
           if (tag.EditorValue !== "" && !tag.IsApplied) {
@@ -894,8 +893,15 @@ export async function applyAITagFn() {
             const uniqueStr = new Date().getTime();
             const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
 
-            const startMarker = item.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
+            const paragraphs = item.paragraphs;
+            context.load(paragraphs, 'text, font/hidden');
             await context.sync();
+
+            let visibleParagraph = paragraphs.items.find(p => !p.font.hidden);
+            if (visibleParagraph) {
+              const startMarker = visibleParagraph.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.before);
+              await context.sync();
+            }
 
             if (tag.ComponentKeyDataType === 'TABLE') {
               const range = item.getRange();
