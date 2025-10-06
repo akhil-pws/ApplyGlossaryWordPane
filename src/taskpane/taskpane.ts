@@ -1788,6 +1788,8 @@ export async function customizeTable(type: string) {
     } else if (styleObj) {
 
       tablePreview.innerHTML = styleObj.Preview;
+    }else{
+      tablePreview.innerHTML='';
     }
   };
 
