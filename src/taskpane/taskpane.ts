@@ -913,8 +913,11 @@ export async function applyAITagFn() {
 
               for (const node of bodyNodes) {
                 if (node.nodeType === Node.TEXT_NODE) {
-                  const textContent = node.textContent?.trim();
+                  let textContent = node.textContent?.trim();
+
                   if (textContent) {
+                    textContent = textContent.replace(/\n- /g, "\n• ");
+
                     textContent.split('\n').forEach(line => {
                       if (line.trim()) {
                         insertLineWithHeadingStyle(range, line);
@@ -994,8 +997,10 @@ export async function applyAITagFn() {
                       });
                     });
                   } else {
-                    const elementText = element.innerText.trim();
+                    let elementText = element.innerText.trim();
                     if (elementText) {
+                      elementText = elementText.replace(/\n- /g, "\n• ");
+
                       elementText.split('\n').forEach(line => {
                         if (line.trim()) {
                           insertLineWithHeadingStyle(range, line);
@@ -2029,8 +2034,10 @@ export async function replaceMention(word: any, type: any) {
 
         for (const node of bodyNodes) {
           if (node.nodeType === Node.TEXT_NODE) {
-            const textContent = node.textContent?.trim();
+            let textContent = node.textContent?.trim();
             if (textContent) {
+              textContent = textContent.replace(/\n- /g, "\n• ");
+
               textContent.split('\n').forEach(line => {
                 if (line.trim()) {
                   insertLineWithHeadingStyle(selection, line);
@@ -2117,8 +2124,9 @@ export async function replaceMention(word: any, type: any) {
                 });
               });
             } else {
-              const elementText = element.innerText.trim();
+              let elementText = element.innerText.trim();
               if (elementText) {
+                elementText = elementText.replace(/\n- /g, "\n• ");
                 elementText.split('\n').forEach(line => {
                   if (line.trim()) {
                     insertLineWithHeadingStyle(selection, line);
@@ -2175,7 +2183,6 @@ function insertLineWithHeadingStyle(range: Word.Range, line: string) {
     text = line.substring(2).trim();
   }
 
-  text = text.replace(/\n- /g, "\n• ");
   const paragraph = range.insertParagraph(text, Word.InsertLocation.before);
   paragraph.style = style;
 }

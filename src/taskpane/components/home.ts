@@ -185,8 +185,10 @@ export async function replaceMention(word: any, type: any) {
 
                 for (const node of bodyNodes) {
                     if (node.nodeType === Node.TEXT_NODE) {
-                        const textContent = node.textContent?.trim();
+                        let textContent = node.textContent?.trim();
                         if (textContent) {
+                            textContent = textContent.replace(/\n- /g, "\n• ");
+
                             textContent.split('\n').forEach(line => {
                                 if (line.trim()) {
                                     insertLineWithHeadingStyle(selection, line);
@@ -268,8 +270,10 @@ export async function replaceMention(word: any, type: any) {
 
                             newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
                         } else {
-                            const elementText = element.innerText.trim();
+                            let elementText = element.innerText.trim();
                             if (elementText) {
+                                elementText = elementText.replace(/\n- /g, "\n• ");
+
                                 elementText.split('\n').forEach(line => {
                                     if (line.trim()) {
                                         insertLineWithHeadingStyle(selection, line);
@@ -573,8 +577,10 @@ async function insertTagPrompt(tag: any) {
 
                     for (const node of bodyNodes) {
                         if (node.nodeType === Node.TEXT_NODE) {
-                            const textContent = node.textContent?.trim();
+                            let textContent = node.textContent?.trim();
                             if (textContent) {
+                                textContent = textContent.replace(/\n- /g, "\n• ");
+
                                 textContent.split('\n').forEach(line => {
                                     if (line.trim()) {
                                         insertLineWithHeadingStyle(selection, line);
@@ -654,8 +660,10 @@ async function insertTagPrompt(tag: any) {
                                     });
                                 });
                             } else {
-                                const elementText = element.innerText.trim();
+                                let elementText = element.innerText.trim();
                                 if (elementText) {
+                                    elementText = elementText.replace(/\n- /g, "\n• ");
+
                                     elementText.split('\n').forEach(line => {
                                         if (line.trim()) {
                                             insertLineWithHeadingStyle(selection, line);
@@ -667,6 +675,8 @@ async function insertTagPrompt(tag: any) {
                     }
                 } else {
                     let content = removeQuotes(tag.EditorValue);
+                    content = content.replace(/\n- /g, "\n• ");
+
                     let lines = content.split(/\r?\n/);
                     lines.forEach(line => {
                         insertLineWithHeadingStyle(selection, line)
