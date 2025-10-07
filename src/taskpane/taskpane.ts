@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, selectMatchingBookmarkFromSelection, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -249,7 +249,7 @@ async function fetchDocument(action) {
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-
+    console.log(dataList.Group[0]);
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
       (item) => item.SourceValue !== ''
@@ -1008,8 +1008,17 @@ export async function applyAITagFn() {
 
               await context.sync();
             } else {
-              item.insertText(tag.EditorValue, Word.InsertLocation.replace);
+
+              let text = tag.EditorValue.trim();
+              text = text.replace(/\n- /g, "\n• ");
+              // text = text.replace(/\n- /g, "\n    • ");
+
+              // Now insert the updated text
+              item.insertText(text, Word.InsertLocation.replace);
+
               await context.sync();
+
+
             }
 
             const endMarker = item.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
@@ -1788,8 +1797,8 @@ export async function customizeTable(type: string) {
     } else if (styleObj) {
 
       tablePreview.innerHTML = styleObj.Preview;
-    }else{
-      tablePreview.innerHTML='';
+    } else {
+      tablePreview.innerHTML = '';
     }
   };
 
@@ -2166,6 +2175,7 @@ function insertLineWithHeadingStyle(range: Word.Range, line: string) {
     text = line.substring(2).trim();
   }
 
+  text = text.replace(/\n- /g, "\n• ");
   const paragraph = range.insertParagraph(text, Word.InsertLocation.before);
   paragraph.style = style;
 }
@@ -2427,7 +2437,7 @@ async function logBookmarksInSelection() {
     let bookmarks = range.getBookmarks(); // Returns ClientResult<string[]>
 
     await context.sync(); // Ensure bookmarks are retrieved
-    if (bookmarks.value.length > 0) {
+    if (bookmarks.value.length > 1) {
       selectedNames = []
       const badgeWrapper = document.getElementById('tags-in-selected-text');
       if (badgeWrapper) {
@@ -2441,6 +2451,39 @@ async function logBookmarksInSelection() {
         const container = document.getElementById('tags-in-selected-text');
         if (container) {
           renderSelectedTags(selectedNames, availableKeys)// Trigger function when selection changes
+        }
+      });
+    } else if (bookmarks.value.length === 1) {
+      const badgeWrapper = document.getElementById('tags-in-selected-text');
+      if (badgeWrapper) {
+        badgeWrapper.classList.remove('d-none');
+        badgeWrapper.classList.add('d-block');
+      }
+      bookmarks.value.forEach((bookmarkName) => {
+        let processedName = bookmarkName.split("_Split_")[0];
+        processedName = processedName.replace(/_/g, " ");
+        let aiTag;
+        if (/^ID\d+$/i.test(processedName)) {
+          aiTag = availableKeys.find(
+            mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === processedName.toLowerCase()
+          );
+        } else {
+          aiTag = availableKeys.find(
+            mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === processedName.toLowerCase()
+          );
+        }
+
+        const container = document.getElementById('tags-in-selected-text');
+        if (container && aiTag) {
+          selectMatchingBookmarkFromSelection(processedName);
+          selectedNames = [processedName];
+
+          const appBody = document.getElementById('app-body');
+          appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+
+          generateCheckboxHistory(aiTag).then(html => {
+            appBody.innerHTML = html;
+          });
         }
       });
     } else {
