@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, selectMatchingBookmarkFromSelection, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
