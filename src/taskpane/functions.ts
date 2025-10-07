@@ -376,7 +376,7 @@ export function swicthThemeIcon() {
   }
 }
 
-async function selectMatchingBookmarkFromSelection(displayName) {
+export async function selectMatchingBookmarkFromSelection(displayName) {
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
     const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
