@@ -298,7 +298,9 @@ export function renderSelectedTags(selectedNames, availableKeys) {
     const badge = document.createElement('span');
     badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
     badge.style.cursor = 'pointer';
-    badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+    if (aiTag?.DisplayName) {
+      badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+    }
 
     badge.addEventListener('click', async () => {
       await selectMatchingBookmarkFromSelection(name);
