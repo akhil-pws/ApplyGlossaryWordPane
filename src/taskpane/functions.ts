@@ -295,28 +295,26 @@ export function renderSelectedTags(selectedNames, availableKeys) {
         mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
       );
     }
-    const badge = document.createElement('span');
-    badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
-    badge.style.cursor = 'pointer';
     if (aiTag?.DisplayName) {
+
+      const badge = document.createElement('span');
+      badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
+      badge.style.cursor = 'pointer';
       badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+      badge.addEventListener('click', async () => {
+        await selectMatchingBookmarkFromSelection(name);
+
+        if (aiTag) {
+          const appBody = document.getElementById('app-body');
+          appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+
+          generateCheckboxHistory(aiTag).then(html => {
+            appBody.innerHTML = html;
+          });
+        }
+      });
+      badgeWrapper.appendChild(badge);
     }
-
-    badge.addEventListener('click', async () => {
-      await selectMatchingBookmarkFromSelection(name);
-
-      if (aiTag) {
-        const appBody = document.getElementById('app-body');
-        appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-
-        generateCheckboxHistory(aiTag).then(html => {
-          appBody.innerHTML = html;
-        });
-      }
-    });
-
-
-    badgeWrapper.appendChild(badge);
   });
 }
 
