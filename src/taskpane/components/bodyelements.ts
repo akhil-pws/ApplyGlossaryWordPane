@@ -113,16 +113,16 @@ function Confirmationpopup(content: string) {
 function customizeTablePopup(selectedValue: string, type: string) {
   const isDark = theme === "Dark";
   const popupClass = isDark ? "bg-dark text-light" : "bg-light text-dark";
-
+  const header= type === "Custom" ? "Customized Tables" : "Default Tables";
   const sourceList = type === "Custom" ? customTableStyle : wordTableStyles;
-
+  const warningContent = type === "Custom"? '':'<small class="text-secondary font-italic">Warning: The previewed table colors may vary depending on the accent or theme currently selected in Word.</small>'
   const dropdown = `
     <select class="form-select mb-2 ${popupClass}" id="confirmation-popup-dropdown">
       ${sourceList
         .map(opt => {
           const value = type === "Custom" ? opt.BaseStyle : opt.style;
           const isSelected = value === selectedValue;
-          const text = type === "Custom" ? opt.Name : opt.name;
+          const text = type === "Custom" ? opt.Name : opt.style;
 
           return `<option value="${value}" ${isSelected ? "selected" : ""}>
                     ${text}
@@ -168,12 +168,13 @@ function customizeTablePopup(selectedValue: string, type: string) {
   <div class="modal-dialog">
     <div class="modal-content ${popupClass}">
       <div class="modal-header border-0">
-        <h5 class="fw-bold">Customize Table</h5>
+        <h5 class="fw-bold">${header}</h5>
       </div>
 
       <div class="modal-body">
         ${dropdown}
         ${tablePreview}
+        ${warningContent}
       </div>
 
       <div class="modal-footer border-0">
