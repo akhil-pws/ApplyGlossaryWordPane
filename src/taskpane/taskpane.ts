@@ -868,6 +868,8 @@ function addCopyListeners() {
 }
 
 export async function applyAITagFn() {
+  toaster("Please wait... applying AI tags", "info");
+
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
@@ -1026,8 +1028,23 @@ export async function applyAITagFn() {
 
             }
 
-            const endMarker = item.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
+            // 1. Find last visible paragraph of the replaced region
+            const itemParagraphs = item.paragraphs;
+            context.load(itemParagraphs, 'items, font/hidden');
             await context.sync();
+
+            let lastVisiblePara = null;
+            for (let p of itemParagraphs.items) {
+              if (!p.font.hidden) lastVisiblePara = p;
+            }
+
+            // 2. Force end marker into visible para
+            let endMarker = null;
+            if (lastVisiblePara) {
+              endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
+              await context.sync();
+            }
+
 
             const markers = context.document.body.paragraphs;
             context.load(markers, 'text');
@@ -1053,6 +1070,8 @@ export async function applyAITagFn() {
       }
 
       await context.sync();
+      toaster("AI tag application completed!", "success");
+
     } catch (err) {
       console.error("Error during tag application:", err);
     }
