@@ -1517,151 +1517,150 @@ async function displayMentions() {
 }
 
 export async function addGenAITags() {
+
   if (!isTagUpdating) {
+
     if (isGlossaryActive) {
       await removeMatchingContentControls();
     }
 
-    let selectedClient = clientList.filter((item) => item.ID === clientId);
+    let selectedClient = clientList.filter(item => item.ID === clientId);
+
+    // Build Primary Source List
+    let sourceTypeList = [
+      ...new Map(
+        dataList.SourceTypeList
+          .filter(item => item.VectorID > 0)
+          .map(item => [ item.SourceTypeID, { Name: item.SourceType, ID: item.SourceTypeID } ])
+      ).values()
+    ];
+
+    const sourceOptions = sourceTypeList
+      .map((src:any) => `<option value="${src.ID}">${src.Name}</option>`)
+      .join("");
 
     let sponsorOptions = clientList.map(client => {
       const isSelectedClient = selectedClient.some(selected => selected.ID === client.ID);
-      return ` 
+      return `
         <li class="dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="${client.ID}" id="sponsor${client.ID}" ${isSelectedClient ? 'checked disabled' : ''}>
             <label class="form-check-label text-prewrap" for="sponsor${client.ID}">${client.Name}</label>
           </div>
-        </li>
-      `;
-    }).join('');
+        </li>`;
+    }).join("");
 
     document.getElementById('app-body').innerHTML = navTabs;
-    // Add modal HTML to the DOM 
-    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions);
-    const promptTemplateElement = document.getElementById('add-prompt-template')
-    setupPromptBuilderUI(promptTemplateElement, promptBuilderList)
 
+    // Inject modal
+    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions, sourceOptions);
 
-    document.getElementById('tag-tab').addEventListener('click', () => {
-      switchToAddTag()
-    });
+    const promptTemplateElement = document.getElementById('add-prompt-template');
+    setupPromptBuilderUI(promptTemplateElement, promptBuilderList);
 
+    document.getElementById('tag-tab').addEventListener('click', () => switchToAddTag());
+    document.getElementById('prompt-tab').addEventListener('click', () => switchToPromptBuilder());
 
-    document.getElementById('prompt-tab').addEventListener('click', () => {
-      switchToPromptBuilder()
-    });
-
-    //prompt starting
     mentionDropdownFn('prompt', 'mention-dropdown', 'add');
-    //prompt end
-    const form = document.getElementById('genai-form');
-    const promptField = document.getElementById('prompt');
 
+    const form = document.getElementById('genai-form');
     const nameField = document.getElementById('name');
     const descriptionField = document.getElementById('description');
+    const promptField = document.getElementById('prompt');
+    const primarySourceField = document.getElementById('primarySource');
+
     const saveGloballyCheckbox = document.getElementById('saveGlobally');
     const availableForAllCheckbox = document.getElementById('isAvailableForAll');
     const sponsorDropdownButton = document.getElementById('sponsorDropdown');
     const sponsorDropdownItems = document.querySelectorAll('.dropdown-item .form-check-input');
 
     document.getElementById('cancel-btn-gen-ai').addEventListener('click', () => {
-      if (!isPendingResponse) {
-        loadHomepage(availableKeys)
-      }
+      if (!isPendingResponse) loadHomepage(availableKeys);
     });
 
-    // Check if elements exist
     if (form && nameField && promptField && sponsorDropdownItems.length > 0) {
+
       const updateDropdownLabel = () => {
         if (availableForAllCheckbox.checked) {
-          sponsorDropdownButton.textContent = clientList.map(client => client.Name).join(", ");
+          sponsorDropdownButton.textContent = clientList.map(x => x.Name).join(", ");
         } else {
-          const selectedOptions = Array.from(sponsorDropdownItems)
+          const selectedNames = Array.from(sponsorDropdownItems)
             .filter(cb => cb.checked && cb.id !== 'selectAll')
             .map(cb => cb.parentElement.textContent.trim());
-          sponsorDropdownButton.textContent = selectedOptions.length ? selectedOptions.join(", ") : "Select Sponsors";
+
+          sponsorDropdownButton.textContent = selectedNames.length
+            ? selectedNames.join(", ")
+            : "Select Sponsors";
         }
       };
-      // Form validation logic on submit
-      form.addEventListener('submit', async function (e) {
+
+      // Submit Handler
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // Reset previous validation errors
-        form.querySelectorAll('.is-invalid').forEach(input => input.classList.remove('is-invalid'));
+        form.querySelectorAll('.is-invalid').forEach(i => i.classList.remove('is-invalid'));
 
         let valid = true;
 
-        if (!(nameField as HTMLInputElement).value.trim()) {
-          nameField.classList.add('is-invalid');
+        if (!nameField.value.trim()) { nameField.classList.add('is-invalid'); valid = false; }
+        if (!promptField.value.trim()) { promptField.classList.add('is-invalid'); valid = false; }
+
+        if (!primarySourceField.value.trim()) {
+          primarySourceField.classList.add('is-invalid');
           valid = false;
         }
 
-        if (!(promptField as HTMLInputElement).value.trim()) {
-          promptField.classList.add('is-invalid');
-          valid = false;
-        }
+        if (!valid) return;
 
-        if (valid) {
-          // Prepare object to pass to createTextGenTag
-          const selectedSponsors = Array.from(sponsorDropdownItems)
-            .filter(cb => cb.checked && cb.id !== 'selectAll')
-            .map(cb => {
-              const client = clientList.find(client => client.ID == cb.value);
-              return client; // Collect the entire client object
-            });
+        const selectedSponsors = Array.from(sponsorDropdownItems)
+          .filter(cb => cb.checked && cb.id !== 'selectAll')
+          .map(cb => clientList.find(c => c.ID == cb.value));
 
-          const isAvailableForAll = availableForAllCheckbox.checked;
-          const isSaveGlobally = saveGloballyCheckbox.checked;
-          const aigroup = dataList.Group.find(element => element.DisplayName === 'AIGroup');
-          const formData = {
-            DisplayName: nameField.value.trim(),
-            Prompt: promptField.value.trim(),
-            Description: descriptionField.value.trim(),
-            GroupKeyClient: selectedSponsors, // Array of selected sponsor objects
-            AllClient: isAvailableForAll ? 1 : 0,
-            SaveGlobally: isSaveGlobally,
-            UserDefined: '1',
-            ComponentKeyDataTypeID: '1',
-            ComponentKeyDataAccessID: '3',
-            AIFlag: 1,
-            DocumentTypeID: dataList.DocumentTypeID,
-            ReportHeadID: dataList.ID,
-            SourceTypeID: '',
-            ReportHeadGroupID: aigroup.ID,
-            ReportHeadSourceID: ''
-          };
+        const isAvailableForAll = availableForAllCheckbox.checked;
+        const isSaveGlobally = saveGloballyCheckbox.checked;
+        const aigroup = dataList.Group.find(el => el.DisplayName === 'AIGroup');
 
-          await createTextGenTag(formData);
-        }
+        const formData = {
+          DisplayName: nameField.value.trim(),
+          Prompt: promptField.value.trim(),
+          Description: descriptionField.value.trim(),
+          GroupKeyClient: selectedSponsors,
+          AllClient: isAvailableForAll ? 1 : 0,
+          SaveGlobally: isSaveGlobally,
+          UserDefined: '1',
+          ComponentKeyDataTypeID: '1',
+          ComponentKeyDataAccessID: '3',
+          AIFlag: 1,
+          DocumentTypeID: dataList.DocumentTypeID,
+          ReportHeadID: dataList.ID,
+
+          // NEW FIELD
+          SourceTypeID: primarySourceField.value,
+
+          ReportHeadGroupID: aigroup.ID,
+          ReportHeadSourceID: 0
+        };
+
+        await createTextGenTag(formData);
       });
 
-
       const checkAndDisableSponsors = () => {
-        sponsorDropdownItems.forEach(checkbox => {
-          if (!checkbox.disabled) {
-            checkbox.checked = true;
-            checkbox.disabled = true;
+        sponsorDropdownItems.forEach(cb => {
+          if (!cb.disabled) {
+            cb.checked = true;
+            cb.disabled = true;
           }
         });
         updateDropdownLabel();
       };
 
-      // Function to enable sponsors without unchecking them
       const enableSponsors = () => {
-        sponsorDropdownItems.forEach(checkbox => {
-          const isSelectedClient = selectedClient.some(selected => selected.ID === parseInt(checkbox.value));
-          if (!isSelectedClient) {
-            checkbox.disabled = false;
-          }
+        sponsorDropdownItems.forEach(cb => {
+          const isSelectedClient = selectedClient.some(sel => sel.ID === parseInt(cb.value));
+          if (!isSelectedClient) cb.disabled = false;
         });
         updateDropdownLabel();
       };
-
-      // Event listener for "Save Globally" checkbox
-
-
-      // Event listener for "Available to All Sponsors" checkbox
 
       saveGloballyCheckbox.addEventListener('change', function () {
         if (!isPendingResponse) {
@@ -1673,68 +1672,54 @@ export async function addGenAITags() {
             availableForAllCheckbox.checked = false;
             availableForAllCheckbox.disabled = true;
             sponsorDropdownButton.disabled = true;
-            sponsorDropdownItems.forEach(checkbox => {
-              if (!checkbox.disabled) {
-                checkbox.checked = false;
-                checkbox.disabled = false;
+
+            sponsorDropdownItems.forEach(cb => {
+              if (!cb.disabled) {
+                cb.checked = false;
+                cb.disabled = false;
               }
             });
+
             updateDropdownLabel();
           }
         }
       });
 
-      // Event listener for "Available to All Sponsors" checkbox
       availableForAllCheckbox.addEventListener('change', function () {
         if (!isPendingResponse) {
-
-          if (this.checked) {
-            checkAndDisableSponsors();
-          } else {
-            enableSponsors();
-          }
+          this.checked ? checkAndDisableSponsors() : enableSponsors();
         }
       });
 
-      // Add event listener to prevent dropdown close on item selection
       document.querySelectorAll('.dropdown-item').forEach(item => {
-        item.addEventListener('click', function (event) {
-          {
-            event.stopPropagation(); // Prevent dropdown from closing
-            const checkbox = this.querySelector('.form-check-input');
-            if (checkbox) {
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const checkbox = this.querySelector('.form-check-input');
+          if (!checkbox) return;
 
-
-              if (checkbox.id === 'selectAll') {
-                const isChecked = checkbox.checked;
-                sponsorDropdownItems.forEach(cb => {
-                  if (!cb.disabled) cb.checked = isChecked;
-                });
-              }
-              updateDropdownLabel();
-            }
+          if (checkbox.id === 'selectAll') {
+            const isChecked = checkbox.checked;
+            sponsorDropdownItems.forEach(cb => {
+              if (!cb.disabled) cb.checked = isChecked;
+            });
           }
+
+          updateDropdownLabel();
         });
       });
 
-      // Initial label update
       updateDropdownLabel();
 
-
-      // Clear validation errors when user types
-      [nameField, promptField].forEach(field => {
+      [nameField, promptField, primarySourceField].forEach(field => {
         field.addEventListener('input', function () {
           if (this.classList.contains('is-invalid') && this.value.trim()) {
             this.classList.remove('is-invalid');
           }
-          if (nameField) {
-            const errorDiv = document.getElementById('submition-error');
-            errorDiv.style.display = 'none';
-          }
         });
       });
+
     } else {
-      console.error('Required elements are missing or not rendered yet.');
+      console.error("Required elements missing.");
     }
   }
 }

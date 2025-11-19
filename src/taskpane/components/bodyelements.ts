@@ -1,7 +1,7 @@
 import { colorPallete, customTableStyle, theme } from "../taskpane";
 import { wordTableStyles } from "./tablestyles";
 
-function addtagbody(sponsorOptions) {
+function addtagbody(sponsorOptions,sourceOptions) {
   const body = `<div class="modal-dialog">
   <div class="modal-content">
     <div class="modal-body p-3 pt-0">
@@ -20,6 +20,17 @@ function addtagbody(sponsorOptions) {
           <label for="description" class="form-label">Description</label>
           <textarea class="form-control" id="description" rows="6"></textarea>
         </div>
+
+          <div class="mb-3">
+              <label for="primarySource" class="form-label">
+                <span class="text-danger">*</span> Primary Source
+              </label>
+              <select class="form-control" id="primarySource" required>
+                <option value="">Select Primary Source</option>
+                ${sourceOptions}
+              </select>
+              <div class="invalid-feedback">Primary Source is required.</div>
+            </div>
 
         <!-- Prompt Field -->
         <div class="mb-3 prompt-box">
@@ -81,6 +92,7 @@ function addtagbody(sponsorOptions) {
 
   return body
 }
+
 
 
 function Confirmationpopup(content: string) {
