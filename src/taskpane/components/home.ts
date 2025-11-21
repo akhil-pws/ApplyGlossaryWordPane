@@ -684,10 +684,32 @@ async function insertTagPrompt(tag: any) {
                     });
                 }
             }
-
-            const endMarker = selection.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
+            const itemParagraphs = selection.paragraphs;
+            context.load(itemParagraphs, 'items, font/hidden');
             await context.sync();
+            // Find last visible paragraph
+            let lastVisiblePara = null;
+            for (let p of itemParagraphs.items) {
+                if (!p.font.hidden) lastVisiblePara = p;
+            }
 
+            // Insert [[BOOKMARK_END]] after last visible paragraph
+            let endMarker = null;
+            if (lastVisiblePara) {
+                endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
+                await context.sync();
+            } else {
+                const newPara = selection.insertParagraph("", Word.InsertLocation.after);
+                await context.sync();
+
+                // FORCE this paragraph to be visible
+                newPara.font.hidden = false;
+                await context.sync();
+                endMarker = newPara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
+                await context.sync();
+            }
+
+            // Now retrieve both markers from the document (even if hidden)
             const markers = context.document.body.paragraphs;
             context.load(markers, 'text');
             await context.sync();
@@ -706,7 +728,6 @@ async function insertTagPrompt(tag: any) {
                 end.delete();
                 afterBookmark.delete();
                 await context.sync();
-
             }
             toaster('Inserted successfully', 'success');
 
