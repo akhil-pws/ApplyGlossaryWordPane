@@ -564,8 +564,25 @@ async function insertTagPrompt(tag: any) {
             const uniqueStr = new Date().getTime();
             const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
 
-            const startMarker = selection.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
+
+            const paragraphs = selection.paragraphs;
+            context.load(paragraphs, 'text, font/hidden');
             await context.sync();
+
+            let visibleParagraph = paragraphs.items.find(p => !p.font.hidden);
+            let startMarker = null;
+            if (visibleParagraph) {
+                startMarker = visibleParagraph.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.before);
+                await context.sync();
+            } else {
+                const newPara = selection.insertParagraph("", Word.InsertLocation.after);
+                await context.sync();
+                // FORCE this paragraph to be visible
+                newPara.font.hidden = false;
+                await context.sync();
+                startMarker = newPara.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.after);
+                await context.sync();
+            }
 
             if (tag.EditorValue === '') {
                 selection.insertParagraph(`#${tag.DisplayName}#`, Word.InsertLocation.before);
