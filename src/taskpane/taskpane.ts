@@ -1823,7 +1823,7 @@ export async function customizeTable(type: string) {
         colorPallete.Primary = styleObj.PrimaryColor;
         colorPallete.Secondary = styleObj.SecondaryColor;
         colorPallete.Customize = true;
-        tableStyle = dropdown.value; // stores full object as string
+        tableStyle = styleObj.BaseStyle; // stores full object as string
       } else {
         colorPallete.Customize = false;
         tableStyle = dropdown.value; // normal style string
