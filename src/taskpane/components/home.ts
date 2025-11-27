@@ -549,212 +549,178 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 }
 
 
-async function insertTagPrompt(tag: any) {
+export async function insertTagPrompt(tag) {
     return Word.run(async (context) => {
         try {
             const selection = context.document.getSelection();
             await context.sync();
 
-            if (!selection) {
-                throw new Error('Selection is invalid or not found.');
-            }
+            if (!selection) throw new Error("Invalid selection");
 
+            const placeholder = `#${tag.DisplayName}#`;
 
-            const cleanDisplayName = tag.ID;
-            const uniqueStr = new Date().getTime();
-            const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
-
-
-            const paragraphs = selection.paragraphs;
-            context.load(paragraphs, 'text, font/hidden');
+            // STEP 1: Insert placeholder
+            const inserted = selection.insertText(placeholder, Word.InsertLocation.replace);
             await context.sync();
 
-            let visibleParagraph = paragraphs.items.find(p => !p.font.hidden);
-            let startMarker = null;
-            if (visibleParagraph) {
-                startMarker = visibleParagraph.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.before);
-                await context.sync();
-            } else {
-                const newPara = selection.insertParagraph("", Word.InsertLocation.after);
-                await context.sync();
-                // FORCE this paragraph to be visible
-                newPara.font.hidden = false;
-                await context.sync();
-                startMarker = newPara.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.after);
-                await context.sync();
-            }
+            // STEP 2: Collapse selection to that placeholder range
+            const itemRange = inserted.getRange();
+            await context.sync();
 
-            if (tag.EditorValue === '') {
-                selection.insertParagraph(`#${tag.DisplayName}#`, Word.InsertLocation.before);
-            } else {
-                if (tag.ComponentKeyDataType === 'TABLE') {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(tag.EditorValue, 'text/html');
-                    const bodyNodes = Array.from(doc.body.childNodes);
+            // STEP 3: Insert BOOKMARK_START before range
+            const startMarker = itemRange.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
+            await context.sync();
 
-                    for (const node of bodyNodes) {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            let textContent = node.textContent?.trim();
-                            if (textContent) {
-                                textContent = textContent.replace(/\n- /g, "\n• ");
+            // STEP 4: Replace placeholder using applyAITagFn logic
+            if (tag.ComponentKeyDataType === "TABLE") {
 
-                                textContent.split('\n').forEach(line => {
-                                    if (line.trim()) {
-                                        insertLineWithHeadingStyle(selection, line);
-                                    }
-                                });
+                const range = itemRange;
+                range.delete();
+                await context.sync();
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(tag.EditorValue, "text/html");
+                const bodyNodes = Array.from(doc.body.childNodes);
+
+                for (const node of bodyNodes) {
+
+                    // TEXT NODE
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        let txt = node.textContent?.trim();
+                        if (txt) {
+                            txt = txt.replace(/\n- /g, "\n• ");
+                            txt.split("\n").forEach(line => {
+                                if (line.trim()) insertLineWithHeadingStyle(range, line);
+                            });
+                        }
+                    }
+
+                    // ELEMENT NODE
+                    else if (node.nodeType === Node.ELEMENT_NODE) {
+
+                        const el = node;
+
+                        // TABLE BLOCK
+                        if (el.tagName.toLowerCase() === "table") {
+
+                            const rows = Array.from(el.querySelectorAll("tr"));
+
+                            if (rows.length === 0) {
+                                range.insertParagraph("[Empty Table]", Word.InsertLocation.after);
+                                continue;
                             }
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                            const element = node as HTMLElement;
 
-                            if (element.tagName.toLowerCase() === 'table') {
-                                const rows = Array.from(element.querySelectorAll('tr'));
+                            const maxCols = Math.max(...rows.map(r =>
+                                Array.from(r.querySelectorAll("td, th"))
+                                    .reduce((sum, c) => sum + parseInt(c.getAttribute("colspan") || "1"), 0)
+                            ));
 
-                                if (rows.length === 0) {
-                                    selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                                    continue;
-                                }
+                            const p = range.insertParagraph("", Word.InsertLocation.after);
+                            await context.sync();
 
-                                const maxCols = Math.max(...rows.map(row => {
-                                    return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                                        return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                                    }, 0);
-                                }));
+                            const table = p.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                            table.style = tableStyle;
+                            await context.sync();
 
-                                const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-                                await context.sync();
+                            if (colorPallete.Customize) {
+                                await colorTable(table, rows, context);
+                            }
 
-                                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                                table.style = tableStyle;
-                                await context.sync();
-                                if (colorPallete.Customize) {
-                                    await colorTable(table, rows, context);
-                                }
+                            const rowspanTracker = new Array(maxCols).fill(0);
 
-                                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+                            rows.forEach((row, rowIndex) => {
+                                const cells = Array.from(row.querySelectorAll("td, th"));
+                                let cellIndex = 0;
 
-                                rows.forEach((row, rowIndex) => {
-                                    const cells = Array.from(row.querySelectorAll('td, th'));
-                                    let cellIndex = 0;
+                                cells.forEach(cell => {
 
-                                    cells.forEach((cell) => {
-                                        while (rowspanTracker[cellIndex] > 0) {
-                                            rowspanTracker[cellIndex]--;
-                                            cellIndex++;
+                                    while (rowspanTracker[cellIndex] > 0) {
+                                        rowspanTracker[cellIndex]--;
+                                        cellIndex++;
+                                    }
+
+                                    const cellText = Array.from(cell.childNodes)
+                                        .map(n => n.nodeType === Node.TEXT_NODE
+                                            ? (n.textContent?.trim() || "")
+                                            : (n.innerText?.trim() || "")
+                                        )
+                                        .filter(x => x)
+                                        .join(" ");
+
+                                    const colspan = parseInt(cell.getAttribute("colspan") || "1");
+                                    const rowspan = parseInt(cell.getAttribute("rowspan") || "1");
+
+                                    table.getCell(rowIndex, cellIndex).value = cellText;
+
+                                    for (let i = 1; i < colspan; i++) {
+                                        if (cellIndex + i < maxCols)
+                                            table.getCell(rowIndex, cellIndex + i).value = "";
+                                    }
+
+                                    if (rowspan > 1) {
+                                        for (let i = 0; i < colspan; i++) {
+                                            if (cellIndex + i < maxCols)
+                                                rowspanTracker[cellIndex + i] = rowspan - 1;
                                         }
+                                    }
 
-                                        const cellText = Array.from(cell.childNodes)
-                                            .map(node => {
-                                                if (node.nodeType === Node.TEXT_NODE) {
-                                                    return node.textContent?.trim() || '';
-                                                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                    return (node as HTMLElement).innerText.trim();
-                                                }
-                                                return '';
-                                            })
-                                            .filter(text => text.length > 0)
-                                            .join(' ');
-
-                                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                                        table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                        for (let i = 1; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols) {
-                                                table.getCell(rowIndex, cellIndex + i).value = "";
-                                            }
-                                        }
-
-                                        if (rowspan > 1) {
-                                            for (let i = 0; i < colspan; i++) {
-                                                if (cellIndex + i < maxCols) {
-                                                    rowspanTracker[cellIndex + i] = rowspan - 1;
-                                                }
-                                            }
-                                        }
-
-                                        cellIndex += colspan;
-                                    });
+                                    cellIndex += colspan;
                                 });
-                            } else {
-                                let elementText = element.innerText.trim();
-                                if (elementText) {
-                                    elementText = elementText.replace(/\n- /g, "\n• ");
+                            });
 
-                                    elementText.split('\n').forEach(line => {
-                                        if (line.trim()) {
-                                            insertLineWithHeadingStyle(selection, line);
-                                        }
-                                    });
-                                }
+                        }
+                        else {
+                            let txt = el.innerText?.trim();
+                            if (txt) {
+                                txt = txt.replace(/\n- /g, "\n• ");
+                                txt.split("\n").forEach(line => {
+                                    if (line.trim()) insertLineWithHeadingStyle(range, line);
+                                });
                             }
                         }
                     }
-                } else {
-                    let content = removeQuotes(tag.EditorValue);
-                    content = content.replace(/\n- /g, "\n• ");
-
-                    let lines = content.split(/\r?\n/);
-                    lines.forEach(line => {
-                        insertLineWithHeadingStyle(selection, line)
-                        // selection.insertParagraph(line, Word.InsertLocation.before);
-                    });
                 }
             }
-            const itemParagraphs = selection.paragraphs;
-            context.load(itemParagraphs, 'items, font/hidden');
-            await context.sync();
-            // Find last visible paragraph
-            let lastVisiblePara = null;
-            for (let p of itemParagraphs.items) {
-                if (!p.font.hidden) lastVisiblePara = p;
+
+            else {
+                // Non-table content
+                const txt = tag.EditorValue.replace(/\n- /g, "\n• ");
+                itemRange.insertText(txt, Word.InsertLocation.replace);
             }
 
-            // Insert [[BOOKMARK_END]] after last visible paragraph
-            let endMarker = null;
-            if (lastVisiblePara) {
-                endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
-                await context.sync();
-            } else {
-                const newPara = selection.insertParagraph("", Word.InsertLocation.after);
-                await context.sync();
-
-                // FORCE this paragraph to be visible
-                newPara.font.hidden = false;
-                await context.sync();
-                endMarker = newPara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
-                await context.sync();
-            }
-
-            // Now retrieve both markers from the document (even if hidden)
-            const markers = context.document.body.paragraphs;
-            context.load(markers, 'text');
             await context.sync();
 
-            const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
-            const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
+            // STEP 5: Insert BOOKMARK_END
+            const endMarker = itemRange.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
+            await context.sync();
+
+            // STEP 6: Turn markers into bookmark
+            const paras = context.document.body.paragraphs;
+            context.load(paras, "text");
+            await context.sync();
+
+            const start = paras.items.find(p => p.text === "[[BOOKMARK_START]]");
+            const end = paras.items.find(p => p.text === "[[BOOKMARK_END]]");
 
             if (start && end) {
-                const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
+                const bookmarkRange = start.getRange("Start").expandTo(end.getRange("End"));
+                const bookmarkName = `ID${tag.ID}_Split_${new Date().getTime()}`;
                 bookmarkRange.insertBookmark(bookmarkName);
-                console.log(`Bookmark added: ${bookmarkName}`);
-                const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
 
-                afterBookmark.select();
-                start.delete()
+                start.delete();
                 end.delete();
-                afterBookmark.delete();
                 await context.sync();
             }
-            toaster('Inserted successfully', 'success');
 
-        } catch (error) {
-            toaster('Something went wrong', 'error');
+            toaster("Inserted successfully", "success");
 
-            console.error('Detailed error:', error);
+        } catch (err) {
+            console.error(err);
+            toaster("Something went wrong", "error");
         }
     });
 }
+
 
 export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any) {
     setTimeout(() => {
