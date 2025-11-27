@@ -26,7 +26,6 @@ export async function insertLineWithHeadingStyle(range: Word.Range, line: string
       style = "Heading 1";
       text = line.substring(2).trim();
     }
-
     // Create an empty paragraph with the desired style
     const paragraph = range.insertParagraph("", Word.InsertLocation.before);
     paragraph.style = style;
@@ -301,6 +300,8 @@ export function renderSelectedTags(selectedNames, availableKeys) {
       badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
       badge.style.cursor = 'pointer';
       badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+
+
       badge.addEventListener('click', async () => {
         await selectMatchingBookmarkFromSelection(name);
 
@@ -313,6 +314,8 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           });
         }
       });
+
+
       badgeWrapper.appendChild(badge);
     }
   });
@@ -500,3 +503,25 @@ export async function colorTable(table: any, rows: any, context: any) {
   }
   await context.sync();
 }
+
+export function mapImagesToComponentObjects(input: any): any[] {
+  if (!input) return [];
+
+  // 1️⃣ Flatten ALL three arrays into a single list
+  const flatImages = [
+    ...(input.Flowchart || []),
+    ...(input.Graph || []),
+    ...(input.Image || [])
+  ];
+
+  // 2️⃣ Map to required structure
+  return flatImages.map(img => ({
+    Name: img.ImageName,
+    DisplayName: img.ImageName,
+    EditorValue: img.ImageData,
+    UserValue: img.ImageData,
+    ComponentKeyDataType: "IMAGE",
+    AIFlag:0
+  }));
+}
+

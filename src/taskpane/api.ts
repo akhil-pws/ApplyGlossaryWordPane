@@ -240,3 +240,20 @@ export async function getAllCustomTables(jwt): Promise<any> {
   const data: any = await response.json();
   return data;
 }
+
+export async function getGeneralImages(jwt): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/image/general`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok.');
+  }
+
+  const data: any = await response.json();
+  return data;
+}
