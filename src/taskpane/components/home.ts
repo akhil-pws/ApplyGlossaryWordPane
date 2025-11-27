@@ -756,8 +756,6 @@ async function insertTagPrompt(tag: any) {
     });
 }
 
-
-
 export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any) {
     setTimeout(() => {
         tag.FilteredReportHeadAIHistoryList.forEach((chat: any, index: number) => {
@@ -766,7 +764,6 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                 (document.getElementById(`chatInput`) as HTMLTextAreaElement).value = tag.textareavalue;
                 delete (tag.textareavalue)
             }
-
 
             // After initializing buttons inside setTimeout
             const chatInput = document.getElementById("chatInput") as HTMLTextAreaElement;

@@ -1737,10 +1737,9 @@ export async function customizeTable(type: string) {
 
   const applyStyle = () => {
     if (!dropdown || !tablePreview) return;
-
     let styleObj: any;
     if (type === "Custom") {
-      styleObj = customTableStyle.find(s => s.BaseStyle === dropdown.value);
+      styleObj = customTableStyle.find(s => s.Name === dropdown.value);
     } else {
       styleObj = wordTableStyles.find(s => s.style === dropdown.value);
     }
@@ -1819,7 +1818,7 @@ export async function customizeTable(type: string) {
   if (okBtn && dropdown) {
     okBtn.addEventListener("click", () => {
       if (type === "Custom") {
-        const styleObj = customTableStyle.find(s => s.BaseStyle === dropdown.value);
+        const styleObj = customTableStyle.find(s => s.Name === dropdown.value);
         colorPallete.Header = styleObj.HeaderColor;
         colorPallete.Primary = styleObj.PrimaryColor;
         colorPallete.Secondary = styleObj.SecondaryColor;
