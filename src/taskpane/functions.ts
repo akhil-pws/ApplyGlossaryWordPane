@@ -457,7 +457,7 @@ export async function colorTable(table: any, rows: any, context: any) {
   // 1) Plain Table 3  (FIRST COLUMN BOLD)
   // ------------------------------------------------------------
   if (base === "Plain Table 3") {
-   table.rows.items.forEach(row => row.cells.load("items"));
+    table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
     table.rows.items.forEach((row, rowIndex) => {
@@ -481,7 +481,8 @@ export async function colorTable(table: any, rows: any, context: any) {
   // 2) Plain Table 5  (HEADER BOLD, OTHERS NORMAL)
   // ------------------------------------------------------------
   else if (base === "Plain Table 5") {
-     table.rows.items.forEach(row => row.cells.load("items"));
+    table.getBorder(Word.BorderLocation.insideVertical).type = Word.BorderType.none;
+    table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
     table.rows.items.forEach((row, rowIndex) => {
@@ -566,7 +567,7 @@ export async function colorTable(table: any, rows: any, context: any) {
   // 7) List Table 2 (HEADER + FIRST COLUMN BOLD)
   // ------------------------------------------------------------
   else if (base.startsWith("List Table 2")) {
-     table.rows.items.forEach(row => row.cells.load("items"));
+    table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
     table.rows.items.forEach((row, rowIndex) => {
