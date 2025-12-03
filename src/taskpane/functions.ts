@@ -399,7 +399,6 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
   });
 }
 
-
 export async function colorTable(table: any, rows: any, context: any) {
   // Copy cell values from DOM table to Word table
   rows.forEach((row, rowIndex) => {
@@ -452,13 +451,69 @@ export async function colorTable(table: any, rows: any, context: any) {
   const base = tableStyle.split(" - ")[0].trim();
 
   // Plain Table or Grid Table 2
-  if (base.startsWith("Plain Table")) {
+  // ⚠ IMPORTANT: ORDER MUST BE SPECIFIC → GENERIC
+
+  // ------------------------------------------------------------
+  // 1) Plain Table 3  (FIRST COLUMN BOLD)
+  // ------------------------------------------------------------
+  if (base === "Plain Table 3") {
+   table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0 || cellIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // 2) Plain Table 5  (HEADER BOLD, OTHERS NORMAL)
+  // ------------------------------------------------------------
+  else if (base === "Plain Table 5") {
+     table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0 || cellIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // 3) Plain Table (your original logic — UNCHANGED)
+  // ------------------------------------------------------------
+  else if (base === "Plain Table") {
     table.rows.items.forEach((row, i) => {
       const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
       applyColor(row, bg);
     });
   }
-  // Grid Table 4
+
+  // ------------------------------------------------------------
+  // 4) Grid Table 4 (UNCHANGED)
+  // ------------------------------------------------------------
   else if (base.startsWith("Grid Table 4")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
@@ -470,22 +525,34 @@ export async function colorTable(table: any, rows: any, context: any) {
       }
     });
   }
-  // Grid Table 5 Dark
+
+  // ------------------------------------------------------------
+  // 5) Grid Table 5 Dark (UNCHANGED)
+  // ------------------------------------------------------------
   else if (base.startsWith("Grid Table 5 Dark")) {
-    table.rows.items.forEach((row) => row.cells.load("items"));
+    table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
     table.rows.items.forEach((row, rowIndex) => {
       row.cells.items.forEach((cell, cellIndex) => {
         let bgColor = colorPallete.Primary;
-        if (rowIndex === 0 || cellIndex === 0) bgColor = colorPallete.Header;
-        else bgColor = rowIndex % 2 === 1 ? colorPallete.Primary : colorPallete.Secondary;
+
+        if (rowIndex === 0 || cellIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
 
         applyColor(cell, bgColor);
       });
     });
   }
-  // List Table 3
+
+  // ------------------------------------------------------------
+  // 6) List Table 3 (UNCHANGED)
+  // ------------------------------------------------------------
   else if (base.startsWith("List Table 3")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
@@ -494,9 +561,33 @@ export async function colorTable(table: any, rows: any, context: any) {
       if (i > 0) applyColor(row, colorPallete.Primary);
     });
   }
-  // Fallback for unknown tables
+
+  // ------------------------------------------------------------
+  // 7) List Table 2 (HEADER + FIRST COLUMN BOLD)
+  // ------------------------------------------------------------
+  else if (base.startsWith("List Table 2")) {
+     table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+  }
   else {
     table.rows.items.forEach((row) => applyColor(row, colorPallete.Primary));
   }
+
   await context.sync();
 }
