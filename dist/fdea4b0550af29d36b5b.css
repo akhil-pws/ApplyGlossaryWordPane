@@ -320,6 +320,12 @@ ul {
   text-overflow: ellipsis;
 }
 
+#sourceDropdown{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 #header-nav {
   position: sticky;
   top: 0;

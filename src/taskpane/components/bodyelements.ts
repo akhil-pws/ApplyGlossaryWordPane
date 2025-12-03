@@ -21,16 +21,36 @@ function addtagbody(sponsorOptions,sourceOptions) {
           <textarea class="form-control" id="description" rows="6"></textarea>
         </div>
 
-          <div class="mb-3">
-              <label for="primarySource" class="form-label">
-                <span class="text-danger">*</span> Primary Source
-              </label>
-              <select class="form-control" id="primarySource" required>
-                <option value="">Select Primary Source</option>
-                ${sourceOptions}
-              </select>
-              <div class="invalid-feedback">Primary Source is required.</div>
-            </div>
+      
+
+        <div class="mb-3">
+          <label for="source" class="form-label"><span class="text-danger">*</span> Primary Source Type</label>
+          <div class="dropdown w-100">
+            <button 
+              class="btn btn-white border w-100 text-start d-flex justify-content-between align-items-center dropdown-toggle" 
+              type="button" 
+              id="sourceDropdown" 
+              data-bs-toggle="dropdown" 
+              aria-expanded="false" 
+              >
+              <span id="sponsorDropdownLabel">Select Source</span>
+              <span class="dropdown-toggle-icon"></span>
+            </button>
+            <ul class="dropdown-menu w-100 p-2" aria-labelledby="sourceDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+              <li class="source-dropdown-item dropdown-item p-2" style="cursor: pointer;">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="selectAll" id="sourceSelectAll">
+                  <label class="form-check-label" for="sourceSelectAll">Select All</label>
+                </div>
+              </li>
+              ${sourceOptions}
+            </ul>
+          </div>
+          <div class="invalid-feedback" id="primarySourceError" style="display:none;">
+            Primary Source is required.
+          </div>
+
+        </div>
 
         <!-- Prompt Field -->
         <div class="mb-3 prompt-box">
@@ -69,10 +89,10 @@ function addtagbody(sponsorOptions,sourceOptions) {
               <span class="dropdown-toggle-icon"></span>
             </button>
             <ul class="dropdown-menu w-100 p-2" aria-labelledby="sponsorDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-              <li class="dropdown-item p-2" style="cursor: pointer;">
+              <li class="sponsor-dropdown-item dropdown-item p-2" style="cursor: pointer;">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="selectAll" id="selectAll">
-                  <label class="form-check-label" for="selectAll">Select All</label>
+                  <input class="form-check-input" type="checkbox" value="selectAll" id="sponsorSelectAll">
+                  <label class="form-check-label" for="sponsorSelectAll">Select All</label>
                 </div>
               </li>
               ${sponsorOptions}
