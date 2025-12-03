@@ -70,7 +70,9 @@ Office.onReady((info) => {
     Office.context.document.addHandlerAsync(
       Office.EventType.DocumentSelectionChanged,
       () => {
-        logBookmarksInSelection();
+        // logBookmarksInSelection();
+
+       onSelectionChanged();
       }
     );
   }
@@ -79,6 +81,53 @@ Office.onReady((info) => {
 
 // Example usage:
 
+async function onSelectionChanged() {
+    try {
+        await Word.run(async (context) => {
+
+            const selection = context.document.getSelection();
+            const tables = selection.tables;
+            context.load(tables, "items");
+            await context.sync();
+
+            if (tables.items.length === 0) {
+                console.log("No table selected");
+                return;
+            }
+
+            const table = tables.items[0];
+
+            // Load properties that reveal styles
+            context.load(
+                table,
+                "style, styleBuiltIn, shadingColor, tableAlignment, horizontalAlignment, verticalAlignment, rowCount, columnCount"
+            );
+
+            // Load "values" -> includes internal border matrices
+            context.load(table, "_V");
+            await context.sync();
+
+            console.clear();
+            console.log("===== TABLE STYLE INFO =====");
+
+            console.log("Style:", table.style);
+            console.log("Built-in:", table.styleBuiltIn);
+            console.log("Alignment:", table.tableAlignment);
+            console.log("Shading:", table.shadingColor);
+
+            console.log("Row Count:", table.rowCount);
+            console.log("Column Count:", table.columnCount);
+
+            console.log("===== BORDER MATRIX (table._V) =====");
+            console.log(table._V);   // THIS has all cell border styles
+
+            // If you want clean JSON:
+            console.log(JSON.stringify(table._V, null, 2));
+        });
+    } catch (err) {
+        console.error("Error fetching table styles:", err);
+    }
+}
 
 
 async function retrieveDocumentProperties() {
@@ -245,12 +294,13 @@ async function fetchDocument(action) {
   try {
 
     const data = await getReportById(documentID, jwt);
-    const images=await getGeneralImages(jwt);
+    const images = await getGeneralImages(jwt);
+
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-    let mappedImages=mapImagesToComponentObjects(images['Data']);
+    let mappedImages = mapImagesToComponentObjects(images['Data']);
     dataList.GroupKeyAll.push(...mappedImages);
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
@@ -1016,69 +1066,98 @@ export async function applyAITagFn() {
               }
 
               await context.sync();
-            } else {
+            }
+          else if (tag.ComponentKeyDataType === "IMAGE") {
 
-              let text = tag.EditorValue.trim();
-              text = text.replace(/\n- /g, "\n• ");
-              // text = text.replace(/\n- /g, "\n    • ");
+            let base64Image: string = tag.EditorValue;
 
-              // Now insert the updated text
-              item.insertText(text, Word.InsertLocation.replace);
+            // Clean base64
+            if (!base64Image) continue;
 
-              await context.sync();
-
-
+            // Convert SVG → PNG
+            if (base64Image.startsWith("data:image/svg+xml")) {
+              base64Image = await svgBase64ToPngBase64(base64Image);
+            }
+            // Already PNG/JPEG → strip data prefix
+            else if (base64Image.startsWith("data:image")) {
+              base64Image = base64Image.split(",")[1];
             }
 
-            // 1. Find last visible paragraph of the replaced region
-            const itemParagraphs = item.paragraphs;
-            context.load(itemParagraphs, 'items, font/hidden');
+            // Delete the #Tag# placeholder
+            const range = item.getRange();
+            range.delete();
+
+            // Insert image
+            const insertedImage = range.insertInlinePictureFromBase64(
+              base64Image,
+              Word.InsertLocation.replace
+            );
+
+            await context.sync();
+          } else {
+
+            let text = tag.EditorValue.trim();
+            text = text.replace(/\n- /g, "\n• ");
+            // text = text.replace(/\n- /g, "\n    • ");
+
+            // Now insert the updated text
+            item.insertText(text, Word.InsertLocation.replace);
+
             await context.sync();
 
-            let lastVisiblePara = null;
-            for (let p of itemParagraphs.items) {
-              if (!p.font.hidden) lastVisiblePara = p;
-            }
 
-            // 2. Force end marker into visible para
-            let endMarker = null;
-            if (lastVisiblePara) {
-              endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
-              await context.sync();
-            }
+          }
 
+          // 1. Find last visible paragraph of the replaced region
+          const itemParagraphs = item.paragraphs;
+          context.load(itemParagraphs, 'items, font/hidden');
+          await context.sync();
 
-            const markers = context.document.body.paragraphs;
-            context.load(markers, 'text');
+          let lastVisiblePara = null;
+          for (let p of itemParagraphs.items) {
+            if (!p.font.hidden) lastVisiblePara = p;
+          }
+
+          // 2. Force end marker into visible para
+          let endMarker = null;
+          if (lastVisiblePara) {
+            endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
             await context.sync();
+          }
 
-            const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
-            const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
 
-            if (start && end) {
-              const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
-              bookmarkRange.insertBookmark(bookmarkName);
-              console.log(`Bookmark added: ${bookmarkName}`);
-              const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
+          const markers = context.document.body.paragraphs;
+          context.load(markers, 'text');
+          await context.sync();
 
-              afterBookmark.select();
-              start.delete();
-              end.delete();
-              afterBookmark.delete();
-              await context.sync();
-            }
+          const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
+          const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
+
+          if (start && end) {
+            const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
+            bookmarkRange.insertBookmark(bookmarkName);
+            console.log(`Bookmark added: ${bookmarkName}`);
+            const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
+
+            afterBookmark.select();
+            start.delete();
+            end.delete();
+            afterBookmark.delete();
+            await context.sync();
           }
         }
       }
+    }
 
       await context.sync();
-      toaster("AI tag application completed!", "success");
+    toaster("AI tag application completed!", "success");
 
-    } catch (err) {
-      console.error("Error during tag application:", err);
-    }
-  });
+  } catch (err) {
+    console.error("Error during tag application:", err);
+  }
+});
 }
+
 
 function selectResponse(tagIndex, chatIndex) {
   // Handle the response selection logic here
@@ -1528,7 +1607,7 @@ export async function addGenAITags() {
     let selectedClient = clientList.filter(item => item.ID === clientId);
 
     // Build Primary Source List
-    const sourceTypeList = [
+    let sourceTypeList = [
       ...new Map(
         dataList.SourceTypeList
           .filter(item => item.VectorID > 0)
@@ -1725,7 +1804,6 @@ export async function addGenAITags() {
   }
 }
 
-
 export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
@@ -1739,10 +1817,9 @@ export async function customizeTable(type: string) {
 
   const applyStyle = () => {
     if (!dropdown || !tablePreview) return;
-
     let styleObj: any;
     if (type === "Custom") {
-      styleObj = customTableStyle.find(s => s.BaseStyle === dropdown.value);
+      styleObj = customTableStyle.find(s => s.Name === dropdown.value);
     } else {
       styleObj = wordTableStyles.find(s => s.style === dropdown.value);
     }
@@ -1821,12 +1898,12 @@ export async function customizeTable(type: string) {
   if (okBtn && dropdown) {
     okBtn.addEventListener("click", () => {
       if (type === "Custom") {
-        const styleObj = customTableStyle.find(s => s.BaseStyle === dropdown.value);
+        const styleObj = customTableStyle.find(s => s.Name === dropdown.value);
         colorPallete.Header = styleObj.HeaderColor;
         colorPallete.Primary = styleObj.PrimaryColor;
         colorPallete.Secondary = styleObj.SecondaryColor;
         colorPallete.Customize = true;
-        tableStyle = dropdown.value; // stores full object as string
+        tableStyle = styleObj.BaseStyle; // stores full object as string
       } else {
         colorPallete.Customize = false;
         tableStyle = dropdown.value; // normal style string
@@ -2508,3 +2585,41 @@ async function logBookmarksInSelection() {
     }
   });
 }
+
+export async function svgBase64ToPngBase64(svgBase64: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const svgBlob = new Blob(
+        [atob(svgBase64.split(',')[1])],
+        { type: "image/svg+xml" }
+      );
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width || 1200;
+        canvas.height = img.height || 800;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject("Canvas unsupported.");
+        
+        ctx.drawImage(img, 0, 0);
+
+        const pngBase64 = canvas.toDataURL("image/png").split(",")[1];
+        resolve(pngBase64);
+
+        URL.revokeObjectURL(url);
+      };
+
+      img.onerror = () => reject("SVG load failed.");
+      img.src = url;
+
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+

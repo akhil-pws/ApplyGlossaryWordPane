@@ -94,7 +94,6 @@ function addtagbody(sponsorOptions,sourceOptions) {
 }
 
 
-
 function Confirmationpopup(content: string) {
   const isDark = theme === 'Dark';
   const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
@@ -132,7 +131,7 @@ function customizeTablePopup(selectedValue: string, type: string) {
     <select class="form-select mb-2 ${popupClass}" id="confirmation-popup-dropdown">
       ${sourceList
         .map(opt => {
-          const value = type === "Custom" ? opt.BaseStyle : opt.style;
+          const value = type === "Custom" ? opt.Name : opt.style;
           const isSelected = value === selectedValue;
           const text = type === "Custom" ? opt.Name : opt.style;
 
