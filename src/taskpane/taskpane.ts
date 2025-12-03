@@ -1789,11 +1789,15 @@ export async function addGenAITags() {
   }
 }
 
+
 export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  container.innerHTML = customizeTablePopup(tableStyle, type);
+  const customStyleName = localStorage.getItem("CustomStyle") || "";
+  const defaultStyle = localStorage.getItem("DefaultStyle") || tableStyle;
+  let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
+  container.innerHTML = customizeTablePopup(styleObj, type);
 
   const cancelBtn = document.getElementById("confirmation-popup-cancel");
   const okBtn = document.getElementById("confirmation-popup-confirm");
@@ -1888,10 +1892,14 @@ export async function customizeTable(type: string) {
         colorPallete.Primary = styleObj.PrimaryColor;
         colorPallete.Secondary = styleObj.SecondaryColor;
         colorPallete.Customize = true;
-        tableStyle = styleObj.BaseStyle; // stores full object as string
+        localStorage.setItem("CustomStyle", styleObj.Name);
+
+        tableStyle = styleObj.BaseStyle; // stores full object as 
       } else {
         colorPallete.Customize = false;
         tableStyle = dropdown.value; // normal style string
+        localStorage.setItem("DefaultStyle", tableStyle);
+
       }
 
       localStorage.setItem("colorPallete", JSON.stringify(colorPallete));
