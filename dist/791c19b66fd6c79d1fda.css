@@ -435,3 +435,9 @@ ul {
   position: absolute !important;
   /* just in case */
 }
+
+.ai-response-container{
+ white-space: normal !important;
+  word-wrap: break-word;
+  overflow-x: hidden;
+}
