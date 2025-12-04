@@ -449,13 +449,6 @@ export async function colorTable(table: any, rows: any, context: any) {
 
   // Determine base table type
   const base = tableStyle.split(" - ")[0].trim();
-
-  // Plain Table or Grid Table 2
-  // ⚠ IMPORTANT: ORDER MUST BE SPECIFIC → GENERIC
-
-  // ------------------------------------------------------------
-  // 1) Plain Table 3  (FIRST COLUMN BOLD)
-  // ------------------------------------------------------------
   if (base === "Plain Table 3") {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
@@ -477,9 +470,41 @@ export async function colorTable(table: any, rows: any, context: any) {
     });
   }
 
-  // ------------------------------------------------------------
-  // 2) Plain Table 5  (HEADER BOLD, OTHERS NORMAL)
-  // ------------------------------------------------------------
+  else if (base === "Plain Table 2") {
+
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    const rowCount = table.rows.items.length;
+    const firstGapIndex = 0;             // gap between row 0 and row 1
+    const lastGapIndex = rowCount - 1;   // gap between last-2 and last row
+
+    table.rows.items.forEach((row, rowIndex) => {
+      // rowIndex = gap BELOW this row
+      if (rowIndex !== firstGapIndex && rowIndex !== lastGapIndex) {
+        const bottom = row.getBorder(Word.BorderLocation.bottom);
+        bottom.type = Word.BorderType.none;
+      }
+    });
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0 || cellIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+
+    await context.sync();
+  }
   else if (base === "Plain Table 5") {
     table.getBorder(Word.BorderLocation.insideVertical).type = Word.BorderType.none;
     table.rows.items.forEach(row => row.cells.load("items"));
@@ -526,10 +551,6 @@ export async function colorTable(table: any, rows: any, context: any) {
       }
     });
   }
-
-  // ------------------------------------------------------------
-  // 5) Grid Table 5 Dark (UNCHANGED)
-  // ------------------------------------------------------------
   else if (base.startsWith("Grid Table 5 Dark")) {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
@@ -550,10 +571,6 @@ export async function colorTable(table: any, rows: any, context: any) {
       });
     });
   }
-
-  // ------------------------------------------------------------
-  // 6) List Table 3 (UNCHANGED)
-  // ------------------------------------------------------------
   else if (base.startsWith("List Table 3")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
@@ -563,9 +580,6 @@ export async function colorTable(table: any, rows: any, context: any) {
     });
   }
 
-  // ------------------------------------------------------------
-  // 7) List Table 2 (HEADER + FIRST COLUMN BOLD)
-  // ------------------------------------------------------------
   else if (base.startsWith("List Table 2")) {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
