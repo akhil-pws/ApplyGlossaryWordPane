@@ -479,6 +479,9 @@ export async function colorTable(table: any, rows: any, context: any) {
     const firstGapIndex = 0;             // gap between row 0 and row 1
     const lastGapIndex = rowCount - 1;   // gap between last-2 and last row
 
+    // --------------------------------------------
+    // STEP 2 — Turn OFF all gaps EXCEPT first + last
+    // --------------------------------------------
     table.rows.items.forEach((row, rowIndex) => {
       // rowIndex = gap BELOW this row
       if (rowIndex !== firstGapIndex && rowIndex !== lastGapIndex) {
@@ -487,11 +490,14 @@ export async function colorTable(table: any, rows: any, context: any) {
       }
     });
 
+    // --------------------------------------------
+    // STEP 3 — Your existing background coloring
+    // --------------------------------------------
     table.rows.items.forEach((row, rowIndex) => {
       row.cells.items.forEach((cell, cellIndex) => {
         let bgColor = colorPallete.Primary;
 
-        if (rowIndex === 0 || cellIndex === 0) {
+        if (rowIndex === 0) {
           bgColor = colorPallete.Header;
         } else {
           bgColor = rowIndex % 2 === 1
@@ -507,6 +513,7 @@ export async function colorTable(table: any, rows: any, context: any) {
   }
   else if (base === "Plain Table 5") {
     table.getBorder(Word.BorderLocation.insideVertical).type = Word.BorderType.none;
+
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
@@ -514,7 +521,7 @@ export async function colorTable(table: any, rows: any, context: any) {
       row.cells.items.forEach((cell, cellIndex) => {
         let bgColor = colorPallete.Primary;
 
-        if (rowIndex === 0 || cellIndex === 0) {
+        if (rowIndex === 0) {
           bgColor = colorPallete.Header;
         } else {
           bgColor = rowIndex % 2 === 1
@@ -526,6 +533,7 @@ export async function colorTable(table: any, rows: any, context: any) {
       });
     });
   }
+
 
   // ------------------------------------------------------------
   // 3) Plain Table (your original logic — UNCHANGED)
