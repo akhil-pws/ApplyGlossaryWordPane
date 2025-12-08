@@ -684,8 +684,19 @@ export async function insertTagPrompt(tag) {
 
             else {
                 // Non-table content
-                const txt = tag.EditorValue.replace(/\n- /g, "\n• ");
-                itemRange.insertText(txt, Word.InsertLocation.replace);
+                const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
+
+                // Clear existing content first
+                itemRange.insertText("", Word.InsertLocation.replace);
+                await context.sync();
+
+                // Insert each line using heading detection
+                txt.split("\n").forEach(line => {
+                    if (line.trim()) {
+                        insertLineWithHeadingStyle(itemRange, line);
+                    }
+                });
+
             }
 
             await context.sync();

@@ -1018,10 +1018,20 @@ export async function applyAITagFn() {
 
               let text = tag.EditorValue.trim();
               text = text.replace(/\n- /g, "\n• ");
-              // text = text.replace(/\n- /g, "\n    • ");
 
-              // Now insert the updated text
-              item.insertText(text, Word.InsertLocation.replace);
+              // Delete the placeholder text first
+              item.insertText("", Word.InsertLocation.replace);
+              await context.sync();
+
+              // Insert each line with heading logic
+              const lines = text.split("\n");
+              const range = item.getRange();
+
+              for (const line of lines) {
+                if (line.trim()) {
+                  insertLineWithHeadingStyle(range, line);
+                }
+              }
 
               await context.sync();
 
