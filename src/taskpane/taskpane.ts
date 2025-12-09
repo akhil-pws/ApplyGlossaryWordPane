@@ -239,6 +239,11 @@ function displayMenu() {
 async function getTableStyle() {
   const tableStyle = await getAllCustomTables(jwt);
   customTableStyle = tableStyle['Data'];
+  const currentCustomStyle = sessionStorage.getItem("CustomStyle");
+  if (!currentCustomStyle && currentCustomStyle !== '') {
+    const selectedTable = customTableStyle.find(style => style.ID === dataList.TableCustomizationID);
+    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+  }
 }
 
 async function fetchDocument(action) {
@@ -1804,7 +1809,7 @@ export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  const customStyleName = localStorage.getItem("CustomStyle") || "";
+  const customStyleName = sessionStorage.getItem("CustomStyle") || "";
   const defaultStyle = localStorage.getItem("DefaultStyle") || tableStyle;
   let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
   container.innerHTML = customizeTablePopup(styleObj, type);
@@ -1902,7 +1907,7 @@ export async function customizeTable(type: string) {
         colorPallete.Primary = styleObj.PrimaryColor;
         colorPallete.Secondary = styleObj.SecondaryColor;
         colorPallete.Customize = true;
-        localStorage.setItem("CustomStyle", styleObj.Name);
+        sessionStorage.setItem("CustomStyle", styleObj.Name);
 
         tableStyle = styleObj.BaseStyle; // stores full object as 
       } else {
