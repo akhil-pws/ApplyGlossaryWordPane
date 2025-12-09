@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable } from "../functions";
-import { addGenAITags, aiTagList, applyAITagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, svgBase64ToPngBase64, tableStyle, theme } from "../taskpane";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64 } from "../functions";
+import { addGenAITags, aiTagList, applyAITagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
 import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
 let preview = '';
@@ -89,13 +89,14 @@ export function loadHomepage(availableKeys) {
 
             // Loop through mentions and create the list items
             mentions.forEach(mention => {
+
                 const listItem = document.createElement('li');
                 listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`; // Apply the theme classes
 
                 // Create the icon for AI or non-AI tags
                 const icon = isAISection
                     ? `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`
-                    : `<i class="fa-solid fa-layer-group text-muted me-2"></i>`;
+                    : mention.ComponentKeyDataType === 'TEXT' ? `<i class="fa-solid fa-layer-group text-muted me-2"></i>` : `<i class="fa-solid fa-image text-muted me-2"></i>`;
 
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
 
@@ -163,6 +164,7 @@ export function loadHomepage(availableKeys) {
 }
 
 
+
 export async function replaceMention(word: any, type: any) {
     return Word.run(async (context) => {
         try {
@@ -170,60 +172,61 @@ export async function replaceMention(word: any, type: any) {
             await context.sync();
 
             if (!selection) {
-                throw new Error("Selection is invalid or not found.");
+                throw new Error('Selection is invalid or not found.');
             }
 
             let newSelection = selection;
 
-            // ------------------------------------------------------------
-            // TABLE
-            // ------------------------------------------------------------
-            if (type === "TABLE") {
+            if (type === 'TABLE') {
                 const parser = new DOMParser();
-                const doc = parser.parseFromString(word.EditorValue, "text/html");
+                const doc = parser.parseFromString(word.EditorValue, 'text/html');
                 const bodyNodes = Array.from(doc.body.childNodes);
+
+                await context.sync();
 
                 for (const node of bodyNodes) {
                     if (node.nodeType === Node.TEXT_NODE) {
-                        let text = node.textContent?.trim();
-                        if (text) {
-                            text = text.replace(/\n- /g, "\n• ");
-                            text.split("\n").forEach((line) => {
-                                if (line.trim()) insertLineWithHeadingStyle(selection, line);
+                        let textContent = node.textContent?.trim();
+                        if (textContent) {
+                            textContent = textContent.replace(/\n- /g, "\n• ");
+
+                            textContent.split('\n').forEach(line => {
+                                if (line.trim()) {
+                                    insertLineWithHeadingStyle(selection, line);
+                                }
                             });
                         }
                     } else if (node.nodeType === Node.ELEMENT_NODE) {
                         const element = node as HTMLElement;
 
-                        // ------------ TABLE HTML HANDLING ------------
-                        if (element.tagName.toLowerCase() === "table") {
-                            const rows = Array.from(element.querySelectorAll("tr"));
+                        if (element.tagName.toLowerCase() === 'table') {
+                            const rows = Array.from(element.querySelectorAll('tr'));
 
                             if (rows.length === 0) {
                                 selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
                                 continue;
                             }
 
-                            const maxCols = Math.max(
-                                ...rows.map((row) =>
-                                    Array.from(row.querySelectorAll("td, th")).reduce((sum, cell) => {
-                                        return sum + (parseInt(cell.getAttribute("colspan") || "1", 10));
-                                    }, 0)
-                                )
-                            );
+                            const maxCols = Math.max(...rows.map(row => {
+                                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                                }, 0);
+                            }));
 
                             const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-                            const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            table.style = tableStyle;
+                            await context.sync();
 
+                            const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                            table.style = tableStyle;  // Apply built-in Word table style
+
+                            await context.sync();
                             if (colorPallete.Customize) {
                                 await colorTable(table, rows, context);
                             }
-
-                            const rowspanTracker = new Array(maxCols).fill(0);
+                            const rowspanTracker: number[] = new Array(maxCols).fill(0);
 
                             rows.forEach((row, rowIndex) => {
-                                const cells = Array.from(row.querySelectorAll("td, th"));
+                                const cells = Array.from(row.querySelectorAll('td, th'));
                                 let cellIndex = 0;
 
                                 cells.forEach((cell) => {
@@ -233,20 +236,21 @@ export async function replaceMention(word: any, type: any) {
                                     }
 
                                     const cellText = Array.from(cell.childNodes)
-                                        .map((node) =>
-                                            node.nodeType === Node.TEXT_NODE
-                                                ? node.textContent?.trim() || ""
-                                                : (node as HTMLElement).innerText.trim()
-                                        )
-                                        .filter((t) => t.length > 0)
-                                        .join(" ");
+                                        .map(node => {
+                                            if (node.nodeType === Node.TEXT_NODE) {
+                                                return node.textContent?.trim() || '';
+                                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                                return (node as HTMLElement).innerText.trim();
+                                            }
+                                            return '';
+                                        })
+                                        .filter(text => text.length > 0)
+                                        .join(' ');
 
-                                    const colspan = parseInt(cell.getAttribute("colspan") || "1", 10);
-                                    const rowspan = parseInt(cell.getAttribute("rowspan") || "1", 10);
-
+                                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
                                     table.getCell(rowIndex, cellIndex).value = cellText;
 
-                                    // Fill merged colspan cells
                                     for (let i = 1; i < colspan; i++) {
                                         if (cellIndex + i < maxCols) {
                                             table.getCell(rowIndex, cellIndex + i).value = "";
@@ -265,26 +269,23 @@ export async function replaceMention(word: any, type: any) {
                                 });
                             });
 
-                            newSelection = table.getCell(0, 0);
-                        }
+                            newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
+                        } else {
+                            let elementText = element.innerText.trim();
+                            if (elementText) {
+                                elementText = elementText.replace(/\n- /g, "\n• ");
 
-                        // ---------- NON-TABLE ELEMENTS ----------
-                        else {
-                            let text = element.innerText.trim();
-                            if (text) {
-                                text = text.replace(/\n- /g, "\n• ");
-                                text.split("\n").forEach((line) => {
-                                    if (line.trim()) insertLineWithHeadingStyle(selection, line);
+                                elementText.split('\n').forEach(line => {
+                                    if (line.trim()) {
+                                        insertLineWithHeadingStyle(selection, line);
+                                    }
                                 });
                             }
+                            newSelection = selection; // If it's not a table, just use the existing selection.
                         }
                     }
                 }
             }
-
-            // ------------------------------------------------------------
-            // IMAGE
-            // ------------------------------------------------------------
             else if (type === "IMAGE") {
                 let base64Image: string = word.EditorValue;
 
@@ -297,34 +298,33 @@ export async function replaceMention(word: any, type: any) {
 
                 selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
                 newSelection = selection;
-            }
-
-            // ------------------------------------------------------------
-            // TEXT (DEFAULT)
-            // ------------------------------------------------------------
-            else {
-                if (!word.EditorValue || word.IsApplied) {
+            } else {
+                if (word.EditorValue === '' || word.IsApplied) {
                     selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
                 } else {
-                    const lines = removeQuotes(word.EditorValue).split(/\r?\n/);
-                    lines.forEach((line) => selection.insertParagraph(line, Word.InsertLocation.before));
+                    let content = removeQuotes(word.EditorValue);
+                    let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+                    lines.forEach(line => {
+                        selection.insertParagraph(line, Word.InsertLocation.before);
+                    });
                 }
-                newSelection = selection;
+                newSelection = selection; // After inserting the text, set selection to it.
             }
 
-            // ------------------------------------------------------------
-            // FINALIZE — move cursor down
-            // ------------------------------------------------------------
-            const nextLine = selection.insertParagraph("", Word.InsertLocation.after);
-            nextLine.select();
+            // Move the cursor to the next line after content insertion
+            const nextLineParagraph = selection.insertParagraph("", Word.InsertLocation.after);
+            await context.sync();
+
+            // Set the new cursor position after content
+            newSelection = nextLineParagraph;
+            selection.select(); // Select the new paragraph where the cursor will be
             await context.sync();
 
         } catch (error) {
-            console.error("Detailed error:", error);
+            console.error('Detailed error:', error);
         }
     });
 }
-
 
 
 export async function openAITag(tag) {
@@ -698,8 +698,19 @@ export async function insertTagPrompt(tag) {
 
             else {
                 // Non-table content
-                const txt = tag.EditorValue.replace(/\n- /g, "\n• ");
-                itemRange.insertText(txt, Word.InsertLocation.replace);
+                const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
+
+                // Clear existing content first
+                itemRange.insertText("", Word.InsertLocation.replace);
+                await context.sync();
+
+                // Insert each line using heading detection
+                txt.split("\n").forEach(line => {
+                    if (line.trim()) {
+                        insertLineWithHeadingStyle(itemRange, line);
+                    }
+                });
+
             }
 
             await context.sync();

@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, colorTable, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -70,9 +70,7 @@ Office.onReady((info) => {
     Office.context.document.addHandlerAsync(
       Office.EventType.DocumentSelectionChanged,
       () => {
-        // logBookmarksInSelection();
-
-       onSelectionChanged();
+        logBookmarksInSelection();
       }
     );
   }
@@ -81,53 +79,6 @@ Office.onReady((info) => {
 
 // Example usage:
 
-async function onSelectionChanged() {
-    try {
-        await Word.run(async (context) => {
-
-            const selection = context.document.getSelection();
-            const tables = selection.tables;
-            context.load(tables, "items");
-            await context.sync();
-
-            if (tables.items.length === 0) {
-                console.log("No table selected");
-                return;
-            }
-
-            const table = tables.items[0];
-
-            // Load properties that reveal styles
-            context.load(
-                table,
-                "style, styleBuiltIn, shadingColor, tableAlignment, horizontalAlignment, verticalAlignment, rowCount, columnCount"
-            );
-
-            // Load "values" -> includes internal border matrices
-            context.load(table, "_V");
-            await context.sync();
-
-            console.clear();
-            console.log("===== TABLE STYLE INFO =====");
-
-            console.log("Style:", table.style);
-            console.log("Built-in:", table.styleBuiltIn);
-            console.log("Alignment:", table.tableAlignment);
-            console.log("Shading:", table.shadingColor);
-
-            console.log("Row Count:", table.rowCount);
-            console.log("Column Count:", table.columnCount);
-
-            console.log("===== BORDER MATRIX (table._V) =====");
-            console.log(table._V);   // THIS has all cell border styles
-
-            // If you want clean JSON:
-            console.log(JSON.stringify(table._V, null, 2));
-        });
-    } catch (err) {
-        console.error("Error fetching table styles:", err);
-    }
-}
 
 
 async function retrieveDocumentProperties() {
@@ -288,6 +239,11 @@ function displayMenu() {
 async function getTableStyle() {
   const tableStyle = await getAllCustomTables(jwt);
   customTableStyle = tableStyle['Data'];
+  const currentCustomStyle = sessionStorage.getItem("CustomStyle");
+  if (!currentCustomStyle && currentCustomStyle !== '') {
+    const selectedTable = customTableStyle.find(style => style.ID === dataList.TableCustomizationID);
+    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+  }
 }
 
 async function fetchDocument(action) {
@@ -295,6 +251,7 @@ async function fetchDocument(action) {
 
     const data = await getReportById(documentID, jwt);
     const images = await getGeneralImages(jwt);
+
 
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
@@ -316,7 +273,7 @@ async function fetchDocument(action) {
     GroupName = aiGroup ? aiGroup.Name : '';
     aiTagList = aiGroup ? aiGroup.GroupKey : [];
 
-    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'IMAGE');
+    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'IMAGE');
     availableKeys.forEach((key) => {
       if (key.AIFlag === 1) {
         const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
@@ -1067,95 +1024,106 @@ export async function applyAITagFn() {
 
               await context.sync();
             }
-          else if (tag.ComponentKeyDataType === "IMAGE") {
+            else if (tag.ComponentKeyDataType === "IMAGE") {
 
-            let base64Image: string = tag.EditorValue;
+              let base64Image: string = tag.EditorValue;
 
-            // Clean base64
-            if (!base64Image) continue;
+              // Clean base64
+              if (!base64Image) continue;
 
-            // Convert SVG → PNG
-            if (base64Image.startsWith("data:image/svg+xml")) {
-              base64Image = await svgBase64ToPngBase64(base64Image);
+              // Convert SVG → PNG
+              if (base64Image.startsWith("data:image/svg+xml")) {
+                base64Image = await svgBase64ToPngBase64(base64Image);
+              }
+              // Already PNG/JPEG → strip data prefix
+              else if (base64Image.startsWith("data:image")) {
+                base64Image = base64Image.split(",")[1];
+              }
+
+              // Delete the #Tag# placeholder
+              const range = item.getRange();
+              range.delete();
+
+              // Insert image
+              const insertedImage = range.insertInlinePictureFromBase64(
+                base64Image,
+                Word.InsertLocation.replace
+              );
+
+              await context.sync();
             }
-            // Already PNG/JPEG → strip data prefix
-            else if (base64Image.startsWith("data:image")) {
-              base64Image = base64Image.split(",")[1];
+            else {
+
+              let text = tag.EditorValue.trim();
+              text = text.replace(/\n- /g, "\n• ");
+
+              // Delete the placeholder text first
+              item.insertText("", Word.InsertLocation.replace);
+              await context.sync();
+
+              // Insert each line with heading logic
+              const lines = text.split("\n");
+              const range = item.getRange();
+
+              for (const line of lines) {
+                if (line.trim()) {
+                  insertLineWithHeadingStyle(range, line);
+                }
+              }
+
+              await context.sync();
+
+
             }
 
-            // Delete the #Tag# placeholder
-            const range = item.getRange();
-            range.delete();
-
-            // Insert image
-            const insertedImage = range.insertInlinePictureFromBase64(
-              base64Image,
-              Word.InsertLocation.replace
-            );
-
-            await context.sync();
-          } else {
-
-            let text = tag.EditorValue.trim();
-            text = text.replace(/\n- /g, "\n• ");
-            // text = text.replace(/\n- /g, "\n    • ");
-
-            // Now insert the updated text
-            item.insertText(text, Word.InsertLocation.replace);
-
+            // 1. Find last visible paragraph of the replaced region
+            const itemParagraphs = item.paragraphs;
+            context.load(itemParagraphs, 'items, font/hidden');
             await context.sync();
 
+            let lastVisiblePara = null;
+            for (let p of itemParagraphs.items) {
+              if (!p.font.hidden) lastVisiblePara = p;
+            }
 
-          }
+            // 2. Force end marker into visible para
+            let endMarker = null;
+            if (lastVisiblePara) {
+              endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
+              await context.sync();
+            }
 
-          // 1. Find last visible paragraph of the replaced region
-          const itemParagraphs = item.paragraphs;
-          context.load(itemParagraphs, 'items, font/hidden');
-          await context.sync();
 
-          let lastVisiblePara = null;
-          for (let p of itemParagraphs.items) {
-            if (!p.font.hidden) lastVisiblePara = p;
-          }
-
-          // 2. Force end marker into visible para
-          let endMarker = null;
-          if (lastVisiblePara) {
-            endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
+            const markers = context.document.body.paragraphs;
+            context.load(markers, 'text');
             await context.sync();
-          }
 
+            const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
+            const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
 
-          const markers = context.document.body.paragraphs;
-          context.load(markers, 'text');
-          await context.sync();
+            if (start && end) {
+              const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
+              bookmarkRange.insertBookmark(bookmarkName);
+              console.log(`Bookmark added: ${bookmarkName}`);
+              const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
 
-          const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
-          const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
-
-          if (start && end) {
-            const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
-            bookmarkRange.insertBookmark(bookmarkName);
-            console.log(`Bookmark added: ${bookmarkName}`);
-            const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
-
-            afterBookmark.select();
-            start.delete();
-            end.delete();
-            afterBookmark.delete();
-            await context.sync();
+              afterBookmark.select();
+              start.delete();
+              end.delete();
+              afterBookmark.delete();
+              await context.sync();
+            }
           }
         }
       }
-    }
 
       await context.sync();
-    toaster("AI tag application completed!", "success");
+      toaster("AI tag application completed!", "success");
 
-  } catch (err) {
-    console.error("Error during tag application:", err);
-  }
-});
+    } catch (err) {
+      console.error("Error during tag application:", err);
+    }
+  });
 }
 
 
@@ -1615,14 +1583,21 @@ export async function addGenAITags() {
       ).values()
     ];
 
-    const sourceOptions = sourceTypeList
-      .map((src: any) => `<option value="${src.ID}">${src.Name}</option>`)
-      .join("");
+
+    let sourceOptions = sourceTypeList.map((src: any) => {
+      return `
+        <li class="source-dropdown-item dropdown-item p-2" style="cursor: pointer;">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}">
+            <label class="form-check-label text-prewrap" for="source${src.ID}">${src.Name}</label>
+          </div>
+        </li>`;
+    }).join("");
 
     let sponsorOptions = clientList.map(client => {
       const isSelectedClient = selectedClient.some(selected => selected.ID === client.ID);
       return `
-        <li class="dropdown-item p-2" style="cursor: pointer;">
+        <li class="sponsor-dropdown-item dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="${client.ID}" id="sponsor${client.ID}" ${isSelectedClient ? 'checked disabled' : ''}>
             <label class="form-check-label text-prewrap" for="sponsor${client.ID}">${client.Name}</label>
@@ -1647,25 +1622,31 @@ export async function addGenAITags() {
     const nameField = document.getElementById('name');
     const descriptionField = document.getElementById('description');
     const promptField = document.getElementById('prompt');
-    const primarySourceField = document.getElementById('primarySource');
+    // const primarySourceField = document.getElementById('primarySource');
 
     const saveGloballyCheckbox = document.getElementById('saveGlobally');
+
     const availableForAllCheckbox = document.getElementById('isAvailableForAll');
     const sponsorDropdownButton = document.getElementById('sponsorDropdown');
-    const sponsorDropdownItems = document.querySelectorAll('.dropdown-item .form-check-input');
+    const sponsorDropdownItems = document.querySelectorAll('.sponsor-dropdown-item .form-check-input');
+
+
+    const sourceDropdownButton = document.getElementById('sourceDropdown');
+    const sourceDropdownItems = document.querySelectorAll('.source-dropdown-item .form-check-input');
 
     document.getElementById('cancel-btn-gen-ai').addEventListener('click', () => {
       if (!isPendingResponse) loadHomepage(availableKeys);
     });
 
-    if (form && nameField && promptField && sponsorDropdownItems.length > 0) {
 
-      const updateDropdownLabel = () => {
+    if (form && nameField && promptField && sponsorDropdownItems.length > 0 && sourceDropdownItems.length > 0) {
+
+      const updateSponsorDropdownLabel = () => {
         if (availableForAllCheckbox.checked) {
           sponsorDropdownButton.textContent = clientList.map(x => x.Name).join(", ");
         } else {
           const selectedNames = Array.from(sponsorDropdownItems)
-            .filter(cb => cb.checked && cb.id !== 'selectAll')
+            .filter(cb => cb.checked && cb.id !== 'sponsorSelectAll')
             .map(cb => cb.parentElement.textContent.trim());
 
           sponsorDropdownButton.textContent = selectedNames.length
@@ -1673,6 +1654,16 @@ export async function addGenAITags() {
             : "Select Sponsors";
         }
       };
+
+      const updateSourceDropdownLabel = () => {
+        const selectedNames = Array.from(sourceDropdownItems)
+          .filter(cb => cb.checked && cb.id !== 'sourceSelectAll')
+          .map(cb => cb.parentElement.textContent.trim());
+
+        sourceDropdownButton.textContent = selectedNames.length
+          ? selectedNames.join(", ")
+          : "Select Source Types";
+      }
 
       // Submit Handler
       form.addEventListener('submit', async (e) => {
@@ -1685,15 +1676,22 @@ export async function addGenAITags() {
         if (!nameField.value.trim()) { nameField.classList.add('is-invalid'); valid = false; }
         if (!promptField.value.trim()) { promptField.classList.add('is-invalid'); valid = false; }
 
-        if (!primarySourceField.value.trim()) {
-          primarySourceField.classList.add('is-invalid');
+        // PRIMARY SOURCE VALIDATION
+        const selectedPrimarySources = Array.from(sourceDropdownItems)
+          .filter(cb => cb.checked && cb.id !== 'sourceSelectAll')
+          .map(cb => cb.value);
+
+        if (!selectedPrimarySources.length) {
+          document.getElementById("primarySourceError").style.display = "block";
           valid = false;
+        } else {
+          document.getElementById("primarySourceError").style.display = "none";
         }
 
         if (!valid) return;
 
         const selectedSponsors = Array.from(sponsorDropdownItems)
-          .filter(cb => cb.checked && cb.id !== 'selectAll')
+          .filter(cb => cb.checked && cb.id !== 'sponsorSelectAll')
           .map(cb => clientList.find(c => c.ID == cb.value));
 
         const isAvailableForAll = availableForAllCheckbox.checked;
@@ -1714,8 +1712,8 @@ export async function addGenAITags() {
           DocumentTypeID: dataList.DocumentTypeID,
           ReportHeadID: dataList.ID,
 
-          // NEW FIELD
-          SourceTypeID: primarySourceField.value,
+          // MULTI SELECT SOURCE TYPE
+          SourceTypeID: selectedPrimarySources.join(","),
 
           ReportHeadGroupID: aigroup.ID,
           ReportHeadSourceID: 0
@@ -1731,7 +1729,7 @@ export async function addGenAITags() {
             cb.disabled = true;
           }
         });
-        updateDropdownLabel();
+        updateSponsorDropdownLabel();
       };
 
       const enableSponsors = () => {
@@ -1739,7 +1737,7 @@ export async function addGenAITags() {
           const isSelectedClient = selectedClient.some(sel => sel.ID === parseInt(cb.value));
           if (!isSelectedClient) cb.disabled = false;
         });
-        updateDropdownLabel();
+        updateSponsorDropdownLabel();
       };
 
       saveGloballyCheckbox.addEventListener('change', function () {
@@ -1760,10 +1758,12 @@ export async function addGenAITags() {
               }
             });
 
-            updateDropdownLabel();
+            updateSponsorDropdownLabel();
           }
         }
       });
+
+
 
       availableForAllCheckbox.addEventListener('change', function () {
         if (!isPendingResponse) {
@@ -1771,26 +1771,59 @@ export async function addGenAITags() {
         }
       });
 
-      document.querySelectorAll('.dropdown-item').forEach(item => {
+
+      saveGloballyCheckbox.checked = true;
+      availableForAllCheckbox.checked = true;
+      // ✔ Trigger its logic so sponsor dropdown activates properly
+      saveGloballyCheckbox.dispatchEvent(new Event("change"));
+      availableForAllCheckbox.dispatchEvent(new Event("change"));
+      document.querySelectorAll('.sponsor-dropdown-item').forEach(item => {
         item.addEventListener('click', function (e) {
           e.stopPropagation();
-          const checkbox = this.querySelector('.form-check-input');
+          const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input');
           if (!checkbox) return;
 
-          if (checkbox.id === 'selectAll') {
+          if (checkbox.id === 'sponsorSelectAll') {
             const isChecked = checkbox.checked;
             sponsorDropdownItems.forEach(cb => {
               if (!cb.disabled) cb.checked = isChecked;
             });
           }
 
-          updateDropdownLabel();
+          updateSponsorDropdownLabel();
         });
       });
 
-      updateDropdownLabel();
+      document.querySelectorAll('.source-dropdown-item').forEach(item => {
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const checkbox = this.querySelector('.source-dropdown-item .form-check-input');
+          if (!checkbox) return;
 
-      [nameField, promptField, primarySourceField].forEach(field => {
+          if (checkbox.id === 'sourceSelectAll') {
+            const isChecked = checkbox.checked;
+            sourceDropdownItems.forEach(cb => {
+              cb.checked = isChecked;
+            });
+          }
+
+          updateSourceDropdownLabel();
+          const selectedCount = Array.from(sourceDropdownItems)
+            .filter(cb => cb.checked).length;
+
+          if (selectedCount === 0) {
+            document.getElementById("primarySourceError").style.display = "block";
+          } else {
+            document.getElementById("primarySourceError").style.display = "none";
+          }
+
+        });
+      });
+
+      updateSponsorDropdownLabel();
+      updateSourceDropdownLabel();
+
+      [nameField, promptField].forEach(field => {
         field.addEventListener('input', function () {
           if (this.classList.contains('is-invalid') && this.value.trim()) {
             this.classList.remove('is-invalid');
@@ -1804,11 +1837,15 @@ export async function addGenAITags() {
   }
 }
 
+
 export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  container.innerHTML = customizeTablePopup(tableStyle, type);
+  const customStyleName = sessionStorage.getItem("CustomStyle") || "";
+  const defaultStyle = localStorage.getItem("DefaultStyle") || tableStyle;
+  let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
+  container.innerHTML = customizeTablePopup(styleObj, type);
 
   const cancelBtn = document.getElementById("confirmation-popup-cancel");
   const okBtn = document.getElementById("confirmation-popup-confirm");
@@ -1903,10 +1940,14 @@ export async function customizeTable(type: string) {
         colorPallete.Primary = styleObj.PrimaryColor;
         colorPallete.Secondary = styleObj.SecondaryColor;
         colorPallete.Customize = true;
-        tableStyle = styleObj.BaseStyle; // stores full object as string
+        sessionStorage.setItem("CustomStyle", styleObj.Name);
+
+        tableStyle = styleObj.BaseStyle; // stores full object as 
       } else {
         colorPallete.Customize = false;
         tableStyle = dropdown.value; // normal style string
+        localStorage.setItem("DefaultStyle", tableStyle);
+
       }
 
       localStorage.setItem("colorPallete", JSON.stringify(colorPallete));
@@ -2585,41 +2626,3 @@ async function logBookmarksInSelection() {
     }
   });
 }
-
-export async function svgBase64ToPngBase64(svgBase64: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      const svgBlob = new Blob(
-        [atob(svgBase64.split(',')[1])],
-        { type: "image/svg+xml" }
-      );
-      const url = URL.createObjectURL(svgBlob);
-
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-
-      img.onload = function () {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width || 1200;
-        canvas.height = img.height || 800;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject("Canvas unsupported.");
-        
-        ctx.drawImage(img, 0, 0);
-
-        const pngBase64 = canvas.toDataURL("image/png").split(",")[1];
-        resolve(pngBase64);
-
-        URL.revokeObjectURL(url);
-      };
-
-      img.onerror = () => reject("SVG load failed.");
-      img.src = url;
-
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-

@@ -26,6 +26,7 @@ export async function insertLineWithHeadingStyle(range: Word.Range, line: string
       style = "Heading 1";
       text = line.substring(2).trim();
     }
+
     // Create an empty paragraph with the desired style
     const paragraph = range.insertParagraph("", Word.InsertLocation.before);
     paragraph.style = style;
@@ -300,8 +301,6 @@ export function renderSelectedTags(selectedNames, availableKeys) {
       badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
       badge.style.cursor = 'pointer';
       badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
-
-
       badge.addEventListener('click', async () => {
         await selectMatchingBookmarkFromSelection(name);
 
@@ -314,8 +313,6 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           });
         }
       });
-
-
       badgeWrapper.appendChild(badge);
     }
   });
@@ -402,7 +399,6 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
   });
 }
 
-
 export async function colorTable(table: any, rows: any, context: any) {
   // Copy cell values from DOM table to Word table
   rows.forEach((row, rowIndex) => {
@@ -453,15 +449,105 @@ export async function colorTable(table: any, rows: any, context: any) {
 
   // Determine base table type
   const base = tableStyle.split(" - ")[0].trim();
+  if (base === "Plain Table 3") {
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
 
-  // Plain Table or Grid Table 2
-  if (base.startsWith("Plain Table")) {
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0 || cellIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+  }
+
+  else if (base === "Plain Table 2") {
+
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    const rowCount = table.rows.items.length;
+    const firstGapIndex = 0;             // gap between row 0 and row 1
+    const lastGapIndex = rowCount - 1;   // gap between last-2 and last row
+
+    // --------------------------------------------
+    // STEP 2 — Turn OFF all gaps EXCEPT first + last
+    // --------------------------------------------
+    table.rows.items.forEach((row, rowIndex) => {
+      // rowIndex = gap BELOW this row
+      if (rowIndex !== firstGapIndex && rowIndex !== lastGapIndex) {
+        const bottom = row.getBorder(Word.BorderLocation.bottom);
+        bottom.type = Word.BorderType.none;
+      }
+    });
+
+    // --------------------------------------------
+    // STEP 3 — Your existing background coloring
+    // --------------------------------------------
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+
+    await context.sync();
+  }
+  else if (base === "Plain Table 5") {
+    table.getBorder(Word.BorderLocation.insideVertical).type = Word.BorderType.none;
+
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+  }
+
+
+  // ------------------------------------------------------------
+  // 3) Plain Table (your original logic — UNCHANGED)
+  // ------------------------------------------------------------
+  else if (base === "Plain Table") {
     table.rows.items.forEach((row, i) => {
       const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
       applyColor(row, bg);
     });
   }
-  // Grid Table 4
+
+  // ------------------------------------------------------------
+  // 4) Grid Table 4 (UNCHANGED)
+  // ------------------------------------------------------------
   else if (base.startsWith("Grid Table 4")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
@@ -473,22 +559,26 @@ export async function colorTable(table: any, rows: any, context: any) {
       }
     });
   }
-  // Grid Table 5 Dark
   else if (base.startsWith("Grid Table 5 Dark")) {
-    table.rows.items.forEach((row) => row.cells.load("items"));
+    table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
     table.rows.items.forEach((row, rowIndex) => {
       row.cells.items.forEach((cell, cellIndex) => {
         let bgColor = colorPallete.Primary;
-        if (rowIndex === 0 || cellIndex === 0) bgColor = colorPallete.Header;
-        else bgColor = rowIndex % 2 === 1 ? colorPallete.Primary : colorPallete.Secondary;
+
+        if (rowIndex === 0 || cellIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
 
         applyColor(cell, bgColor);
       });
     });
   }
-  // List Table 3
   else if (base.startsWith("List Table 3")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
@@ -497,10 +587,31 @@ export async function colorTable(table: any, rows: any, context: any) {
       if (i > 0) applyColor(row, colorPallete.Primary);
     });
   }
-  // Fallback for unknown tables
+
+  else if (base.startsWith("List Table 2")) {
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = colorPallete.Primary;
+
+        if (rowIndex === 0) {
+          bgColor = colorPallete.Header;
+        } else {
+          bgColor = rowIndex % 2 === 1
+            ? colorPallete.Primary
+            : colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+      });
+    });
+  }
   else {
     table.rows.items.forEach((row) => applyColor(row, colorPallete.Primary));
   }
+
   await context.sync();
 }
 
@@ -525,3 +636,39 @@ export function mapImagesToComponentObjects(input: any): any[] {
   }));
 }
 
+export async function svgBase64ToPngBase64(svgBase64: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const svgBlob = new Blob(
+        [atob(svgBase64.split(',')[1])],
+        { type: "image/svg+xml" }
+      );
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width || 1200;
+        canvas.height = img.height || 800;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject("Canvas unsupported.");
+        
+        ctx.drawImage(img, 0, 0);
+
+        const pngBase64 = canvas.toDataURL("image/png").split(",")[1];
+        resolve(pngBase64);
+
+        URL.revokeObjectURL(url);
+      };
+
+      img.onerror = () => reject("SVG load failed.");
+      img.src = url;
+
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
