@@ -4,9 +4,9 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, renderSelectedTags, selectMatchingBookmarkFromSelection, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, colorTable, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getReportById, loginUser, updateGroupKey } from "./api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
 export let jwt = '';
 export let UserRole: any = {};
@@ -250,11 +250,15 @@ async function fetchDocument(action) {
   try {
 
     const data = await getReportById(documentID, jwt);
+    const images = await getGeneralImages(jwt);
+
+
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-    console.log(dataList.Group[0]);
+    let mappedImages = mapImagesToComponentObjects(images['Data']);
+    dataList.GroupKeyAll.push(...mappedImages);
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
       (item) => item.SourceValue !== ''
@@ -269,7 +273,7 @@ async function fetchDocument(action) {
     GroupName = aiGroup ? aiGroup.Name : '';
     aiTagList = aiGroup ? aiGroup.GroupKey : [];
 
-    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT');
+    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'IMAGE');
     availableKeys.forEach((key) => {
       if (key.AIFlag === 1) {
         const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
@@ -1019,7 +1023,36 @@ export async function applyAITagFn() {
               }
 
               await context.sync();
-            } else {
+            }
+            else if (tag.ComponentKeyDataType === "IMAGE") {
+
+              let base64Image: string = tag.EditorValue;
+
+              // Clean base64
+              if (!base64Image) continue;
+
+              // Convert SVG → PNG
+              if (base64Image.startsWith("data:image/svg+xml")) {
+                base64Image = await svgBase64ToPngBase64(base64Image);
+              }
+              // Already PNG/JPEG → strip data prefix
+              else if (base64Image.startsWith("data:image")) {
+                base64Image = base64Image.split(",")[1];
+              }
+
+              // Delete the #Tag# placeholder
+              const range = item.getRange();
+              range.delete();
+
+              // Insert image
+              const insertedImage = range.insertInlinePictureFromBase64(
+                base64Image,
+                Word.InsertLocation.replace
+              );
+
+              await context.sync();
+            }
+            else {
 
               let text = tag.EditorValue.trim();
               text = text.replace(/\n- /g, "\n• ");

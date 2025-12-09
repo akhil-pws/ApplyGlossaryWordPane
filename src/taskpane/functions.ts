@@ -614,3 +614,61 @@ export async function colorTable(table: any, rows: any, context: any) {
 
   await context.sync();
 }
+
+export function mapImagesToComponentObjects(input: any): any[] {
+  if (!input) return [];
+
+  // 1️⃣ Flatten ALL three arrays into a single list
+  const flatImages = [
+    ...(input.Flowchart || []),
+    ...(input.Graph || []),
+    ...(input.Image || [])
+  ];
+
+  // 2️⃣ Map to required structure
+  return flatImages.map(img => ({
+    Name: img.ImageName,
+    DisplayName: img.ImageName,
+    EditorValue: img.ImageData,
+    UserValue: img.ImageData,
+    ComponentKeyDataType: "IMAGE",
+    AIFlag:0
+  }));
+}
+
+export async function svgBase64ToPngBase64(svgBase64: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const svgBlob = new Blob(
+        [atob(svgBase64.split(',')[1])],
+        { type: "image/svg+xml" }
+      );
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width || 1200;
+        canvas.height = img.height || 800;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject("Canvas unsupported.");
+        
+        ctx.drawImage(img, 0, 0);
+
+        const pngBase64 = canvas.toDataURL("image/png").split(",")[1];
+        resolve(pngBase64);
+
+        URL.revokeObjectURL(url);
+      };
+
+      img.onerror = () => reject("SVG load failed.");
+      img.src = url;
+
+    } catch (err) {
+      reject(err);
+    }
+  });
+}

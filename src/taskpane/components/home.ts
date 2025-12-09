@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable } from "../functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64 } from "../functions";
 import { addGenAITags, aiTagList, applyAITagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
 import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
@@ -89,13 +89,14 @@ export function loadHomepage(availableKeys) {
 
             // Loop through mentions and create the list items
             mentions.forEach(mention => {
+
                 const listItem = document.createElement('li');
                 listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`; // Apply the theme classes
 
                 // Create the icon for AI or non-AI tags
                 const icon = isAISection
                     ? `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`
-                    : `<i class="fa-solid fa-layer-group text-muted me-2"></i>`;
+                    : mention.ComponentKeyDataType === 'TEXT' ? `<i class="fa-solid fa-layer-group text-muted me-2"></i>` : `<i class="fa-solid fa-image text-muted me-2"></i>`;
 
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
 
@@ -284,6 +285,19 @@ export async function replaceMention(word: any, type: any) {
                         }
                     }
                 }
+            }
+            else if (type === "IMAGE") {
+                let base64Image: string = word.EditorValue;
+
+                if (base64Image.startsWith("data:image/svg+xml")) {
+                    // Convert SVG → PNG
+                    base64Image = await svgBase64ToPngBase64(base64Image);
+                } else if (base64Image.startsWith("data:image")) {
+                    base64Image = base64Image.split(",")[1]; // strip prefix
+                }
+
+                selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
+                newSelection = selection;
             } else {
                 if (word.EditorValue === '' || word.IsApplied) {
                     selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
