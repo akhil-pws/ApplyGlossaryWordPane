@@ -257,3 +257,19 @@ export async function getGeneralImages(jwt): Promise<any> {
   const data: any = await response.json();
   return data;
 }
+
+export async function getReportHeadImageById(id: string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/image/report-head/${id}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok.');
+  }
+  const data: any = await response.json();
+  return data;
+};

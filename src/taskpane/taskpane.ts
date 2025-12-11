@@ -6,7 +6,7 @@ import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
 import { applyThemeClasses, chatfooter, colorTable, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, loginUser, updateGroupKey } from "./api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
 export let jwt = '';
 export let UserRole: any = {};
@@ -14,6 +14,7 @@ let storedUrl = storeUrl
 let documentID = ''
 let organizationName = ''
 export let aiTagList = [];
+export let imageList = [];
 let initialised = true;
 export let availableKeys = [];
 let promptBuilderList = [];
@@ -41,7 +42,9 @@ export let colorPallete: any = {
   "Header": '#FFFFFF',
   "Primary": '#FFFFFF',
   "Secondary": '#FFFFFF',
-  "Customize": false
+  "Customize": true,
+  "IsHeaderBold": true,
+  "IsSideHeaderBold": false
 };
 
 export let customTableStyle = [];
@@ -250,29 +253,31 @@ async function fetchDocument(action) {
   try {
 
     const data = await getReportById(documentID, jwt);
-    const images = await getGeneralImages(jwt);
-
+    const generalImages = await getGeneralImages(jwt);
 
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-    let mappedImages = mapImagesToComponentObjects(images['Data']);
+    const ID = dataList.ID;
+    const documentImages = await getReportHeadImageById(ID, jwt);
+    let mappedDocumentImages = mapImagesToComponentObjects(documentImages['Data']);
+    let mappedImages = mapImagesToComponentObjects(generalImages['Data']);
     dataList.GroupKeyAll.push(...mappedImages);
+    dataList.GroupKeyAll.push(...mappedDocumentImages);
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
       (item) => item.SourceValue !== ''
         && item.AIFlag === 1
-    ) // Filter items with an extension
-      .map((item) => ({
-        ...item, // Spread the existing properties
-        SourceName: decodeURIComponent(transformDocumentName(item.SourceValue))
-      }));
+    ).map((item) => ({
+      ...item, // Spread the existing properties
+      SourceName: decodeURIComponent(transformDocumentName(item.SourceValue))
+    }));
     clientId = dataList.ClientID;
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
     GroupName = aiGroup ? aiGroup.Name : '';
     aiTagList = aiGroup ? aiGroup.GroupKey : [];
-
+    imageList = dataList.GroupKeyAll.filter(element => element.ComponentKeyDataType === 'IMAGE');
     availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'IMAGE');
     availableKeys.forEach((key) => {
       if (key.AIFlag === 1) {
@@ -876,8 +881,7 @@ function addCopyListeners() {
   });
 }
 
-export async function applyAITagFn() {
-  toaster("Please wait... applying AI tags", "info");
+export async function applyTagFn() {
 
   return Word.run(async (context) => {
     try {
@@ -886,246 +890,314 @@ export async function applyAITagFn() {
       context.load(body, 'text');
       await context.sync();
 
-      for (let i = 0; i < aiTagList.length; i++) {
-        const tag = aiTagList[i];
-        tag.EditorValue = removeQuotes(tag.EditorValue);
+      // for (let i = 0; i < imageList.length; i++) {
+      //   const tag = imageList[i];
+      //   const searchResults = body.search(`$${tag.DisplayName}$`, {
+      //     matchCase: false,
+      //     matchWholeWord: false,
+      //   });
+      //   context.load(searchResults, 'items');
+      //   await context.sync();
 
-        const searchResults = body.search(`#${tag.DisplayName}#`, {
-          matchCase: false,
-          matchWholeWord: false,
-        });
-        context.load(searchResults, 'items');
-        await context.sync();
+      //   for (const item of searchResults.items) {
+      //     if (tag.EditorValue !== "" && !tag.IsApplied) {
+      //       let base64Image: string = tag.EditorValue;
 
+      //       // Clean base64
+      //       if (!base64Image) continue;
 
-        for (const item of searchResults.items) {
-          if (tag.EditorValue !== "" && !tag.IsApplied) {
-            const cleanDisplayName = tag.ID;
-            const uniqueStr = new Date().getTime();
-            const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
+      //       // Convert SVG → PNG
+      //       if (base64Image.startsWith("data:image/svg+xml")) {
+      //         base64Image = await svgBase64ToPngBase64(base64Image);
+      //       }
+      //       // Already PNG/JPEG → strip data prefix
+      //       else if (base64Image.startsWith("data:image")) {
+      //         base64Image = base64Image.split(",")[1];
+      //       }
 
-            const paragraphs = item.paragraphs;
-            context.load(paragraphs, 'text, font/hidden');
-            await context.sync();
-
-            let visibleParagraph = paragraphs.items.find(p => !p.font.hidden);
-            if (visibleParagraph) {
-              const startMarker = visibleParagraph.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.before);
-              await context.sync();
-            }
-
-            if (tag.ComponentKeyDataType === 'TABLE') {
-              const range = item.getRange();
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(tag.EditorValue, 'text/html');
-              const bodyNodes = Array.from(doc.body.childNodes);
-
-              range.delete();
-
-              for (const node of bodyNodes) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                  let textContent = node.textContent?.trim();
-
-                  if (textContent) {
-                    textContent = textContent.replace(/\n- /g, "\n• ");
-
-                    textContent.split('\n').forEach(line => {
-                      if (line.trim()) {
-                        insertLineWithHeadingStyle(range, line);
-                      }
-                    });
-                  }
-                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                  const element = node as HTMLElement;
-
-                  if (element.tagName.toLowerCase() === 'table') {
-                    const rows = Array.from(element.querySelectorAll('tr'));
-
-                    if (rows.length === 0) {
-                      range.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                      continue;
-                    }
-
-                    const maxCols = Math.max(...rows.map(row => {
-                      return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                        return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                      }, 0);
-                    }));
-
-                    const paragraph = range.insertParagraph("", Word.InsertLocation.before);
-                    await context.sync();
-
-                    const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                    table.style = tableStyle;
-                    await context.sync();
-                    if (colorPallete.Customize) {
-                      await colorTable(table, rows, context);
-                    }
-                    const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-                    rows.forEach((row, rowIndex) => {
-                      const cells = Array.from(row.querySelectorAll('td, th'));
-                      let cellIndex = 0;
-
-                      cells.forEach((cell) => {
-                        while (rowspanTracker[cellIndex] > 0) {
-                          rowspanTracker[cellIndex]--;
-                          cellIndex++;
-                        }
-
-                        const cellText = Array.from(cell.childNodes)
-                          .map(node => {
-                            if (node.nodeType === Node.TEXT_NODE) {
-                              return node.textContent?.trim() || '';
-                            } else if (node.nodeType === Node.ELEMENT_NODE) {
-                              return (node as HTMLElement).innerText.trim();
-                            }
-                            return '';
-                          })
-                          .filter(text => text.length > 0)
-                          .join(' ');
-
-                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                        table.getCell(rowIndex, cellIndex).value = cellText;
-
-                        for (let i = 1; i < colspan; i++) {
-                          if (cellIndex + i < maxCols) {
-                            table.getCell(rowIndex, cellIndex + i).value = "";
-                          }
-                        }
-
-                        if (rowspan > 1) {
-                          for (let i = 0; i < colspan; i++) {
-                            if (cellIndex + i < maxCols) {
-                              rowspanTracker[cellIndex + i] = rowspan - 1;
-                            }
-                          }
-                        }
-
-                        cellIndex += colspan;
-                      });
-                    });
-                  } else {
-                    let elementText = element.innerText.trim();
-                    if (elementText) {
-                      elementText = elementText.replace(/\n- /g, "\n• ");
-
-                      elementText.split('\n').forEach(line => {
-                        if (line.trim()) {
-                          insertLineWithHeadingStyle(range, line);
-                        }
-                      });
-                    }
-                  }
-                }
-              }
-
-              await context.sync();
-            }
-            else if (tag.ComponentKeyDataType === "IMAGE") {
-
-              let base64Image: string = tag.EditorValue;
-
-              // Clean base64
-              if (!base64Image) continue;
-
-              // Convert SVG → PNG
-              if (base64Image.startsWith("data:image/svg+xml")) {
-                base64Image = await svgBase64ToPngBase64(base64Image);
-              }
-              // Already PNG/JPEG → strip data prefix
-              else if (base64Image.startsWith("data:image")) {
-                base64Image = base64Image.split(",")[1];
-              }
-
-              // Delete the #Tag# placeholder
-              const range = item.getRange();
-              range.delete();
-
-              // Insert image
-              const insertedImage = range.insertInlinePictureFromBase64(
-                base64Image,
-                Word.InsertLocation.replace
-              );
-
-              await context.sync();
-            }
-            else {
-
-              let text = tag.EditorValue.trim();
-              text = text.replace(/\n- /g, "\n• ");
-
-              // Delete the placeholder text first
-              item.insertText("", Word.InsertLocation.replace);
-              await context.sync();
-
-              // Insert each line with heading logic
-              const lines = text.split("\n");
-              const range = item.getRange();
-
-              for (const line of lines) {
-                if (line.trim()) {
-                  insertLineWithHeadingStyle(range, line);
-                }
-              }
-
-              await context.sync();
-
-
-            }
-
-            // 1. Find last visible paragraph of the replaced region
-            const itemParagraphs = item.paragraphs;
-            context.load(itemParagraphs, 'items, font/hidden');
-            await context.sync();
-
-            let lastVisiblePara = null;
-            for (let p of itemParagraphs.items) {
-              if (!p.font.hidden) lastVisiblePara = p;
-            }
-
-            // 2. Force end marker into visible para
-            let endMarker = null;
-            if (lastVisiblePara) {
-              endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
-              await context.sync();
-            }
-
-
-            const markers = context.document.body.paragraphs;
-            context.load(markers, 'text');
-            await context.sync();
-
-            const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
-            const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
-
-            if (start && end) {
-              const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
-              bookmarkRange.insertBookmark(bookmarkName);
-              console.log(`Bookmark added: ${bookmarkName}`);
-              const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
-
-              afterBookmark.select();
-              start.delete();
-              end.delete();
-              afterBookmark.delete();
-              await context.sync();
-            }
-          }
-        }
-      }
-
-      await context.sync();
-      toaster("AI tag application completed!", "success");
-
+      //       const imageRange = item.getRange();
+      //       imageRange.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
+      //       await context.sync();
+      //       tag.IsApplied = true;
+      //     }
+      //   }
+      // }
+      await applyAITagFn(body, context);
+      await applyImageTagFn(body, context);
     } catch (err) {
       console.error("Error during tag application:", err);
     }
   });
 }
 
+async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
+  for (let i = 0; i < imageList.length; i++) {
+    const tag = imageList[i];
+    const searchResults = body.search(`$${tag.DisplayName}$`, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    context.load(searchResults, 'items');
+    await context.sync();
+
+    for (const item of searchResults.items) {
+      if (tag.EditorValue !== "") {
+        let base64Image: string = tag.EditorValue;
+
+        // Clean base64
+        if (!base64Image) continue;
+
+        // Convert SVG → PNG
+        if (base64Image.startsWith("data:image/svg+xml")) {
+          base64Image = await svgBase64ToPngBase64(base64Image);
+        }
+        // Already PNG/JPEG → strip data prefix
+        else if (base64Image.startsWith("data:image")) {
+          base64Image = base64Image.split(",")[1];
+        }
+
+        const imageRange = item.getRange();
+        imageRange.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
+        await context.sync();
+      }
+    }
+  }
+  await context.sync();
+}
+
+async function applyAITagFn(body: Word.Body, context: Word.RequestContext) {
+  toaster("Please wait... applying AI tags", "info");
+  for (let i = 0; i < aiTagList.length; i++) {
+    const tag = aiTagList[i];
+    tag.EditorValue = removeQuotes(tag.EditorValue);
+
+    const searchResults = body.search(`#${tag.DisplayName}#`, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    context.load(searchResults, 'items');
+    await context.sync();
+
+
+    for (const item of searchResults.items) {
+      if (tag.EditorValue !== "" && !tag.IsApplied) {
+        const cleanDisplayName = tag.ID;
+        const uniqueStr = new Date().getTime();
+        const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
+
+        const paragraphs = item.paragraphs;
+        context.load(paragraphs, 'text, font/hidden');
+        await context.sync();
+
+        let visibleParagraph = paragraphs.items.find(p => !p.font.hidden);
+        if (visibleParagraph) {
+          const startMarker = visibleParagraph.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.before);
+          await context.sync();
+        }
+
+        if (tag.ComponentKeyDataType === 'TABLE') {
+          const range = item.getRange();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(tag.EditorValue, 'text/html');
+          const bodyNodes = Array.from(doc.body.childNodes);
+
+          range.delete();
+
+          for (const node of bodyNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              let textContent = node.textContent?.trim();
+
+              if (textContent) {
+                textContent = textContent.replace(/\n- /g, "\n• ");
+
+                textContent.split('\n').forEach(line => {
+                  if (line.trim()) {
+                    insertLineWithHeadingStyle(range, line);
+                  }
+                });
+              }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+
+              if (element.tagName.toLowerCase() === 'table') {
+                const rows = Array.from(element.querySelectorAll('tr'));
+
+                if (rows.length === 0) {
+                  range.insertParagraph("[Empty Table]", Word.InsertLocation.before);
+                  continue;
+                }
+
+                const maxCols = Math.max(...rows.map(row => {
+                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
+                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
+                  }, 0);
+                }));
+
+                const paragraph = range.insertParagraph("", Word.InsertLocation.before);
+                await context.sync();
+
+                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
+                table.style = tableStyle;
+                await context.sync();
+                if (colorPallete.Customize) {
+                  await colorTable(table, rows, context);
+                }
+                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+                rows.forEach((row, rowIndex) => {
+                  const cells = Array.from(row.querySelectorAll('td, th'));
+                  let cellIndex = 0;
+
+                  cells.forEach((cell) => {
+                    while (rowspanTracker[cellIndex] > 0) {
+                      rowspanTracker[cellIndex]--;
+                      cellIndex++;
+                    }
+
+                    const cellText = Array.from(cell.childNodes)
+                      .map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                          return node.textContent?.trim() || '';
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          return (node as HTMLElement).innerText.trim();
+                        }
+                        return '';
+                      })
+                      .filter(text => text.length > 0)
+                      .join(' ');
+
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+
+                    table.getCell(rowIndex, cellIndex).value = cellText;
+
+                    for (let i = 1; i < colspan; i++) {
+                      if (cellIndex + i < maxCols) {
+                        table.getCell(rowIndex, cellIndex + i).value = "";
+                      }
+                    }
+
+                    if (rowspan > 1) {
+                      for (let i = 0; i < colspan; i++) {
+                        if (cellIndex + i < maxCols) {
+                          rowspanTracker[cellIndex + i] = rowspan - 1;
+                        }
+                      }
+                    }
+
+                    cellIndex += colspan;
+                  });
+                });
+              } else {
+                let elementText = element.innerText.trim();
+                if (elementText) {
+                  elementText = elementText.replace(/\n- /g, "\n• ");
+
+                  elementText.split('\n').forEach(line => {
+                    if (line.trim()) {
+                      insertLineWithHeadingStyle(range, line);
+                    }
+                  });
+                }
+              }
+            }
+          }
+
+          await context.sync();
+        }
+        else if (tag.ComponentKeyDataType === "IMAGE") {
+
+          let base64Image: string = tag.EditorValue;
+
+          // Clean base64
+          if (!base64Image) continue;
+
+          // Convert SVG → PNG
+          if (base64Image.startsWith("data:image/svg+xml")) {
+            base64Image = await svgBase64ToPngBase64(base64Image);
+          }
+          // Already PNG/JPEG → strip data prefix
+          else if (base64Image.startsWith("data:image")) {
+            base64Image = base64Image.split(",")[1];
+          }
+
+          // Delete the #Tag# placeholder
+          const range = item.getRange();
+          range.delete();
+
+          // Insert image
+          const insertedImage = range.insertInlinePictureFromBase64(
+            base64Image,
+            Word.InsertLocation.replace
+          );
+
+          await context.sync();
+        }
+        else {
+          let text = tag.EditorValue.trim();
+          text = text.replace(/\n- /g, "\n• ");
+
+          // Delete the placeholder text first
+          item.insertText("", Word.InsertLocation.replace);
+          await context.sync();
+
+          // Insert each line with heading logic
+          const lines = text.split("\n");
+          const range = item.getRange();
+
+          for (const line of lines) {
+            if (line.trim()) {
+              insertLineWithHeadingStyle(range, line);
+            }
+          }
+
+          await context.sync();
+        }
+
+        // 1. Find last visible paragraph of the replaced region
+        const itemParagraphs = item.paragraphs;
+        context.load(itemParagraphs, 'items, font/hidden');
+        await context.sync();
+
+        let lastVisiblePara = null;
+        for (let p of itemParagraphs.items) {
+          if (!p.font.hidden) lastVisiblePara = p;
+        }
+
+        // 2. Force end marker into visible para
+        let endMarker = null;
+        if (lastVisiblePara) {
+          endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
+          await context.sync();
+        }
+
+
+        const markers = context.document.body.paragraphs;
+        context.load(markers, 'text');
+        await context.sync();
+
+        const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
+        const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
+
+        if (start && end) {
+          const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
+          bookmarkRange.insertBookmark(bookmarkName);
+          console.log(`Bookmark added: ${bookmarkName}`);
+          const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
+
+          afterBookmark.select();
+          start.delete();
+          end.delete();
+          afterBookmark.delete();
+          await context.sync();
+        }
+      }
+    }
+  }
+
+  await context.sync();
+  toaster("AI tag application completed!", "success");
+}
 
 function selectResponse(tagIndex, chatIndex) {
   // Handle the response selection logic here
@@ -1936,13 +2008,14 @@ export async function customizeTable(type: string) {
     okBtn.addEventListener("click", () => {
       if (type === "Custom") {
         const styleObj = customTableStyle.find(s => s.Name === dropdown.value);
-        colorPallete.Header = styleObj.HeaderColor;
-        colorPallete.Primary = styleObj.PrimaryColor;
-        colorPallete.Secondary = styleObj.SecondaryColor;
+        colorPallete.Header = styleObj.Setting.HeaderColor;
+        colorPallete.Primary = styleObj.Setting.PrimaryColor;
+        colorPallete.Secondary = styleObj.Setting.SecondaryColor;
         colorPallete.Customize = true;
+        colorPallete.IsSideHeaderBold = styleObj.Setting.IsSideHeaderBold;
+        colorPallete.IsHeaderBold = styleObj.Setting.IsHeaderBold;
         sessionStorage.setItem("CustomStyle", styleObj.Name);
-
-        tableStyle = styleObj.BaseStyle; // stores full object as 
+        tableStyle = styleObj.Setting.BaseStyle; // stores full object as 
       } else {
         colorPallete.Customize = false;
         tableStyle = dropdown.value; // normal style string

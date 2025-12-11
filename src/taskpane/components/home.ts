@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64 } from "../functions";
-import { addGenAITags, aiTagList, applyAITagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
+import { addGenAITags, aiTagList, applyTagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
 import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
 let preview = '';
@@ -59,44 +59,45 @@ export function loadHomepage(availableKeys) {
 
     function updateSuggestions() {
         const searchTerm = searchBox.value.trim().toLowerCase();
-        suggestionList.replaceChildren(); // Clear previous results
+        suggestionList.replaceChildren();
+
         if (searchTerm === '') {
-            suggestionList.innerHTML = ''
+            suggestionList.innerHTML = '';
             return;
         }
 
-        const filteredMentions = availableKeys.filter(mention =>
-            mention.DisplayName.toLowerCase().includes(searchTerm)
+        const filteredMentions = availableKeys.filter(m =>
+            m.DisplayName.toLowerCase().includes(searchTerm)
         );
 
+        // Split groups
         const nonAITags = filteredMentions.filter(m => m.AIFlag === 0);
         const aiTags = filteredMentions.filter(m => m.AIFlag === 1);
 
-        const createSection = (labelText, mentions, isAISection = false) => {
+        // Further split non-AI tags into: TEXT + IMAGE
+        const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT");
+        const imageTags = nonAITags.filter(m => m.ComponentKeyDataType !== "TEXT");
+
+        const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
             if (mentions.length === 0) return;
 
-            // Define the theme classes based on the current theme
             const themeClasses = theme === 'Dark'
                 ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
                 : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
 
-
-            // Create the section label
             const label = document.createElement('li');
             label.className = `list-group-item fw-bold text-secondary ${themeClasses.labelClass}`;
             label.textContent = labelText;
             suggestionList.appendChild(label);
 
-            // Loop through mentions and create the list items
             mentions.forEach(mention => {
-
                 const listItem = document.createElement('li');
-                listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`; // Apply the theme classes
+                listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`;
 
-                // Create the icon for AI or non-AI tags
-                const icon = isAISection
-                    ? `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`
-                    : mention.ComponentKeyDataType === 'TEXT' ? `<i class="fa-solid fa-layer-group text-muted me-2"></i>` : `<i class="fa-solid fa-image text-muted me-2"></i>`;
+                // ICON LOGIC
+                let icon = `<i class="fa-solid fa-layer-group text-muted me-2"></i>`; // default (TEXT)
+                if (isAISection) icon = `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`;
+                if (isImageSection) icon = `<i class="fa-solid fa-image text-muted me-2"></i>`;
 
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
 
@@ -104,12 +105,11 @@ export function loadHomepage(availableKeys) {
                     if (isAISection) {
                         const appBody = document.getElementById('app-body');
                         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                        generateCheckboxHistory(mention).catch(error => {
-                            appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>';
-                        }).then(html => {
-                            appBody.innerHTML = html;
-                        });
+                        generateCheckboxHistory(mention)
+                            .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+                            .then(html => { appBody.innerHTML = html; });
                     } else {
+                        // Properties + Images behave same
                         replaceMention(mention, mention.ComponentKeyDataType);
                         suggestionList.replaceChildren();
                     }
@@ -119,11 +119,12 @@ export function loadHomepage(availableKeys) {
             });
         };
 
-        // Call the function for each section
-        createSection('Properties', nonAITags, false);
+        // Render in desired order
+        createSection('Properties', propertiesTags);
         createSection('AI Tags', aiTags, true);
-
+        createSection('Images', imageTags, false, true);
     }
+
     if (selectedNames.length > 0) {
         const badgeWrapper = document.getElementById('tags-in-selected-text');
         badgeWrapper.classList.remove('d-none');
@@ -158,7 +159,7 @@ export function loadHomepage(availableKeys) {
 
     document.getElementById('apply-btn-tag').addEventListener('click', () => {
         if (!isPendingResponse) {
-            applyAITagFn();
+            applyTagFn();
         }
     });
 }
