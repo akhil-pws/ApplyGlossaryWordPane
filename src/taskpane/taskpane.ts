@@ -3,7 +3,7 @@
  * See LICENSE in the project root for license information.
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
-import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, setupPromptBuilderUI } from "./components/home";
+import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./components/home";
 import { applyThemeClasses, chatfooter, colorTable, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./api";
@@ -37,7 +37,7 @@ let filteredGlossaryTerm;
 export let selectedNames = [];
 export let isPendingResponse = false;
 export let theme = 'Light';
-export let tableStyle = 'Grid Table 4 - Accent 1';
+export let tableStyle = 'Plain Table 5';
 export let colorPallete: any = {
   "Header": '#FFFFFF',
   "Primary": '#FFFFFF',
@@ -117,11 +117,11 @@ async function login() {
     UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
     jwt = sessionToken;
     window.location.hash = '#/dashboard';
-    const style = localStorage.getItem('tableStyle');
+    const style = sessionStorage.getItem('tableStyle');
     if (style) {
       tableStyle = style;
     }
-    const localPallete = localStorage.getItem('colorPallete');
+    const localPallete = sessionStorage.getItem('colorPallete');
     if (localPallete) {
       colorPallete = JSON.parse(localPallete);
     }
@@ -194,12 +194,12 @@ async function handleLogin(event) {
       if (data.Status === true && data['Data']) {
         if (data['Data'].ResponseStatus) {
           jwt = data.Data.Token;
-          const style = localStorage.getItem('tableStyle');
+          const style = sessionStorage.getItem('tableStyle');
           if (style) {
             tableStyle = style;
           }
 
-          const localPallete = localStorage.getItem('colorPallete');
+          const localPallete = sessionStorage.getItem('colorPallete');
           if (localPallete) {
             colorPallete = JSON.parse(localPallete);
           }
@@ -253,18 +253,12 @@ async function fetchDocument(action) {
   try {
 
     const data = await getReportById(documentID, jwt);
-    const generalImages = await getGeneralImages(jwt);
 
     document.getElementById('app-body').innerHTML = ``
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-    const ID = dataList.ID;
-    const documentImages = await getReportHeadImageById(ID, jwt);
-    let mappedDocumentImages = mapImagesToComponentObjects(documentImages['Data']);
-    let mappedImages = mapImagesToComponentObjects(generalImages['Data']);
-    dataList.GroupKeyAll.push(...mappedImages);
-    dataList.GroupKeyAll.push(...mappedDocumentImages);
+
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
       (item) => item.SourceValue !== ''
@@ -277,8 +271,8 @@ async function fetchDocument(action) {
     const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
     GroupName = aiGroup ? aiGroup.Name : '';
     aiTagList = aiGroup ? aiGroup.GroupKey : [];
-    imageList = dataList.GroupKeyAll.filter(element => element.ComponentKeyDataType === 'IMAGE');
-    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'IMAGE');
+    getImages();
+    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'TEXT');
     availableKeys.forEach((key) => {
       if (key.AIFlag === 1) {
         const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
@@ -1915,7 +1909,7 @@ export async function customizeTable(type: string) {
   if (!container) return;
 
   const customStyleName = sessionStorage.getItem("CustomStyle") || "";
-  const defaultStyle = localStorage.getItem("DefaultStyle") || tableStyle;
+  const defaultStyle = sessionStorage.getItem("DefaultStyle") || tableStyle;
   let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
   container.innerHTML = customizeTablePopup(styleObj, type);
 
@@ -2019,12 +2013,12 @@ export async function customizeTable(type: string) {
       } else {
         colorPallete.Customize = false;
         tableStyle = dropdown.value; // normal style string
-        localStorage.setItem("DefaultStyle", tableStyle);
+        sessionStorage.setItem("DefaultStyle", tableStyle);
 
       }
 
-      localStorage.setItem("colorPallete", JSON.stringify(colorPallete));
-      localStorage.setItem("tableStyle", tableStyle);
+      sessionStorage.setItem("colorPallete", JSON.stringify(colorPallete));
+      sessionStorage.setItem("tableStyle", tableStyle);
 
       container.innerHTML = "";
     });
@@ -2212,149 +2206,6 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
     });
   }
 }
-
-export async function replaceMention(word: any, type: any) {
-  return Word.run(async (context) => {
-    try {
-      const selection = context.document.getSelection();
-      await context.sync();
-
-      if (!selection) {
-        throw new Error('Selection is invalid or not found.');
-      }
-
-      if (type === 'TABLE') {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(word.EditorValue, 'text/html');
-
-        const bodyNodes = Array.from(doc.body.childNodes);
-
-        for (const node of bodyNodes) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            let textContent = node.textContent?.trim();
-            if (textContent) {
-              textContent = textContent.replace(/\n- /g, "\n• ");
-
-              textContent.split('\n').forEach(line => {
-                if (line.trim()) {
-                  insertLineWithHeadingStyle(selection, line);
-                }
-              });
-            }
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node as HTMLElement;
-
-            if (element.tagName.toLowerCase() === 'table') {
-              const rows = Array.from(element.querySelectorAll('tr'));
-
-              if (rows.length === 0) {
-                selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                continue;
-              }
-
-              const maxCols = Math.max(...rows.map(row => {
-                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                  return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                }, 0);
-              }));
-
-              const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-              await context.sync();
-
-              const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-              table.style = tableStyle;  // Apply built-in Word table style
-
-              await context.sync();
-              if (colorPallete.Customize) {
-                await colorTable(table, rows, context);
-              }
-
-              const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-              rows.forEach((row, rowIndex) => {
-                const cells = Array.from(row.querySelectorAll('td, th'));
-                let cellIndex = 0;
-
-                cells.forEach((cell) => {
-                  while (rowspanTracker[cellIndex] > 0) {
-                    rowspanTracker[cellIndex]--;
-                    cellIndex++;
-                  }
-
-                  const cellText = Array.from(cell.childNodes)
-                    .map(node => {
-                      if (node.nodeType === Node.TEXT_NODE) {
-                        return node.textContent?.trim() || '';
-                      } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        return (node as HTMLElement).innerText.trim();
-                      }
-                      return '';
-                    })
-                    .filter(text => text.length > 0)
-                    .join(' ');
-
-                  const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                  const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-                  // if (rowIndex === 0) {
-                  //   const cell = table.getCell(rowIndex, cellIndex);
-                  //   const paragraph = cell.body.paragraphs.getFirst();
-                  //   paragraph.font.bold = true;
-                  //   paragraph.font.highlightColor = "lightGray";  // This works!
-                  // }
-                  table.getCell(rowIndex, cellIndex).value = cellText;
-
-                  for (let i = 1; i < colspan; i++) {
-                    if (cellIndex + i < maxCols) {
-                      table.getCell(rowIndex, cellIndex + i).value = "";
-                    }
-                  }
-
-                  if (rowspan > 1) {
-                    for (let i = 0; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
-                        rowspanTracker[cellIndex + i] = rowspan - 1;
-                      }
-                    }
-                  }
-
-                  cellIndex += colspan;
-                });
-              });
-            } else {
-              let elementText = element.innerText.trim();
-              if (elementText) {
-                elementText = elementText.replace(/\n- /g, "\n• ");
-                elementText.split('\n').forEach(line => {
-                  if (line.trim()) {
-                    insertLineWithHeadingStyle(selection, line);
-                  }
-                });
-              }
-            }
-          }
-        }
-      }
-
-      else {
-        if (word.EditorValue === '' || word.IsApplied) {
-          selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
-        } else {
-          let content = removeQuotes(word.EditorValue);
-          let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-
-          lines.forEach(line => {
-            selection.insertParagraph(line, Word.InsertLocation.before);
-          });
-        }
-      }
-
-      await context.sync();
-    } catch (error) {
-      console.error('Detailed error:', error);
-    }
-  });
-}
-
 
 function insertLineWithHeadingStyle(range: Word.Range, line: string) {
   let style = "Normal";
@@ -2698,4 +2549,104 @@ async function logBookmarksInSelection() {
       }
     }
   });
+
+
+
+}
+async function getImages() {
+  const generalImages = await getGeneralImages(jwt);
+  const ID = dataList.ID;
+  const documentImages = await getReportHeadImageById(ID, jwt);
+  let mappedDocumentImages = mapImagesToComponentObjects(documentImages['Data']);
+  let mappedImages = mapImagesToComponentObjects(generalImages['Data']);
+  dataList.GroupKeyAll.push(...mappedImages);
+  dataList.GroupKeyAll.push(...mappedDocumentImages);
+  availableKeys.push(...mappedImages);
+  availableKeys.push(...mappedDocumentImages);
+  imageList = dataList.GroupKeyAll.filter(element => element.ComponentKeyDataType === 'IMAGE');
+  const searchBox = document.getElementById('search-box');
+  const suggestionList = document.getElementById('suggestion-list');
+  if (!searchBox || !suggestionList) return;
+  function updateSuggestions() {
+    const searchTerm = searchBox.value.trim().toLowerCase();
+    suggestionList.replaceChildren();
+
+    if (searchTerm === '') {
+      suggestionList.innerHTML = '';
+      return;
+    }
+
+    const filteredMentions = availableKeys.filter(m =>
+      m.DisplayName.toLowerCase().includes(searchTerm)
+    );
+
+    // Split groups
+    const nonAITags = filteredMentions.filter(m => m.AIFlag === 0);
+    const aiTags = filteredMentions.filter(m => m.AIFlag === 1);
+
+    // Further split non-AI tags into: TEXT + IMAGE
+    const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT");
+    const imageTags = nonAITags.filter(m => m.ComponentKeyDataType !== "TEXT");
+
+    const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
+      if (mentions.length === 0) return;
+
+      const themeClasses = theme === 'Dark'
+        ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
+        : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
+
+      const label = document.createElement('li');
+      label.className = `list-group-item fw-bold text-secondary ${themeClasses.labelClass}`;
+      label.textContent = labelText;
+      suggestionList.appendChild(label);
+
+      mentions.forEach(mention => {
+        const listItem = document.createElement('li');
+        listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`;
+
+        // ICON LOGIC
+        let icon = `<i class="fa-solid fa-layer-group text-muted me-2"></i>`; // default (TEXT)
+        if (isAISection) icon = `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`;
+        if (isImageSection) icon = `<i class="fa-solid fa-image text-muted me-2"></i>`;
+
+        listItem.innerHTML = `${icon} ${mention.DisplayName}`;
+
+        listItem.onclick = () => {
+          if (isAISection) {
+            const appBody = document.getElementById('app-body');
+            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+            generateCheckboxHistory(mention)
+              .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+              .then(html => { appBody.innerHTML = html; });
+          } else {
+            // Properties + Images behave same
+            replaceMention(mention, mention.ComponentKeyDataType);
+            suggestionList.replaceChildren();
+          }
+        };
+
+        suggestionList.appendChild(listItem);
+      });
+    };
+
+    // Render in desired order
+    createSection('Properties', propertiesTags);
+    createSection('AI Tags', aiTags, true);
+    createSection('Images', imageTags, false, true);
+  }
+
+  if (selectedNames.length > 0) {
+    const badgeWrapper = document.getElementById('tags-in-selected-text');
+    badgeWrapper.classList.remove('d-none');
+    badgeWrapper.classList.add('d-block');
+    renderSelectedTags(selectedNames, availableKeys);
+  }
+
+  // Add input event listener to the search box
+  let debounceTimeout;
+  searchBox.addEventListener('input', () => {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(updateSuggestions, 300); // Delay input handling by 300ms
+  });
+  toaster('Images are loaded and ready for use', 'success');
 }
