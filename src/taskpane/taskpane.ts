@@ -258,6 +258,15 @@ async function fetchDocument(action) {
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
+    tableStyle = 'Plain Table 5';
+    colorPallete = {
+      "Header": '#FFFFFF',
+      "Primary": '#FFFFFF',
+      "Secondary": '#FFFFFF',
+      "Customize": true,
+      "IsHeaderBold": true,
+      "IsSideHeaderBold": false
+    };
 
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
@@ -2648,5 +2657,7 @@ async function getImages() {
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(updateSuggestions, 300); // Delay input handling by 300ms
   });
-  toaster('Images are loaded and ready for use', 'success');
+  if (imageList && imageList.length > 0) {
+    toaster('Images are loaded and ready for use', 'success');
+  }
 }
