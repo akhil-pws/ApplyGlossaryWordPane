@@ -240,12 +240,23 @@ function displayMenu() {
 }
 
 async function getTableStyle() {
-  const tableStyle = await getAllCustomTables(jwt);
-  customTableStyle = tableStyle['Data'];
+  const tableStyleObj = await getAllCustomTables(jwt);
+  customTableStyle = tableStyleObj['Data'];
   const currentCustomStyle = sessionStorage.getItem("CustomStyle");
   if (!currentCustomStyle && currentCustomStyle !== '') {
     const selectedTable = customTableStyle.find(style => style.ID === dataList.TableCustomizationID);
-    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+    if (selectedTable) {
+      sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+      colorPallete = {
+        "Header": selectedTable.Setting.HeaderColor,
+        "Primary": selectedTable.Setting.PrimaryColor,
+        "Secondary": selectedTable.Setting.SecondaryColor,
+        "Customize": true,
+        "IsHeaderBold": selectedTable.Setting.IsHeaderBold,
+        "IsSideHeaderBold": selectedTable.Setting.IsSideHeaderBold
+      };
+      tableStyle = selectedTable.Setting.BaseStyle;
+    }
   }
 }
 
@@ -258,15 +269,26 @@ async function fetchDocument(action) {
     document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
 
     dataList = data['Data'];
-    tableStyle = 'Plain Table 5';
-    colorPallete = {
-      "Header": '#FFFFFF',
-      "Primary": '#FFFFFF',
-      "Secondary": '#FFFFFF',
-      "Customize": true,
-      "IsHeaderBold": true,
-      "IsSideHeaderBold": false
-    };
+    const ts = sessionStorage.getItem('tableStyle');
+    if (ts) {
+      tableStyle = ts;
+    } else {
+      tableStyle = 'Plain Table 5';
+    }
+
+    const cp = sessionStorage.getItem('colorPallete');
+    if (cp) {
+      colorPallete = JSON.parse(cp);
+    } else {
+      colorPallete = {
+        "Header": '#FFFFFF',
+        "Primary": '#FFFFFF',
+        "Secondary": '#FFFFFF',
+        "Customize": true,
+        "IsHeaderBold": true,
+        "IsSideHeaderBold": false
+      };
+    }
 
     getTableStyle();
     sourceList = dataList?.SourceTypeList?.filter(
