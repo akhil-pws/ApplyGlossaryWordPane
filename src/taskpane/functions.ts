@@ -427,6 +427,15 @@ export async function colorTable(table: any, rows: any, context: any) {
     return luminance < 0.5;
   };
 
+  const applyBoldIfNeeded = (cell: any, rowIndex: number, cellIndex: number) => {
+    let weight = "Normal";
+
+    if (colorPallete.IsHeaderBold && rowIndex === 0) weight = "Bold";
+    if (colorPallete.IsSideHeaderBold && cellIndex === 0) weight = "Bold";
+
+    cell.body.font.bold = weight === "Bold";
+  };
+
   // Helper to apply shading, font color, and border to a row or cell
   const applyColor = (cellOrRow: any, bgColor: string) => {
     cellOrRow.shadingColor = bgColor;
@@ -466,6 +475,8 @@ export async function colorTable(table: any, rows: any, context: any) {
         }
 
         applyColor(cell, bgColor);
+        applyBoldIfNeeded(cell, rowIndex, cellIndex);
+
       });
     });
   }
@@ -490,9 +501,6 @@ export async function colorTable(table: any, rows: any, context: any) {
       }
     });
 
-    // --------------------------------------------
-    // STEP 3 — Your existing background coloring
-    // --------------------------------------------
     table.rows.items.forEach((row, rowIndex) => {
       row.cells.items.forEach((cell, cellIndex) => {
         let bgColor = colorPallete.Primary;
@@ -506,6 +514,7 @@ export async function colorTable(table: any, rows: any, context: any) {
         }
 
         applyColor(cell, bgColor);
+        applyBoldIfNeeded(cell, rowIndex, cellIndex);
       });
     });
 
@@ -530,6 +539,7 @@ export async function colorTable(table: any, rows: any, context: any) {
         }
 
         applyColor(cell, bgColor);
+        applyBoldIfNeeded(cell, rowIndex, cellIndex);
       });
     });
   }
@@ -538,10 +548,15 @@ export async function colorTable(table: any, rows: any, context: any) {
   // ------------------------------------------------------------
   // 3) Plain Table (your original logic — UNCHANGED)
   // ------------------------------------------------------------
-  else if (base === "Plain Table") {
+  else if (base === "Table Grid") {
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
     table.rows.items.forEach((row, i) => {
       const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
       applyColor(row, bg);
+      row.cells.items.forEach((cell, cellIndex) => {
+        applyBoldIfNeeded(cell, i, cellIndex);
+      });
     });
   }
 
@@ -551,12 +566,17 @@ export async function colorTable(table: any, rows: any, context: any) {
   else if (base.startsWith("Grid Table 4")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
-
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
     table.rows.items.forEach((row, i) => {
       if (i > 0) {
         const bg = i % 2 === 0 ? colorPallete.Secondary : colorPallete.Primary;
         applyColor(row, bg);
       }
+
+      row.cells.items.forEach((cell, cellIndex) => {
+        applyBoldIfNeeded(cell, i, cellIndex);
+      });
     });
   }
   else if (base.startsWith("Grid Table 5 Dark")) {
@@ -576,15 +596,21 @@ export async function colorTable(table: any, rows: any, context: any) {
         }
 
         applyColor(cell, bgColor);
+        applyBoldIfNeeded(cell, rowIndex, cellIndex);
       });
     });
   }
   else if (base.startsWith("List Table 3")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
-
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
     table.rows.items.forEach((row, i) => {
       if (i > 0) applyColor(row, colorPallete.Primary);
+
+      row.cells.items.forEach((cell, cellIndex) => {
+        applyBoldIfNeeded(cell, i, cellIndex);
+      });
     });
   }
 
@@ -605,6 +631,7 @@ export async function colorTable(table: any, rows: any, context: any) {
         }
 
         applyColor(cell, bgColor);
+        applyBoldIfNeeded(cell, rowIndex, cellIndex);
       });
     });
   }
@@ -632,7 +659,7 @@ export function mapImagesToComponentObjects(input: any): any[] {
     EditorValue: img.ImageData,
     UserValue: img.ImageData,
     ComponentKeyDataType: "IMAGE",
-    AIFlag:0
+    AIFlag: 0
   }));
 }
 
@@ -655,7 +682,7 @@ export async function svgBase64ToPngBase64(svgBase64: string): Promise<string> {
 
         const ctx = canvas.getContext("2d");
         if (!ctx) return reject("Canvas unsupported.");
-        
+
         ctx.drawImage(img, 0, 0);
 
         const pngBase64 = canvas.toDataURL("image/png").split(",")[1];
