@@ -355,6 +355,7 @@ export async function generateCheckboxHistory(tag) {
         : 'fa-solid fa-circle-xmark bg-light text-dark';
 
     const closeBar = `
+    <div class="chat-header sticky-top bg-white z-3">
         <div class="d-flex justify-content-between align-items-center px-2 pt-3">
             <div class="d-flex align-items-center ms-3">
                 <i class="fa fa-microchip-ai text-muted me-2"></i>
@@ -365,10 +366,11 @@ export async function generateCheckboxHistory(tag) {
             </div>
         </div>
         <hr class="mt-2 mb-1 mx-3">
+        </div>
     `;
 
     const chatBody = `
-        <div class="chat-body">
+        <div class="chat-body flex-grow-1 overflow-auto">
             ${generateChatHistoryHtml(history)}
         </div>
     `;
