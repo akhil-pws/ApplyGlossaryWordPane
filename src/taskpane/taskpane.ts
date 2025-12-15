@@ -242,22 +242,20 @@ function displayMenu() {
 async function getTableStyle() {
   const tableStyleObj = await getAllCustomTables(jwt);
   customTableStyle = tableStyleObj['Data'];
-  const currentCustomStyle = sessionStorage.getItem("CustomStyle");
-  if (!currentCustomStyle && currentCustomStyle !== '') {
-    const selectedTable = customTableStyle.find(style => style.ID === dataList.TableCustomizationID);
-    if (selectedTable) {
-      sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
-      colorPallete = {
-        "Header": selectedTable.Setting.HeaderColor,
-        "Primary": selectedTable.Setting.PrimaryColor,
-        "Secondary": selectedTable.Setting.SecondaryColor,
-        "Customize": true,
-        "IsHeaderBold": selectedTable.Setting.IsHeaderBold,
-        "IsSideHeaderBold": selectedTable.Setting.IsSideHeaderBold
-      };
-      tableStyle = selectedTable.Setting.BaseStyle;
-    }
+  const selectedTable = customTableStyle.find(style => style.ID === dataList.TableCustomizationID);
+  if (selectedTable) {
+    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+    colorPallete = {
+      "Header": selectedTable.Setting.HeaderColor,
+      "Primary": selectedTable.Setting.PrimaryColor,
+      "Secondary": selectedTable.Setting.SecondaryColor,
+      "Customize": true,
+      "IsHeaderBold": selectedTable.Setting.IsHeaderBold,
+      "IsSideHeaderBold": selectedTable.Setting.IsSideHeaderBold
+    };
+    tableStyle = selectedTable.Setting.BaseStyle;
   }
+
 }
 
 async function fetchDocument(action) {
