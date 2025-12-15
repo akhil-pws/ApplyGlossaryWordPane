@@ -441,3 +441,13 @@ ul {
   word-wrap: break-word;
   overflow-x: hidden;
 }
+
+.chat-header {
+  position: sticky;
+  top: 0;
+}
+
+.chat-body {
+  overflow-y: auto;
+  min-height: 0;            /* CRITICAL for flex scroll */
+}
