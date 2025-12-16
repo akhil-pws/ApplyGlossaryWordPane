@@ -567,187 +567,167 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
 
 export async function insertTagPrompt(tag) {
-    return Word.run(async (context) => {
-        try {
-            const selection = context.document.getSelection();
-            await context.sync();
+  return Word.run(async (context) => {
+    try {
+      const selection = context.document.getSelection();
+      await context.sync();
 
-            if (!selection) throw new Error("Invalid selection");
+      if (!selection) throw new Error("Invalid selection");
 
-            const placeholder = `#${tag.DisplayName}#`;
+      /* --------------------------------------------------
+         1️⃣ Create invisible anchor at cursor
+      -------------------------------------------------- */
+      const anchorChar = selection.insertText(
+        "\u200B", // zero-width space
+        Word.InsertLocation.replace
+      );
+      await context.sync();
 
-            // STEP 1: Insert placeholder
-            const inserted = selection.insertText(placeholder, Word.InsertLocation.replace);
-            await context.sync();
+      let cursor = anchorChar.getRange();
 
-            // STEP 2: Collapse selection to that placeholder range
-            const itemRange = inserted.getRange();
-            await context.sync();
+      let bookmarkStart: Word.Range | null = null;
+      let bookmarkEnd: Word.Range | null = null;
 
-            // STEP 3: Insert BOOKMARK_START before range
-            const startMarker = itemRange.insertParagraph("[[BOOKMARK_START]]", Word.InsertLocation.before);
-            await context.sync();
-
-            // STEP 4: Replace placeholder using applyAITagFn logic
-            if (tag.ComponentKeyDataType === "TABLE") {
-
-                const range = itemRange;
-                range.delete();
-                await context.sync();
-
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(tag.EditorValue, "text/html");
-                const bodyNodes = Array.from(doc.body.childNodes);
-
-                for (const node of bodyNodes) {
-
-                    // TEXT NODE
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        let txt = node.textContent?.trim();
-                        if (txt) {
-                            txt = txt.replace(/\n- /g, "\n• ");
-                            txt.split("\n").forEach(line => {
-                                if (line.trim()) insertLineWithHeadingStyle(range, line);
-                            });
-                        }
-                    }
-
-                    // ELEMENT NODE
-                    else if (node.nodeType === Node.ELEMENT_NODE) {
-
-                        const el = node;
-
-                        // TABLE BLOCK
-                        if (el.tagName.toLowerCase() === "table") {
-
-                            const rows = Array.from(el.querySelectorAll("tr"));
-
-                            if (rows.length === 0) {
-                                range.insertParagraph("[Empty Table]", Word.InsertLocation.after);
-                                continue;
-                            }
-
-                            const maxCols = Math.max(...rows.map(r =>
-                                Array.from(r.querySelectorAll("td, th"))
-                                    .reduce((sum, c) => sum + parseInt(c.getAttribute("colspan") || "1"), 0)
-                            ));
-
-                            const p = range.insertParagraph("", Word.InsertLocation.after);
-                            await context.sync();
-
-                            const table = p.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            table.style = tableStyle;
-                            await context.sync();
-
-                            if (colorPallete.Customize) {
-                                await colorTable(table, rows, context);
-                            }
-
-                            const rowspanTracker = new Array(maxCols).fill(0);
-
-                            rows.forEach((row, rowIndex) => {
-                                const cells = Array.from(row.querySelectorAll("td, th"));
-                                let cellIndex = 0;
-
-                                cells.forEach(cell => {
-
-                                    while (rowspanTracker[cellIndex] > 0) {
-                                        rowspanTracker[cellIndex]--;
-                                        cellIndex++;
-                                    }
-
-                                    const cellText = Array.from(cell.childNodes)
-                                        .map(n => n.nodeType === Node.TEXT_NODE
-                                            ? (n.textContent?.trim() || "")
-                                            : (n.innerText?.trim() || "")
-                                        )
-                                        .filter(x => x)
-                                        .join(" ");
-
-                                    const colspan = parseInt(cell.getAttribute("colspan") || "1");
-                                    const rowspan = parseInt(cell.getAttribute("rowspan") || "1");
-
-                                    table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                    for (let i = 1; i < colspan; i++) {
-                                        if (cellIndex + i < maxCols)
-                                            table.getCell(rowIndex, cellIndex + i).value = "";
-                                    }
-
-                                    if (rowspan > 1) {
-                                        for (let i = 0; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols)
-                                                rowspanTracker[cellIndex + i] = rowspan - 1;
-                                        }
-                                    }
-
-                                    cellIndex += colspan;
-                                });
-                            });
-
-                        }
-                        else {
-                            let txt = el.innerText?.trim();
-                            if (txt) {
-                                txt = txt.replace(/\n- /g, "\n• ");
-                                txt.split("\n").forEach(line => {
-                                    if (line.trim()) insertLineWithHeadingStyle(range, line);
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-
-            else {
-                // Non-table content
-                const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
-
-                // Clear existing content first
-                itemRange.insertText("", Word.InsertLocation.replace);
-                await context.sync();
-
-                // Insert each line using heading detection
-                txt.split("\n").forEach(line => {
-                    if (line.trim()) {
-                        insertLineWithHeadingStyle(itemRange, line);
-                    }
-                });
-
-            }
-
-            await context.sync();
-
-            // STEP 5: Insert BOOKMARK_END
-            const endMarker = itemRange.insertParagraph("[[BOOKMARK_END]]", Word.InsertLocation.after);
-            await context.sync();
-
-            // STEP 6: Turn markers into bookmark
-            const paras = context.document.body.paragraphs;
-            context.load(paras, "text");
-            await context.sync();
-
-            const start = paras.items.find(p => p.text === "[[BOOKMARK_START]]");
-            const end = paras.items.find(p => p.text === "[[BOOKMARK_END]]");
-
-            if (start && end) {
-                const bookmarkRange = start.getRange("Start").expandTo(end.getRange("End"));
-                const bookmarkName = `ID${tag.ID}_Split_${new Date().getTime()}`;
-                bookmarkRange.insertBookmark(bookmarkName);
-
-                start.delete();
-                end.delete();
-                await context.sync();
-            }
-
-            toaster("Inserted successfully", "success");
-
-        } catch (err) {
-            console.error(err);
-            toaster("Something went wrong", "error");
+      const include = (r: Word.Range) => {
+        if (!bookmarkStart) {
+          bookmarkStart = r.getRange("Start");
         }
-    });
+        bookmarkEnd = r.getRange("End");
+      };
+
+      /* --------------------------------------------------
+         2️⃣ Insert content
+      -------------------------------------------------- */
+      if (tag.ComponentKeyDataType === "TABLE") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(tag.EditorValue, "text/html");
+        const bodyNodes = Array.from(doc.body.childNodes);
+
+        for (const node of bodyNodes) {
+
+          // TEXT NODE
+          if (node.nodeType === Node.TEXT_NODE) {
+            let txt = node.textContent?.trim();
+            if (!txt) continue;
+
+            txt = txt.replace(/\n- /g, "\n• ");
+            for (const line of txt.split("\n")) {
+              if (!line.trim()) continue;
+
+              const p = cursor.insertParagraph("", Word.InsertLocation.after);
+              insertLineWithHeadingStyle(p, line);
+              include(p.getRange());
+              cursor = p.getRange();
+            }
+          }
+
+          // ELEMENT NODE
+          else if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+
+            // TABLE
+            if (el.tagName.toLowerCase() === "table") {
+              const rows = Array.from(el.querySelectorAll("tr"));
+              if (!rows.length) continue;
+
+              const maxCols = Math.max(
+                ...rows.map(r =>
+                  Array.from(r.querySelectorAll("td, th"))
+                    .reduce(
+                      (s, c) => s + parseInt(c.getAttribute("colspan") || "1"),
+                      0
+                    )
+                )
+              );
+
+              const p = cursor.insertParagraph("", Word.InsertLocation.after);
+              const table = p.insertTable(
+                rows.length,
+                maxCols,
+                Word.InsertLocation.after
+              );
+              table.style = tableStyle;
+
+              if (colorPallete.Customize) {
+                await colorTable(table, rows, context);
+              }
+
+              include(table.getRange());
+              cursor = table.getRange();
+            }
+
+            // OTHER HTML ELEMENTS
+            else {
+              let txt = el.innerText?.trim();
+              if (!txt) continue;
+
+              txt = txt.replace(/\n- /g, "\n• ");
+              for (const line of txt.split("\n")) {
+                if (!line.trim()) continue;
+
+                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                insertLineWithHeadingStyle(p, line);
+                include(p.getRange());
+                cursor = p.getRange();
+              }
+            }
+          }
+        }
+      }
+
+      // NON-TABLE CONTENT
+      else {
+        const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
+
+        for (const line of txt.split("\n")) {
+          if (!line.trim()) continue;
+
+          const p = cursor.insertParagraph("", Word.InsertLocation.after);
+          insertLineWithHeadingStyle(p, line);
+          include(p.getRange());
+          cursor = p.getRange();
+        }
+      }
+
+      await context.sync();
+
+      /* --------------------------------------------------
+         3️⃣ Create ONE bookmark covering everything
+      -------------------------------------------------- */
+      if (bookmarkStart && bookmarkEnd) {
+        const bookmarkName =
+          `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+
+        bookmarkStart
+          .expandTo(bookmarkEnd)
+          .insertBookmark(bookmarkName);
+      }
+
+      /* --------------------------------------------------
+         4️⃣ Remove invisible anchor
+      -------------------------------------------------- */
+      anchorChar.delete();
+
+      await context.sync();
+      toaster("Inserted successfully", "success");
+
+    } catch (err) {
+      console.error(err);
+      toaster("Something went wrong", "error");
+    }
+  });
 }
+
+export function getDateTimeStamp() {
+    const d = new Date();
+
+    const pad = (n) => n.toString().padStart(2, "0");
+
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_` +
+        `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+
 
 
 export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any) {

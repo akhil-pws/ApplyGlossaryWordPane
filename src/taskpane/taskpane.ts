@@ -3,8 +3,8 @@
  * See LICENSE in the project root for license information.
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
-import { generateCheckboxHistory, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./components/home";
+import { applyThemeClasses, chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -959,250 +959,225 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
   loadHomepage(availableKeys);
 }
 
-async function applyAITagFn(body: Word.Body, context: Word.RequestContext) {
-  document.getElementById('app-body').innerHTML = `
-  <div id="button-container">
-    <div class="loader" id="loader"></div>
-    <div id="highlighted-text"></div>
-  </div>`
+export async function applyAITagFn(
+  body: Word.Body,
+  context: Word.RequestContext
+) {
   toaster("Please wait... applying AI tags", "info");
-  for (let i = 0; i < aiTagList.length; i++) {
-    const tag = aiTagList[i];
-    tag.EditorValue = removeQuotes(tag.EditorValue);
 
-    const searchResults = body.search(`#${tag.DisplayName}#`, {
+  for (const tag of aiTagList) {
+    tag.EditorValue = removeQuotes(tag.EditorValue);
+    if (!tag.EditorValue || tag.IsApplied) continue;
+
+    const results = body.search(`#${tag.DisplayName}#`, {
       matchCase: false,
-      matchWholeWord: false,
+      matchWholeWord: false
     });
-    context.load(searchResults, 'items');
+
+    context.load(results, "items");
     await context.sync();
 
+    for (const item of results.items) {
 
-    for (const item of searchResults.items) {
-      if (tag.EditorValue !== "" && !tag.IsApplied) {
-        const cleanDisplayName = tag.ID;
-        const uniqueStr = new Date().getTime();
-        const bookmarkName = `ID${cleanDisplayName}_Split_${uniqueStr}`;
+      /* --------------------------------------------------
+         1️⃣ Anchor correctly (NO invisible chars)
+      -------------------------------------------------- */
+      const anchor = item.getRange("Start");
 
-        const paragraphs = item.paragraphs;
-        context.load(paragraphs, 'text, font/hidden');
-        await context.sync();
+      // Remove placeholder text completely
+      item.delete();
+      await context.sync();
 
-        let visibleParagraph = paragraphs.items.find(p => !p.font.hidden);
-        if (visibleParagraph) {
-          const startMarker = visibleParagraph.insertParagraph('[[BOOKMARK_START]]', Word.InsertLocation.before);
-          await context.sync();
+      let cursor = anchor;
+
+      let bookmarkStart: Word.Range | null = null;
+      let bookmarkEnd: Word.Range | null = null;
+
+      const include = (r: Word.Range) => {
+        if (!bookmarkStart) {
+          bookmarkStart = r.getRange("Start");
         }
+        bookmarkEnd = r.getRange("End");
+      };
 
-        if (tag.ComponentKeyDataType === 'TABLE') {
-          const range = item.getRange();
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(tag.EditorValue, 'text/html');
-          const bodyNodes = Array.from(doc.body.childNodes);
+      /* --------------------------------------------------
+         2️⃣ Insert content forward from anchor
+      -------------------------------------------------- */
 
-          range.delete();
+      // TABLE CONTENT
+      if (tag.ComponentKeyDataType === "TABLE") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(tag.EditorValue, "text/html");
+        const nodes = Array.from(doc.body.childNodes);
 
-          for (const node of bodyNodes) {
-            if (node.nodeType === Node.TEXT_NODE) {
-              let textContent = node.textContent?.trim();
+        for (const node of nodes) {
 
-              if (textContent) {
-                textContent = textContent.replace(/\n- /g, "\n• ");
+          // TEXT NODE
+          if (node.nodeType === Node.TEXT_NODE) {
+            let txt = node.textContent?.trim();
+            if (!txt) continue;
 
-                textContent.split('\n').forEach(line => {
-                  if (line.trim()) {
-                    insertLineWithHeadingStyle(range, line);
-                  }
-                });
-              }
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as HTMLElement;
+            txt = txt.replace(/\n- /g, "\n• ");
+            for (const line of txt.split("\n")) {
+              if (!line.trim()) continue;
 
-              if (element.tagName.toLowerCase() === 'table') {
-                const rows = Array.from(element.querySelectorAll('tr'));
+              const p = cursor.insertParagraph("", Word.InsertLocation.after);
+              insertLineWithHeadingStyle(p, line);
 
-                if (rows.length === 0) {
-                  range.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                  continue;
-                }
-
-                const maxCols = Math.max(...rows.map(row => {
-                  return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                  }, 0);
-                }));
-
-                const paragraph = range.insertParagraph("", Word.InsertLocation.before);
-                await context.sync();
-
-                const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                table.style = tableStyle;
-                await context.sync();
-                if (colorPallete.Customize) {
-                  await colorTable(table, rows, context);
-                }
-                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-
-                rows.forEach((row, rowIndex) => {
-                  const cells = Array.from(row.querySelectorAll('td, th'));
-                  let cellIndex = 0;
-
-                  cells.forEach((cell) => {
-                    while (rowspanTracker[cellIndex] > 0) {
-                      rowspanTracker[cellIndex]--;
-                      cellIndex++;
-                    }
-
-                    const cellText = Array.from(cell.childNodes)
-                      .map(node => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                          return node.textContent?.trim() || '';
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                          return (node as HTMLElement).innerText.trim();
-                        }
-                        return '';
-                      })
-                      .filter(text => text.length > 0)
-                      .join(' ');
-
-                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                    table.getCell(rowIndex, cellIndex).value = cellText;
-
-                    for (let i = 1; i < colspan; i++) {
-                      if (cellIndex + i < maxCols) {
-                        table.getCell(rowIndex, cellIndex + i).value = "";
-                      }
-                    }
-
-                    if (rowspan > 1) {
-                      for (let i = 0; i < colspan; i++) {
-                        if (cellIndex + i < maxCols) {
-                          rowspanTracker[cellIndex + i] = rowspan - 1;
-                        }
-                      }
-                    }
-
-                    cellIndex += colspan;
-                  });
-                });
-              } else {
-                let elementText = element.innerText.trim();
-                if (elementText) {
-                  elementText = elementText.replace(/\n- /g, "\n• ");
-
-                  elementText.split('\n').forEach(line => {
-                    if (line.trim()) {
-                      insertLineWithHeadingStyle(range, line);
-                    }
-                  });
-                }
-              }
+              include(p.getRange());
+              cursor = p.getRange();
             }
           }
 
-          await context.sync();
-        }
-        else if (tag.ComponentKeyDataType === "IMAGE") {
+          // ELEMENT NODE
+          else if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
 
-          let base64Image: string = tag.EditorValue;
+            // TABLE
+            if (el.tagName.toLowerCase() === "table") {
+              const rows = Array.from(el.querySelectorAll("tr"));
+              if (!rows.length) continue;
 
-          // Clean base64
-          if (!base64Image) continue;
+              const maxCols = Math.max(
+                ...rows.map(r =>
+                  Array.from(r.querySelectorAll("td, th")).reduce(
+                    (s, c) =>
+                      s + parseInt(c.getAttribute("colspan") || "1", 10),
+                    0
+                  )
+                )
+              );
 
-          // Convert SVG → PNG
-          if (base64Image.startsWith("data:image/svg+xml")) {
-            base64Image = await svgBase64ToPngBase64(base64Image);
-          }
-          // Already PNG/JPEG → strip data prefix
-          else if (base64Image.startsWith("data:image")) {
-            base64Image = base64Image.split(",")[1];
-          }
+              const p = cursor.insertParagraph("", Word.InsertLocation.after);
+              const table = p.insertTable(
+                rows.length,
+                maxCols,
+                Word.InsertLocation.after
+              );
 
-          // Delete the #Tag# placeholder
-          const range = item.getRange();
-          range.delete();
+              table.style = tableStyle;
 
-          // Insert image
-          const insertedImage = range.insertInlinePictureFromBase64(
-            base64Image,
-            Word.InsertLocation.replace
-          );
+              if (colorPallete.Customize) {
+                await colorTable(table, rows, context);
+              }
 
-          await context.sync();
-        }
-        else {
-          let text = tag.EditorValue.trim();
-          text = text.replace(/\n- /g, "\n• ");
+              include(table.getRange());
+              cursor = table.getRange();
+            }
 
-          // Delete the placeholder text first
-          item.insertText("", Word.InsertLocation.replace);
-          await context.sync();
+            // OTHER ELEMENTS
+            else {
+              let txt = el.innerText?.trim();
+              if (!txt) continue;
 
-          // Insert each line with heading logic
-          const lines = text.split("\n");
-          const range = item.getRange();
+              txt = txt.replace(/\n- /g, "\n• ");
+              for (const line of txt.split("\n")) {
+                if (!line.trim()) continue;
 
-          for (const line of lines) {
-            if (line.trim()) {
-              insertLineWithHeadingStyle(range, line);
+                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                insertLineWithHeadingStyle(p, line);
+
+                include(p.getRange());
+                cursor = p.getRange();
+              }
             }
           }
+        }
+      }
 
-          await context.sync();
+      // IMAGE CONTENT
+      else if (tag.ComponentKeyDataType === "IMAGE") {
+        let base64 = tag.EditorValue;
+
+        if (base64.startsWith("data:image/svg+xml")) {
+          base64 = await svgBase64ToPngBase64(base64);
+        } else if (base64.startsWith("data:image")) {
+          base64 = base64.split(",")[1];
         }
 
-        // 1. Find last visible paragraph of the replaced region
-        const itemParagraphs = item.paragraphs;
-        context.load(itemParagraphs, 'items, font/hidden');
-        await context.sync();
+        const pic = cursor.insertInlinePictureFromBase64(
+          base64,
+          Word.InsertLocation.after
+        );
 
-        let lastVisiblePara = null;
-        for (let p of itemParagraphs.items) {
-          if (!p.font.hidden) lastVisiblePara = p;
+        include(pic.getRange());
+        cursor = pic.getRange();
+      }
+
+      // TEXT CONTENT
+      else {
+        const txt = tag.EditorValue
+          .replace(/\n- /g, "\n• ")
+          .trim();
+
+        for (const line of txt.split("\n")) {
+          if (!line.trim()) continue;
+
+          const p = cursor.insertParagraph("", Word.InsertLocation.after);
+          insertLineWithHeadingStyle(p, line);
+
+          include(p.getRange());
+          cursor = p.getRange();
         }
+      }
 
-        // 2. Force end marker into visible para
-        let endMarker = null;
-        if (lastVisiblePara) {
-          endMarker = lastVisiblePara.insertParagraph('[[BOOKMARK_END]]', Word.InsertLocation.after);
-          await context.sync();
-        }
+      await context.sync();
 
-
-        const markers = context.document.body.paragraphs;
-        context.load(markers, 'text');
-        await context.sync();
-
-        const start = markers.items.find(p => p.text === '[[BOOKMARK_START]]');
-        const end = markers.items.find(p => p.text === '[[BOOKMARK_END]]');
-
-        if (start && end) {
-          const bookmarkRange = start.getRange('Start').expandTo(end.getRange('End'));
-          bookmarkRange.insertBookmark(bookmarkName);
-          console.log(`Bookmark added: ${bookmarkName}`);
-          const afterBookmark = end.insertParagraph("", Word.InsertLocation.after);
-
-          afterBookmark.select();
-          start.delete();
-          end.delete();
-          afterBookmark.delete();
-          await context.sync();
-        }
+      /* --------------------------------------------------
+         3️⃣ Create SINGLE bookmark
+      -------------------------------------------------- */
+      if (bookmarkStart && bookmarkEnd) {
+        const bookmarkName = `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+        bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
   }
 
-  await context.sync();
   toaster("AI tag application completed!", "success");
 }
 
-function selectResponse(tagIndex, chatIndex) {
-  // Handle the response selection logic here
-  console.log(`Response selected for tagIndex ${tagIndex}, chatIndex ${chatIndex}`);
+
+export async function normalizeBlankLines(
+  context: Word.RequestContext
+) {
+  const paragraphs = context.document.body.paragraphs;
+  context.load(paragraphs, "items, text");
+  await context.sync();
+
+  let previousWasEmpty = false;
+
+  for (const p of paragraphs.items) {
+    const isEmpty = !p.text || p.text.trim() === "";
+
+    if (isEmpty && previousWasEmpty) {
+      p.delete();
+    }
+
+    previousWasEmpty = isEmpty;
+  }
+
+  await context.sync();
 }
 
+export async function removeTrailingEmptyParagraphs(
+  context: Word.RequestContext
+) {
+  const paragraphs = context.document.body.paragraphs;
+  context.load(paragraphs, "items, text");
+  await context.sync();
+
+  for (let i = paragraphs.items.length - 1; i >= 0; i--) {
+    const p = paragraphs.items[i];
+
+    if (!p.text || p.text.trim() === "") {
+      p.delete();
+    } else {
+      break; // stop once real content is found
+    }
+  }
+
+  await context.sync();
+}
 
 async function fetchGlossary() {
   if (!isTagUpdating) {
@@ -2212,36 +2187,6 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
   }
 }
 
-function insertLineWithHeadingStyle(range: Word.Range, line: string) {
-  let style = "Normal";
-  let text = line;
-
-  if (line.startsWith('###### ')) {
-    style = "Heading 6";
-    text = line.substring(7).trim();
-  } else if (line.startsWith('##### ')) {
-    style = "Heading 5";
-    text = line.substring(6).trim();
-  } else if (line.startsWith('#### ')) {
-    style = "Heading 4";
-    text = line.substring(5).trim();
-  } else if (line.startsWith('### ')) {
-    style = "Heading 3";
-    text = line.substring(4).trim();
-  } else if (line.startsWith('## ')) {
-    style = "Heading 2";
-    text = line.substring(3).trim();
-  } else if (line.startsWith('# ')) {
-    style = "Heading 1";
-    text = line.substring(2).trim();
-  }
-
-  const paragraph = range.insertParagraph(text, Word.InsertLocation.before);
-  paragraph.style = style;
-}
-
-
-
 function removeQuotes(value: string): string {
   return value
     ? value
@@ -2486,78 +2431,78 @@ async function loadPromptTemplates() {
   }
 }
 
-
 async function logBookmarksInSelection() {
   return Word.run(async (context) => {
-    let range = context.document.getSelection();
-    await context.sync(); // Ensure selection is ready
 
+    const rawBookmarks = await getBookmarksFromSelection(context);
+    const bookmarks = pickRelevantBookmarks(rawBookmarks);
 
-    // Get bookmarks in the selection
-    let bookmarks = range.getBookmarks(); // Returns ClientResult<string[]>
-
-    await context.sync(); // Ensure bookmarks are retrieved
-    if (bookmarks.value.length > 1) {
-      selectedNames = []
-      const badgeWrapper = document.getElementById('tags-in-selected-text');
-      if (badgeWrapper) {
-        badgeWrapper.classList.remove('d-none');
-        badgeWrapper.classList.add('d-block');
-      }
-      bookmarks.value.forEach((bookmarkName) => {
-        let processedName = bookmarkName.split("_Split_")[0];
-        processedName = processedName.replace(/_/g, " ");
-        selectedNames.push(processedName)
-        const container = document.getElementById('tags-in-selected-text');
-        if (container) {
-          renderSelectedTags(selectedNames, availableKeys)// Trigger function when selection changes
-        }
-      });
-    } else if (bookmarks.value.length === 1) {
-      const badgeWrapper = document.getElementById('tags-in-selected-text');
-      if (badgeWrapper) {
-        badgeWrapper.classList.remove('d-none');
-        badgeWrapper.classList.add('d-block');
-      }
-      bookmarks.value.forEach((bookmarkName) => {
-        let processedName = bookmarkName.split("_Split_")[0];
-        processedName = processedName.replace(/_/g, " ");
-        let aiTag;
-        if (/^ID\d+$/i.test(processedName)) {
-          aiTag = availableKeys.find(
-            mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === processedName.toLowerCase()
-          );
-        } else {
-          aiTag = availableKeys.find(
-            mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === processedName.toLowerCase()
-          );
-        }
-
-        const container = document.getElementById('tags-in-selected-text');
-        if (container && aiTag) {
-          selectMatchingBookmarkFromSelection(processedName);
-          selectedNames = [processedName];
-
-          const appBody = document.getElementById('app-body');
-          appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-
-          generateCheckboxHistory(aiTag).then(html => {
-            appBody.innerHTML = html;
-          });
-        }
-      });
-    } else {
-      const badgeWrapper = document.getElementById('tags-in-selected-text');
-      if (badgeWrapper) {
-        badgeWrapper.classList.remove('d-block');
-        badgeWrapper.classList.add('d-none');
-      }
+    if (bookmarks.length === 0) {
+      document.getElementById('tags-in-selected-text')
+        ?.classList.replace('d-block', 'd-none');
+      return;
     }
+
+    document.getElementById('tags-in-selected-text')
+      ?.classList.replace('d-none', 'd-block');
+
+    if (bookmarks.length > 1) {
+      selectedNames = bookmarks;
+      renderSelectedTags(selectedNames, availableKeys);
+      return;
+    }
+
+    // Single bookmark
+    const seachBox = document.getElementById('search-box') as HTMLInputElement;
+    if (seachBox) {
+      const processedName = bookmarks[0];
+      selectedNames = [processedName];
+      selectMatchingBookmarkFromSelection(processedName);
+
+      const aiTag = availableKeys.find(k =>
+        k.AIFlag === 1 &&
+        (k.DisplayName.toLowerCase() === processedName.toLowerCase() ||
+          `id${k.ID}`.toLowerCase() === processedName.toLowerCase())
+      );
+
+      if (!aiTag) return;
+
+      const appBody = document.getElementById('app-body');
+      appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+
+      appBody.innerHTML = await generateCheckboxHistory(aiTag);
+    }
+
+
   });
-
-
-
 }
+
+async function getBookmarksFromSelection(context: Word.RequestContext): Promise<string[]> {
+  const selection = context.document.getSelection();
+  const bookmarks = selection.getBookmarks();
+  await context.sync();
+  return bookmarks.value || [];
+}
+
+
+function normalizeBookmark(name: string) {
+  return name.split('_Split_')[0].replace(/_/g, ' ');
+}
+
+function pickRelevantBookmarks(bookmarks: string[]) {
+  // Remove duplicates & internal splits
+  const normalized = Array.from(new Set(bookmarks.map(normalizeBookmark)));
+
+  // Prefer AI tags only
+  return normalized.filter(name =>
+    availableKeys.some(
+      k => k.AIFlag === 1 &&
+        (k.DisplayName.toLowerCase() === name.toLowerCase() ||
+          `id${k.ID}`.toLowerCase() === name.toLowerCase())
+    )
+  );
+}
+
 async function getImages() {
   const generalImages = await getGeneralImages(jwt);
   const ID = dataList.ID;
