@@ -912,43 +912,12 @@ export async function applyTagFn() {
 
       context.load(body, 'text');
       await context.sync();
-
-      // for (let i = 0; i < imageList.length; i++) {
-      //   const tag = imageList[i];
-      //   const searchResults = body.search(`$${tag.DisplayName}$`, {
-      //     matchCase: false,
-      //     matchWholeWord: false,
-      //   });
-      //   context.load(searchResults, 'items');
-      //   await context.sync();
-
-      //   for (const item of searchResults.items) {
-      //     if (tag.EditorValue !== "" && !tag.IsApplied) {
-      //       let base64Image: string = tag.EditorValue;
-
-      //       // Clean base64
-      //       if (!base64Image) continue;
-
-      //       // Convert SVG → PNG
-      //       if (base64Image.startsWith("data:image/svg+xml")) {
-      //         base64Image = await svgBase64ToPngBase64(base64Image);
-      //       }
-      //       // Already PNG/JPEG → strip data prefix
-      //       else if (base64Image.startsWith("data:image")) {
-      //         base64Image = base64Image.split(",")[1];
-      //       }
-
-      //       const imageRange = item.getRange();
-      //       imageRange.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
-      //       await context.sync();
-      //       tag.IsApplied = true;
-      //     }
-      //   }
-      // }
       await applyAITagFn(body, context);
       await applyImageTagFn(body, context);
     } catch (err) {
+      toaster("Something went wrong", "error")
       console.error("Error during tag application:", err);
+      loadHomepage(availableKeys);
     }
   });
 }
@@ -986,9 +955,16 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
     }
   }
   await context.sync();
+  toaster("AI tag application completed!", "success");
+  loadHomepage(availableKeys);
 }
 
 async function applyAITagFn(body: Word.Body, context: Word.RequestContext) {
+  document.getElementById('app-body').innerHTML = `
+  <div id="button-container">
+    <div class="loader" id="loader"></div>
+    <div id="highlighted-text"></div>
+  </div>`
   toaster("Please wait... applying AI tags", "info");
   for (let i = 0; i < aiTagList.length; i++) {
     const tag = aiTagList[i];
