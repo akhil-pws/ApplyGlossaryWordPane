@@ -660,7 +660,8 @@ export function mapImagesToComponentObjects(input: any): any[] {
     EditorValue: img.ImageData,
     UserValue: img.ImageData,
     ComponentKeyDataType: "IMAGE",
-    AIFlag: 0
+    AIFlag: 0,
+    IsImage: true
   }));
 }
 

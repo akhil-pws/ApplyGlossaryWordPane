@@ -2543,7 +2543,7 @@ async function getImages() {
 
     // Further split non-AI tags into: TEXT + IMAGE
     const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT");
-    const imageTags = nonAITags.filter(m => m.ComponentKeyDataType !== "TEXT");
+    const imageTags = nonAITags.filter(m => m.ComponentKeyDataType === "IMAGE" && m.IsImage);
 
     const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
       if (mentions.length === 0) return;
