@@ -963,6 +963,11 @@ export async function applyAITagFn(
   body: Word.Body,
   context: Word.RequestContext
 ) {
+  document.getElementById('app-body').innerHTML = `
+  <div id="button-container">
+    <div class="loader" id="loader"></div>
+    <div id="highlighted-text"></div>
+  </div>`
   toaster("Please wait... applying AI tags", "info");
 
   for (const tag of aiTagList) {
@@ -1132,7 +1137,9 @@ export async function applyAITagFn(
       }
     }
   }
-
+  if (imageList.length === 0) {
+    loadHomepage(availableKeys);
+  }
   toaster("AI tag application completed!", "success");
 }
 
