@@ -1064,6 +1064,53 @@ export async function applyAITagFn(
 
               if (colorPallete.Customize) {
                 await colorTable(table, rows, context);
+              } else {
+                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+                rows.forEach((row, rowIndex) => {
+                  const cells = Array.from(row.querySelectorAll('td, th'));
+                  let cellIndex = 0;
+
+                  cells.forEach((cell) => {
+                    while (rowspanTracker[cellIndex] > 0) {
+                      rowspanTracker[cellIndex]--;
+                      cellIndex++;
+                    }
+
+                    const cellText = Array.from(cell.childNodes)
+                      .map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                          return node.textContent?.trim() || '';
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          return (node as HTMLElement).innerText.trim();
+                        }
+                        return '';
+                      })
+                      .filter(text => text.length > 0)
+                      .join(' ');
+
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                    const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+
+                    table.getCell(rowIndex, cellIndex).value = cellText;
+
+                    for (let i = 1; i < colspan; i++) {
+                      if (cellIndex + i < maxCols) {
+                        table.getCell(rowIndex, cellIndex + i).value = "";
+                      }
+                    }
+
+                    if (rowspan > 1) {
+                      for (let i = 0; i < colspan; i++) {
+                        if (cellIndex + i < maxCols) {
+                          rowspanTracker[cellIndex + i] = rowspan - 1;
+                        }
+                      }
+                    }
+
+                    cellIndex += colspan;
+                  });
+                });
               }
 
               include(table.getRange());
@@ -2542,7 +2589,7 @@ async function getImages() {
     const aiTags = filteredMentions.filter(m => m.AIFlag === 1);
 
     // Further split non-AI tags into: TEXT + IMAGE
-    const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT" || m.ComponentKeyDataType==="TABLE");
+    const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT" || m.ComponentKeyDataType === "TABLE");
     const imageTags = nonAITags.filter(m => m.ComponentKeyDataType === "IMAGE" && m.IsImage);
 
     const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
