@@ -75,7 +75,7 @@ export function loadHomepage(availableKeys) {
         const aiTags = filteredMentions.filter(m => m.AIFlag === 1);
 
         // Further split non-AI tags into: TEXT + IMAGE
-        const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT");
+        const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT" || m.ComponentKeyDataType === "TABLE");
         const imageTags = nonAITags.filter(m => m.ComponentKeyDataType === "IMAGE" && m.IsImage);
 
         const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
@@ -567,155 +567,202 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
 
 export async function insertTagPrompt(tag) {
-  return Word.run(async (context) => {
-    try {
-      const selection = context.document.getSelection();
-      await context.sync();
+    return Word.run(async (context) => {
+        try {
+            const selection = context.document.getSelection();
+            await context.sync();
 
-      if (!selection) throw new Error("Invalid selection");
+            if (!selection) throw new Error("Invalid selection");
 
-      /* --------------------------------------------------
-         1️⃣ Create invisible anchor at cursor
-      -------------------------------------------------- */
-      const anchorChar = selection.insertText(
-        "\u200B", // zero-width space
-        Word.InsertLocation.replace
-      );
-      await context.sync();
+            /* --------------------------------------------------
+               1️⃣ Create invisible anchor at cursor
+            -------------------------------------------------- */
+            const anchorChar = selection.insertText(
+                "\u200B", // zero-width space
+                Word.InsertLocation.replace
+            );
+            await context.sync();
 
-      let cursor = anchorChar.getRange();
+            let cursor = anchorChar.getRange();
 
-      let bookmarkStart: Word.Range | null = null;
-      let bookmarkEnd: Word.Range | null = null;
+            let bookmarkStart: Word.Range | null = null;
+            let bookmarkEnd: Word.Range | null = null;
 
-      const include = (r: Word.Range) => {
-        if (!bookmarkStart) {
-          bookmarkStart = r.getRange("Start");
-        }
-        bookmarkEnd = r.getRange("End");
-      };
+            const include = (r: Word.Range) => {
+                if (!bookmarkStart) {
+                    bookmarkStart = r.getRange("Start");
+                }
+                bookmarkEnd = r.getRange("End");
+            };
 
-      /* --------------------------------------------------
-         2️⃣ Insert content
-      -------------------------------------------------- */
-      if (tag.ComponentKeyDataType === "TABLE") {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(tag.EditorValue, "text/html");
-        const bodyNodes = Array.from(doc.body.childNodes);
+            /* --------------------------------------------------
+               2️⃣ Insert content
+            -------------------------------------------------- */
+            if (tag.ComponentKeyDataType === "TABLE") {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(tag.EditorValue, "text/html");
+                const bodyNodes = Array.from(doc.body.childNodes);
 
-        for (const node of bodyNodes) {
+                for (const node of bodyNodes) {
 
-          // TEXT NODE
-          if (node.nodeType === Node.TEXT_NODE) {
-            let txt = node.textContent?.trim();
-            if (!txt) continue;
+                    // TEXT NODE
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        let txt = node.textContent?.trim();
+                        if (!txt) continue;
 
-            txt = txt.replace(/\n- /g, "\n• ");
-            for (const line of txt.split("\n")) {
-              if (!line.trim()) continue;
+                        txt = txt.replace(/\n- /g, "\n• ");
+                        for (const line of txt.split("\n")) {
+                            if (!line.trim()) continue;
 
-              const p = cursor.insertParagraph("", Word.InsertLocation.after);
-              insertLineWithHeadingStyle(p, line);
-              include(p.getRange());
-              cursor = p.getRange();
+                            const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                            insertLineWithHeadingStyle(p, line);
+                            include(p.getRange());
+                            cursor = p.getRange();
+                        }
+                    }
+
+                    // ELEMENT NODE
+                    else if (node.nodeType === Node.ELEMENT_NODE) {
+                        const el = node as HTMLElement;
+
+                        // TABLE
+                        if (el.tagName.toLowerCase() === "table") {
+                            const rows = Array.from(el.querySelectorAll("tr"));
+                            if (!rows.length) continue;
+
+                            const maxCols = Math.max(
+                                ...rows.map(r =>
+                                    Array.from(r.querySelectorAll("td, th"))
+                                        .reduce(
+                                            (s, c) => s + parseInt(c.getAttribute("colspan") || "1"),
+                                            0
+                                        )
+                                )
+                            );
+
+                            const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                            const table = p.insertTable(
+                                rows.length,
+                                maxCols,
+                                Word.InsertLocation.after
+                            );
+                            table.style = tableStyle;
+
+                            if (colorPallete.Customize) {
+                                await colorTable(table, rows, context);
+                            } else {
+                                const rowspanTracker: number[] = new Array(maxCols).fill(0);
+
+                                rows.forEach((row, rowIndex) => {
+                                    const cells = Array.from(row.querySelectorAll('td, th'));
+                                    let cellIndex = 0;
+
+                                    cells.forEach((cell) => {
+                                        while (rowspanTracker[cellIndex] > 0) {
+                                            rowspanTracker[cellIndex]--;
+                                            cellIndex++;
+                                        }
+
+                                        const cellText = Array.from(cell.childNodes)
+                                            .map(node => {
+                                                if (node.nodeType === Node.TEXT_NODE) {
+                                                    return node.textContent?.trim() || '';
+                                                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                                    return (node as HTMLElement).innerText.trim();
+                                                }
+                                                return '';
+                                            })
+                                            .filter(text => text.length > 0)
+                                            .join(' ');
+
+                                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+                                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+
+                                        table.getCell(rowIndex, cellIndex).value = cellText;
+
+                                        for (let i = 1; i < colspan; i++) {
+                                            if (cellIndex + i < maxCols) {
+                                                table.getCell(rowIndex, cellIndex + i).value = "";
+                                            }
+                                        }
+
+                                        if (rowspan > 1) {
+                                            for (let i = 0; i < colspan; i++) {
+                                                if (cellIndex + i < maxCols) {
+                                                    rowspanTracker[cellIndex + i] = rowspan - 1;
+                                                }
+                                            }
+                                        }
+
+                                        cellIndex += colspan;
+                                    });
+                                });
+                            }
+
+                            include(table.getRange());
+                            cursor = table.getRange();
+                        }
+
+                        // OTHER HTML ELEMENTS
+                        else {
+                            let txt = el.innerText?.trim();
+                            if (!txt) continue;
+
+                            txt = txt.replace(/\n- /g, "\n• ");
+                            for (const line of txt.split("\n")) {
+                                if (!line.trim()) continue;
+
+                                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                                insertLineWithHeadingStyle(p, line);
+                                include(p.getRange());
+                                cursor = p.getRange();
+                            }
+                        }
+                    }
+                }
             }
-          }
 
-          // ELEMENT NODE
-          else if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement;
-
-            // TABLE
-            if (el.tagName.toLowerCase() === "table") {
-              const rows = Array.from(el.querySelectorAll("tr"));
-              if (!rows.length) continue;
-
-              const maxCols = Math.max(
-                ...rows.map(r =>
-                  Array.from(r.querySelectorAll("td, th"))
-                    .reduce(
-                      (s, c) => s + parseInt(c.getAttribute("colspan") || "1"),
-                      0
-                    )
-                )
-              );
-
-              const p = cursor.insertParagraph("", Word.InsertLocation.after);
-              const table = p.insertTable(
-                rows.length,
-                maxCols,
-                Word.InsertLocation.after
-              );
-              table.style = tableStyle;
-
-              if (colorPallete.Customize) {
-                await colorTable(table, rows, context);
-              }
-
-              include(table.getRange());
-              cursor = table.getRange();
-            }
-
-            // OTHER HTML ELEMENTS
+            // NON-TABLE CONTENT
             else {
-              let txt = el.innerText?.trim();
-              if (!txt) continue;
+                const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
 
-              txt = txt.replace(/\n- /g, "\n• ");
-              for (const line of txt.split("\n")) {
-                if (!line.trim()) continue;
+                for (const line of txt.split("\n")) {
+                    if (!line.trim()) continue;
 
-                const p = cursor.insertParagraph("", Word.InsertLocation.after);
-                insertLineWithHeadingStyle(p, line);
-                include(p.getRange());
-                cursor = p.getRange();
-              }
+                    const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                    insertLineWithHeadingStyle(p, line);
+                    include(p.getRange());
+                    cursor = p.getRange();
+                }
             }
-          }
+
+            await context.sync();
+
+            /* --------------------------------------------------
+               3️⃣ Create ONE bookmark covering everything
+            -------------------------------------------------- */
+            if (bookmarkStart && bookmarkEnd) {
+                const bookmarkName =
+                    `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+
+                bookmarkStart
+                    .expandTo(bookmarkEnd)
+                    .insertBookmark(bookmarkName);
+            }
+
+            /* --------------------------------------------------
+               4️⃣ Remove invisible anchor
+            -------------------------------------------------- */
+            anchorChar.delete();
+
+            await context.sync();
+            toaster("Inserted successfully", "success");
+
+        } catch (err) {
+            console.error(err);
+            toaster("Something went wrong", "error");
         }
-      }
-
-      // NON-TABLE CONTENT
-      else {
-        const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
-
-        for (const line of txt.split("\n")) {
-          if (!line.trim()) continue;
-
-          const p = cursor.insertParagraph("", Word.InsertLocation.after);
-          insertLineWithHeadingStyle(p, line);
-          include(p.getRange());
-          cursor = p.getRange();
-        }
-      }
-
-      await context.sync();
-
-      /* --------------------------------------------------
-         3️⃣ Create ONE bookmark covering everything
-      -------------------------------------------------- */
-      if (bookmarkStart && bookmarkEnd) {
-        const bookmarkName =
-          `ID${tag.ID}_Split_${getDateTimeStamp()}`;
-
-        bookmarkStart
-          .expandTo(bookmarkEnd)
-          .insertBookmark(bookmarkName);
-      }
-
-      /* --------------------------------------------------
-         4️⃣ Remove invisible anchor
-      -------------------------------------------------- */
-      anchorChar.delete();
-
-      await context.sync();
-      toaster("Inserted successfully", "success");
-
-    } catch (err) {
-      console.error(err);
-      toaster("Something went wrong", "error");
-    }
-  });
+    });
 }
 
 export function getDateTimeStamp() {
