@@ -6,30 +6,31 @@ export function insertLineWithHeadingStyle(
   paragraph: Word.Paragraph,
   line: string
 ) {
-  let style = "Normal";
+  let builtInStyle: Word.BuiltInStyleName = Word.BuiltInStyleName.normal;
   let text = line;
 
   if (line.startsWith("###### ")) {
-    style = "Heading 6";
+    builtInStyle = Word.BuiltInStyleName.heading6;
     text = line.substring(7).trim();
   } else if (line.startsWith("##### ")) {
-    style = "Heading 5";
+    builtInStyle = Word.BuiltInStyleName.heading5;
     text = line.substring(6).trim();
   } else if (line.startsWith("#### ")) {
-    style = "Heading 4";
+    builtInStyle = Word.BuiltInStyleName.heading4;
     text = line.substring(5).trim();
   } else if (line.startsWith("### ")) {
-    style = "Heading 3";
+    builtInStyle = Word.BuiltInStyleName.heading3;
     text = line.substring(4).trim();
   } else if (line.startsWith("## ")) {
-    style = "Heading 2";
+    builtInStyle = Word.BuiltInStyleName.heading2;
     text = line.substring(3).trim();
   } else if (line.startsWith("# ")) {
-    style = "Heading 1";
+    builtInStyle = Word.BuiltInStyleName.heading1;
     text = line.substring(2).trim();
   }
 
-  paragraph.style = style;
+  // ✅ THIS is the important line
+  paragraph.styleBuiltIn = builtInStyle;
 
   const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(_(.+?)_)/g;
   let lastIndex = 0;
@@ -275,48 +276,51 @@ export function chatfooter(tag: any) {
 
 export function renderSelectedTags(selectedNames, availableKeys) {
   const badgeWrapper = document.getElementById('tag-badge-wrapper');
-  badgeWrapper.innerHTML = '';
-  // Filter out duplicates (case-insensitive)
-  const uniqueNames = [...new Set(
-    selectedNames.map(name => name.toLowerCase())
-  )].map(lowerName =>
-    selectedNames.find(name => name.toLowerCase() === lowerName)
-  );
+  if (badgeWrapper) {
+    badgeWrapper.innerHTML = '';
+    // Filter out duplicates (case-insensitive)
+    const uniqueNames = [...new Set(
+      selectedNames.map(name => name.toLowerCase())
+    )].map(lowerName =>
+      selectedNames.find(name => name.toLowerCase() === lowerName)
+    );
 
 
-  uniqueNames.forEach(name => {
-    let aiTag;
+    uniqueNames.forEach(name => {
+      let aiTag;
 
-    if (/^ID\d+$/i.test(name)) {
-      aiTag = availableKeys.find(
-        mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
-      );
-    } else {
-      aiTag = availableKeys.find(
-        mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
-      );
-    }
-    if (aiTag?.DisplayName) {
+      if (/^ID\d+$/i.test(name)) {
+        aiTag = availableKeys.find(
+          mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
+        );
+      } else {
+        aiTag = availableKeys.find(
+          mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
+        );
+      }
+      if (aiTag?.DisplayName) {
 
-      const badge = document.createElement('span');
-      badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
-      badge.style.cursor = 'pointer';
-      badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
-      badge.addEventListener('click', async () => {
-        await selectMatchingBookmarkFromSelection(name);
+        const badge = document.createElement('span');
+        badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
+        badge.style.cursor = 'pointer';
+        badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+        badge.addEventListener('click', async () => {
+          await selectMatchingBookmarkFromSelection(name);
 
-        if (aiTag) {
-          const appBody = document.getElementById('app-body');
-          appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+          if (aiTag) {
+            const appBody = document.getElementById('app-body');
+            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-          generateCheckboxHistory(aiTag).then(html => {
-            appBody.innerHTML = html;
-          });
-        }
-      });
-      badgeWrapper.appendChild(badge);
-    }
-  });
+            generateCheckboxHistory(aiTag).then(html => {
+              appBody.innerHTML = html;
+            });
+          }
+        });
+        badgeWrapper.appendChild(badge);
+      }
+    });
+  }
+
 }
 
 
