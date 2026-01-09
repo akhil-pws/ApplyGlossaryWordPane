@@ -4,7 +4,7 @@
  */
 import { dataUrl, storeUrl, versionLink } from "./data";
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, renderSelectedTags, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+import { applyThemeClasses, chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, renderSelectedTags, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -1060,7 +1060,10 @@ export async function applyAITagFn(
                 Word.InsertLocation.after
               );
 
-              table.style = tableStyle;
+              const resolvedTableStyle = resolveWordTableStyle(tableStyle);
+              if (resolvedTableStyle !== 'none') {
+                table.style = resolvedTableStyle;
+              }
 
               if (colorPallete.Customize) {
                 await colorTable(table, rows, context);

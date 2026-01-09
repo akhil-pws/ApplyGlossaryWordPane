@@ -343,3 +343,100 @@ export const wordTableStyles = [
     "sideHeader": true
   }
 ]
+
+
+export const wordTableStyleLocales: Record<
+  "en" | "de" ,
+  Record<string, string>
+> = {
+  en: {
+    "Table Grid": "Table Grid",
+    "Plain Table 1": "Plain Table 1",
+
+    "Grid Table 2": "Grid Table 2",
+    "Grid Table 2 - Accent 1": "Grid Table 2 - Accent 1",
+    "Grid Table 2 - Accent 2": "Grid Table 2 - Accent 2",
+    "Grid Table 2 - Accent 3": "Grid Table 2 - Accent 3",
+    "Grid Table 2 - Accent 4": "Grid Table 2 - Accent 4",
+    "Grid Table 2 - Accent 5": "Grid Table 2 - Accent 5",
+    "Grid Table 2 - Accent 6": "Grid Table 2 - Accent 6",
+
+    "List Table 3": "List Table 3",
+    "List Table 3 - Accent 1": "List Table 3 - Accent 1",
+    "List Table 3 - Accent 2": "List Table 3 - Accent 2",
+    "List Table 3 - Accent 3": "List Table 3 - Accent 3",
+    "List Table 3 - Accent 4": "List Table 3 - Accent 4",
+    "List Table 3 - Accent 5": "List Table 3 - Accent 5",
+    "List Table 3 - Accent 6": "List Table 3 - Accent 6",
+
+    "Grid Table 4": "Grid Table 4",
+    "Grid Table 4 - Accent 1": "Grid Table 4 - Accent 1",
+    "Grid Table 4 - Accent 2": "Grid Table 4 - Accent 2",
+    "Grid Table 4 - Accent 3": "Grid Table 4 - Accent 3",
+    "Grid Table 4 - Accent 4": "Grid Table 4 - Accent 4",
+    "Grid Table 4 - Accent 5": "Grid Table 4 - Accent 5",
+    "Grid Table 4 - Accent 6": "Grid Table 4 - Accent 6",
+
+    "Grid Table 5 Dark": "Grid Table 5 Dark",
+    "Grid Table 5 Dark - Accent 1": "Grid Table 5 Dark - Accent 1",
+    "Grid Table 5 Dark - Accent 2": "Grid Table 5 Dark - Accent 2",
+    "Grid Table 5 Dark - Accent 3": "Grid Table 5 Dark - Accent 3",
+    "Grid Table 5 Dark - Accent 4": "Grid Table 5 Dark - Accent 4",
+    "Grid Table 5 Dark - Accent 5": "Grid Table 5 Dark - Accent 5",
+    "Grid Table 5 Dark - Accent 6": "Grid Table 5 Dark - Accent 6",
+
+    "List Table 5 Dark": "List Table 5 Dark",
+    "List Table 5 Dark - Accent 1": "List Table 5 Dark - Accent 1",
+    "List Table 5 Dark - Accent 2": "List Table 5 Dark - Accent 2",
+    "List Table 5 Dark - Accent 3": "List Table 5 Dark - Accent 3",
+    "List Table 5 Dark - Accent 4": "List Table 5 Dark - Accent 4",
+    "List Table 5 Dark - Accent 5": "List Table 5 Dark - Accent 5",
+    "List Table 5 Dark - Accent 6": "List Table 5 Dark - Accent 6"
+  },
+
+  /* ===================== GERMAN ===================== */
+  de: {
+    "Table Grid": "Tabellengitter",
+    "Plain Table 1": "Einfache Tabelle 1",
+
+    "Grid Table 2": "Gitternetztabelle 2",
+    "Grid Table 2 - Accent 1": "Gitternetztabelle 2 – Akzent 1",
+    "Grid Table 2 - Accent 2": "Gitternetztabelle 2 – Akzent 2",
+    "Grid Table 2 - Accent 3": "Gitternetztabelle 2 – Akzent 3",
+    "Grid Table 2 - Accent 4": "Gitternetztabelle 2 – Akzent 4",
+    "Grid Table 2 - Accent 5": "Gitternetztabelle 2 – Akzent 5",
+    "Grid Table 2 - Accent 6": "Gitternetztabelle 2 – Akzent 6",
+
+    "List Table 3": "Listentabelle 3",
+    "List Table 3 - Accent 1": "Listentabelle 3 – Akzent 1",
+    "List Table 3 - Accent 2": "Listentabelle 3 – Akzent 2",
+    "List Table 3 - Accent 3": "Listentabelle 3 – Akzent 3",
+    "List Table 3 - Accent 4": "Listentabelle 3 – Akzent 4",
+    "List Table 3 - Accent 5": "Listentabelle 3 – Akzent 5",
+    "List Table 3 - Accent 6": "Listentabelle 3 – Akzent 6",
+
+    "Grid Table 4": "Gitternetztabelle 4",
+    "Grid Table 4 - Accent 1": "Gitternetztabelle 4 – Akzent 1",
+    "Grid Table 4 - Accent 2": "Gitternetztabelle 4 – Akzent 2",
+    "Grid Table 4 - Accent 3": "Gitternetztabelle 4 – Akzent 3",
+    "Grid Table 4 - Accent 4": "Gitternetztabelle 4 – Akzent 4",
+    "Grid Table 4 - Accent 5": "Gitternetztabelle 4 – Akzent 5",
+    "Grid Table 4 - Accent 6": "Gitternetztabelle 4 – Akzent 6",
+
+    "Grid Table 5 Dark": "Gitternetztabelle 5 dunkel",
+    "Grid Table 5 Dark - Accent 1": "Gitternetztabelle 5 dunkel  – Akzent 1",
+    "Grid Table 5 Dark - Accent 2": "Gitternetztabelle 5 dunkel  – Akzent 2",
+    "Grid Table 5 Dark - Accent 3": "Gitternetztabelle 5 dunkel  – Akzent 3",
+    "Grid Table 5 Dark - Accent 4": "Gitternetztabelle 5 dunkel  – Akzent 4",
+    "Grid Table 5 Dark - Accent 5": "Gitternetztabelle 5 dunkel  – Akzent 5",
+    "Grid Table 5 Dark - Accent 6": "Gitternetztabelle 5 dunkel  – Akzent 6",
+
+    "List Table 5 Dark": "Listentabelle 5 dunkel",
+    "List Table 5 Dark - Accent 1": "Listentabelle 5 dunkel  – Akzent 1",
+    "List Table 5 Dark - Accent 2": "Listentabelle 5 dunkel  – Akzent 2",
+    "List Table 5 Dark - Accent 3": "Listentabelle 5 dunkel  – Akzent 3",
+    "List Table 5 Dark - Accent 4": "Listentabelle 5 dunkel  – Akzent 4",
+    "List Table 5 Dark - Accent 5": "Listentabelle 5 dunkel  – Akzent 5",
+    "List Table 5 Dark - Accent 6": "Listentabelle 5 dunkel  – Akzent 6"
+  },
+};
