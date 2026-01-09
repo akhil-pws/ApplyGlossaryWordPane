@@ -1,5 +1,6 @@
 import { toaster } from "./components/bodyelements";
 import { generateCheckboxHistory } from "./components/home";
+import { wordTableStyleLocales } from "./components/tablestyles";
 import { colorPallete, tableStyle, theme, UserRole } from "./taskpane";
 
 export function insertLineWithHeadingStyle(
@@ -704,4 +705,15 @@ export async function svgBase64ToPngBase64(svgBase64: string): Promise<string> {
       reject(err);
     }
   });
+}
+
+export function resolveWordTableStyle(englishStyle: string): string {
+  const lang =
+    Office.context.displayLanguage?.toLowerCase().slice(0, 2) || "en";
+
+  return (
+    wordTableStyleLocales[lang]?.[englishStyle] ??
+    wordTableStyleLocales.en[englishStyle] ??
+    'none'
+  );
 }

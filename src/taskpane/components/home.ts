@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64 } from "../functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle } from "../functions";
 import { addGenAITags, aiTagList, applyTagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
 import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
 
@@ -218,7 +218,10 @@ export async function replaceMention(word: any, type: any) {
                             await context.sync();
 
                             const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            table.style = tableStyle;  // Apply built-in Word table style
+                            const resolvedTableStyle = resolveWordTableStyle(tableStyle);
+                            if (resolvedTableStyle !== 'none') {
+                                table.style = resolvedTableStyle;
+                            }  // Apply built-in Word table style
 
                             await context.sync();
                             if (colorPallete.Customize) {
@@ -646,7 +649,10 @@ export async function insertTagPrompt(tag) {
                                 maxCols,
                                 Word.InsertLocation.after
                             );
-                            table.style = tableStyle;
+                            const resolvedTableStyle = resolveWordTableStyle(tableStyle);
+                            if (resolvedTableStyle !== 'none') {
+                                table.style = resolvedTableStyle;
+                            }
 
                             if (colorPallete.Customize) {
                                 await colorTable(table, rows, context);
