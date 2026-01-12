@@ -649,6 +649,7 @@ export async function insertTagPrompt(tag) {
                                 maxCols,
                                 Word.InsertLocation.after
                             );
+
                             const resolvedTableStyle = resolveWordTableStyle(tableStyle);
                             if (resolvedTableStyle !== 'none') {
                                 table.style = resolvedTableStyle;

@@ -398,7 +398,9 @@ export const wordTableStyleLocales: Record<
   de: {
     "Table Grid": "Tabellengitter",
     "Plain Table 1": "Einfache Tabelle 1",
-
+    "Plain Table 2": "Einfache Tabelle 2",
+    "Plain Table 3":"Einfache Tabelle 3",
+    "Plain Table 5" : "Einfache Tabelle 5",
     "Grid Table 2": "Gitternetztabelle 2",
     "Grid Table 2 - Accent 1": "Gitternetztabelle 2 – Akzent 1",
     "Grid Table 2 - Accent 2": "Gitternetztabelle 2 – Akzent 2",
@@ -407,6 +409,7 @@ export const wordTableStyleLocales: Record<
     "Grid Table 2 - Accent 5": "Gitternetztabelle 2 – Akzent 5",
     "Grid Table 2 - Accent 6": "Gitternetztabelle 2 – Akzent 6",
 
+    "List Table 2": "Listentabelle 2",
     "List Table 3": "Listentabelle 3",
     "List Table 3 - Accent 1": "Listentabelle 3 – Akzent 1",
     "List Table 3 - Accent 2": "Listentabelle 3 – Akzent 2",
