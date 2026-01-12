@@ -1069,10 +1069,14 @@ export async function applyAITagFn(
                 await colorTable(table, rows, context);
               } else {
                 const rowspanTracker: number[] = new Array(maxCols).fill(0);
+                let lastParamRowIndex = -1; // row index of last non-empty Parameter cell
 
                 rows.forEach((row, rowIndex) => {
                   const cells = Array.from(row.querySelectorAll('td, th'));
                   let cellIndex = 0;
+
+                  // track first column text in HTML row
+                  let firstColText = "";
 
                   cells.forEach((cell) => {
                     while (rowspanTracker[cellIndex] > 0) {
@@ -1095,14 +1099,21 @@ export async function applyAITagFn(
                     const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
                     const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
 
+                    // save first column text if this is first column
+                    if (cellIndex === 0) {
+                      firstColText = cellText.trim();
+                    }
+
                     table.getCell(rowIndex, cellIndex).value = cellText;
 
+                    // colspan blank filling
                     for (let i = 1; i < colspan; i++) {
                       if (cellIndex + i < maxCols) {
                         table.getCell(rowIndex, cellIndex + i).value = "";
                       }
                     }
 
+                    // rowspan tracking
                     if (rowspan > 1) {
                       for (let i = 0; i < colspan; i++) {
                         if (cellIndex + i < maxCols) {
@@ -1113,7 +1124,36 @@ export async function applyAITagFn(
 
                     cellIndex += colspan;
                   });
+
+                  // ✅ AFTER filling the row → apply merge logic for 1st column
+                  if (rowIndex === 0) {
+                    // header row typically
+                    return;
+                  }
+
+                  if (firstColText) {
+                    // new parameter starts
+                    lastParamRowIndex = rowIndex;
+                  } else {
+                    // empty parameter row → merge vertically with previous parameter row
+                    if (lastParamRowIndex !== -1) {
+                      const topCell = table.getCell(lastParamRowIndex, 0);
+                      const bottomCell = table.getCell(rowIndex, 0);
+
+                      // merge bottom into top
+                      topCell.merge(bottomCell);
+
+                      // ✅ center align merged cell
+                      try {
+                        topCell.verticalAlignment = Word.VerticalAlignment.center;
+                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+                      } catch (e) {
+                        // ignore (safe fallback)
+                      }
+                    }
+                  }
                 });
+
               }
 
               include(table.getRange());

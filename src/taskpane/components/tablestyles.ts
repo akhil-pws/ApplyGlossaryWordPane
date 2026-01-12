@@ -351,6 +351,7 @@ export const wordTableStyleLocales: Record<
 > = {
   en: {
     "Table Grid": "Table Grid",
+    "Table Grid 1": "Table Grid",
     "Plain Table 1": "Plain Table 1",
 
     "Grid Table 2": "Grid Table 2",
@@ -397,6 +398,7 @@ export const wordTableStyleLocales: Record<
   /* ===================== GERMAN ===================== */
   de: {
     "Table Grid": "Tabellenraster",
+    "Table Grid 1": "Tabellenraster",
     "Plain Table 1": "Einfache Tabelle 1",
     "Plain Table 2": "Einfache Tabelle 2",
     "Plain Table 3":"Einfache Tabelle 3",

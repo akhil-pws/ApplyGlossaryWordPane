@@ -406,20 +406,60 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
 }
 
 export async function colorTable(table: any, rows: any, context: any) {
-  // Copy cell values from DOM table to Word table
+
+  // ------------------------------------------------------------
+  // 1) Copy cell values DOM -> Word + MERGE FIRST COLUMN GROUPS
+  // ------------------------------------------------------------
+  let lastParamRowIndex = -1; // last row index where 1st col had value
+
   rows.forEach((row, rowIndex) => {
     const cells = Array.from(row.querySelectorAll("td, th"));
     let cellIndex = 0;
 
+    let firstColText = "";
+
     cells.forEach((cell) => {
       const text = cell.innerText.trim();
+
+      // capture first column text
+      if (cellIndex === 0) {
+        firstColText = text;
+      }
+
       table.getCell(rowIndex, cellIndex).value = text;
       cellIndex++;
     });
+
+    // ✅ Merge first column when empty (skip header row)
+    if (rowIndex > 0) {
+      if (firstColText) {
+        // new group starts
+        lastParamRowIndex = rowIndex;
+      } else {
+        // empty first col = merge with last non-empty parameter row
+        if (lastParamRowIndex !== -1) {
+          const topCell = table.getCell(lastParamRowIndex, 0);
+          const bottomCell = table.getCell(rowIndex, 0);
+
+          topCell.merge(bottomCell);
+
+          // ✅ center align merged parameter cell
+          try {
+            topCell.verticalAlignment = Word.VerticalAlignment.center;
+            topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
   });
+
   await context.sync();
 
-  // Load rows for formatting
+  // ------------------------------------------------------------
+  // 2) Load rows for formatting
+  // ------------------------------------------------------------
   table.rows.load("items");
   await context.sync();
 
@@ -464,6 +504,10 @@ export async function colorTable(table: any, rows: any, context: any) {
 
   // Determine base table type
   const base = tableStyle.split(" - ")[0].trim();
+
+  // ------------------------------------------------------------
+  // Plain Table 3
+  // ------------------------------------------------------------
   if (base === "Plain Table 3") {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
@@ -482,11 +526,13 @@ export async function colorTable(table: any, rows: any, context: any) {
 
         applyColor(cell, bgColor);
         applyBoldIfNeeded(cell, rowIndex, cellIndex);
-
       });
     });
   }
 
+  // ------------------------------------------------------------
+  // Plain Table 2
+  // ------------------------------------------------------------
   else if (base === "Plain Table 2") {
 
     table.rows.items.forEach(row => row.cells.load("items"));
@@ -496,9 +542,7 @@ export async function colorTable(table: any, rows: any, context: any) {
     const firstGapIndex = 0;             // gap between row 0 and row 1
     const lastGapIndex = rowCount - 1;   // gap between last-2 and last row
 
-    // --------------------------------------------
     // STEP 2 — Turn OFF all gaps EXCEPT first + last
-    // --------------------------------------------
     table.rows.items.forEach((row, rowIndex) => {
       // rowIndex = gap BELOW this row
       if (rowIndex !== firstGapIndex && rowIndex !== lastGapIndex) {
@@ -526,6 +570,10 @@ export async function colorTable(table: any, rows: any, context: any) {
 
     await context.sync();
   }
+
+  // ------------------------------------------------------------
+  // Plain Table 5
+  // ------------------------------------------------------------
   else if (base === "Plain Table 5") {
     table.getBorder(Word.BorderLocation.insideVertical).type = Word.BorderType.none;
 
@@ -550,9 +598,8 @@ export async function colorTable(table: any, rows: any, context: any) {
     });
   }
 
-
   // ------------------------------------------------------------
-  // 3) Plain Table (your original logic — UNCHANGED)
+  // Table Grid
   // ------------------------------------------------------------
   else if (base === "Table Grid") {
     table.rows.items.forEach(row => row.cells.load("items"));
@@ -563,11 +610,35 @@ export async function colorTable(table: any, rows: any, context: any) {
       row.cells.items.forEach((cell, cellIndex) => {
         applyBoldIfNeeded(cell, i, cellIndex);
       });
+
     });
   }
+  else if (base === "Table Grid 1") {
+    table.rows.items.forEach(r => r.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, i) => {
+      const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
+      applyColor(row, bg);
+
+      row.cells.items.forEach((cell, cellIndex) => {
+        applyBoldIfNeeded(cell, i, cellIndex);
+      });
+    });
+
+    // ✅ ONE full width double border under header row
+    const headerRow = table.rows.items[0];
+    const bottom = headerRow.getBorder(Word.BorderLocation.bottom);
+    bottom.type = Word.BorderType.double;
+    bottom.width = 0.5;
+    bottom.color = "000000";
+
+    await context.sync();
+  }
+
 
   // ------------------------------------------------------------
-  // 4) Grid Table 4 (UNCHANGED)
+  // Grid Table 4
   // ------------------------------------------------------------
   else if (base.startsWith("Grid Table 4")) {
     const headerRow = table.rows.items[0];
@@ -585,6 +656,10 @@ export async function colorTable(table: any, rows: any, context: any) {
       });
     });
   }
+
+  // ------------------------------------------------------------
+  // Grid Table 5 Dark
+  // ------------------------------------------------------------
   else if (base.startsWith("Grid Table 5 Dark")) {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
@@ -606,6 +681,10 @@ export async function colorTable(table: any, rows: any, context: any) {
       });
     });
   }
+
+  // ------------------------------------------------------------
+  // List Table 3
+  // ------------------------------------------------------------
   else if (base.startsWith("List Table 3")) {
     const headerRow = table.rows.items[0];
     applyColor(headerRow, colorPallete.Header);
@@ -620,6 +699,9 @@ export async function colorTable(table: any, rows: any, context: any) {
     });
   }
 
+  // ------------------------------------------------------------
+  // List Table 2
+  // ------------------------------------------------------------
   else if (base.startsWith("List Table 2")) {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
@@ -641,12 +723,17 @@ export async function colorTable(table: any, rows: any, context: any) {
       });
     });
   }
+
+  // ------------------------------------------------------------
+  // default
+  // ------------------------------------------------------------
   else {
     table.rows.items.forEach((row) => applyColor(row, colorPallete.Primary));
   }
 
   await context.sync();
 }
+
 
 export function mapImagesToComponentObjects(input: any): any[] {
   if (!input) return [];
