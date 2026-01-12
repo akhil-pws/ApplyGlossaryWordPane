@@ -396,7 +396,7 @@ export const wordTableStyleLocales: Record<
 
   /* ===================== GERMAN ===================== */
   de: {
-    "Table Grid": "Tabellengitter",
+    "Table Grid": "Tabellenraster",
     "Plain Table 1": "Einfache Tabelle 1",
     "Plain Table 2": "Einfache Tabelle 2",
     "Plain Table 3":"Einfache Tabelle 3",
