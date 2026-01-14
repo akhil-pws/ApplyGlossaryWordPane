@@ -605,7 +605,7 @@ export async function colorTable(table: any, rows: any, context: any) {
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
     table.rows.items.forEach((row, i) => {
-      const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
+      const bg = colorPallete.Header;
       applyColor(row, bg);
       row.cells.items.forEach((cell, cellIndex) => {
         applyBoldIfNeeded(cell, i, cellIndex);
@@ -618,7 +618,7 @@ export async function colorTable(table: any, rows: any, context: any) {
     await context.sync();
 
     table.rows.items.forEach((row, i) => {
-      const bg = i % 2 === 0 ? colorPallete.Header : colorPallete.Primary;
+      const bg = colorPallete.Header;
       applyColor(row, bg);
 
       row.cells.items.forEach((cell, cellIndex) => {
