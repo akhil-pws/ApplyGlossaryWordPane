@@ -1,129 +1,97 @@
-/*
- * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
- * See LICENSE in the project root for license information.
- */
-import { dataUrl, storeUrl, versionLink } from "./data";
-import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./components/home";
-import { applyThemeClasses, chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, renderSelectedTags, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, swicthThemeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./functions";
+// Imports
+import { CONFIG } from "./utils/config";
+import { AuthService } from "./services/auth.service";
+import { DocumentService } from "./services/document.service";
+import { UIService } from "./services/ui.service";
+import { StoreService } from "./services/store.service";
+import { AIService } from "./services/ai.service";
+// Note: GlossaryService import removed if unused or moved
+
+// Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
+import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
-export let jwt = '';
-export let UserRole: any = {};
-let storedUrl = storeUrl
-let documentID = ''
-let organizationName = ''
-export let aiTagList = [];
-export let imageList = [];
-let initialised = true;
-export let availableKeys = [];
-let promptBuilderList = [];
-let glossaryName = ''
-let isGlossaryActive: boolean = false;
-let GroupName: string = '';
-let layTerms = [];
-let dataList: any = []
-let isTagUpdating: boolean = false;
-let capturedFormatting: any = {};
-let emptyFormat: boolean = false;
-let isNoFormatTextAvailable: boolean = false;
-let clientId = '0';
-let userId = 0;
-let clientList = [];
-let version = versionLink;
-let currentYear = new Date().getFullYear();
-export let sourceList;
-let filteredGlossaryTerm;
-export let selectedNames = [];
-export let isPendingResponse = false;
-export let theme = 'Light';
-export let tableStyle = 'Plain Table 5';
-export let colorPallete: any = {
-  "Header": '#FFFFFF',
-  "Primary": '#FFFFFF',
-  "Secondary": '#FFFFFF',
-  "Customize": true,
-  "IsHeaderBold": true,
-  "IsSideHeaderBold": false
-};
-
-export let customTableStyle = [];
-
-/* global document, Office, Word */
-
-window.addEventListener('hashchange', () => {
-  const hash = window.location.hash;
-  if (hash === '#/dashboard' && initialised) {
-    initialised = false;
-    displayMenu();
-
-  }
-});
-
+import { renderSelectedTags } from "./draft/draft-functions";
+import { loadSummarypage } from "./summary/summary";
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Word) {
     document.getElementById("app-body").style.display = "flex";
-    document.getElementById("footer").innerText = `© ${currentYear} - TrialAssure LINK AI Assistant ${version}`
-    const editor = document.getElementById('editor');
+    document.getElementById("footer").innerText = `© ${new Date().getFullYear()} - TrialAssure LINK AI Assistant ${CONFIG.version}`;
 
-    window.location.hash = '#/login';
-    retrieveDocumentProperties()
+    // Initialize Services
+    // AuthService.init(); // if needed
 
-    Office.context.document.addHandlerAsync(
-      Office.EventType.DocumentSelectionChanged,
-      () => {
-        logBookmarksInSelection();
-      }
-    );
-  }
-});
+    // Retrieve Properties via Service
+    DocumentService.retrieveDocumentProperties().then((props) => {
+      if (props) {
+        // Update local state for legacy compatibility
+        // documentID = props.documentID; // Moved to Store
+        // organizationName = props.organizationName; // Moved to Store
+        const store = StoreService.getInstance();
+        store.documentID = props.documentID;
+        store.organizationName = props.organizationName;
 
+        // Check Session
+        const session = AuthService.restoreSession();
+        if (session) {
+          // Restore session state
+          store.jwt = session.jwt;
+          store.UserRole = session.userRole;
+          if (session.tableStyle) store.tableStyle = session.tableStyle;
+          if (session.colorPallete) store.colorPallete = session.colorPallete;
 
-// Example usage:
+          window.location.hash = '#/dashboard';
+          toaster('You are successfully logged in', 'success');
+          displayMenu(); // Trigger legacy menu display
+        } else {
+          loadLoginPage();
+        }
 
-
-
-async function retrieveDocumentProperties() {
-  try {
-    await Word.run(async (context) => {
-      const properties = context.document.properties.customProperties;
-      properties.load("items");
-
-      await context.sync();
-      const property = properties.items.find(prop => prop.key === 'DocumentID');
-      const orgName = properties.items.find(prop => prop.key === 'Organization');
-      if (property && orgName) {
-        documentID = property.value;
-        organizationName = orgName.value;
-        login()
       } else {
         document.getElementById('app-body').innerHTML = `
         <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
         console.log(`Custom property "documentID" not found.`);
-        return null;
       }
+    }).catch(err => {
+      console.error("Failed to initialize", err);
     });
-  } catch (error) {
-    console.error("Error retrieving custom property:", error);
-  }
 
+    // Restore theme preference from sessionStorage
+    const store = StoreService.getInstance();
+    const savedTheme = sessionStorage.getItem('theme');
+    if (savedTheme) {
+      store.theme = savedTheme;
+      UIService.applyTheme(savedTheme as 'Light' | 'Dark');
+    }
+
+    // Setup UI
+    setupEventHandlers();
+  }
+});
+
+function setupEventHandlers() {
+  // Porting event listeners
+  document.getElementById("login-btn")?.addEventListener("click", handleLogin);
 }
 
 async function login() {
   // document.getElementById('header').innerHTML = ``
   const sessionToken = sessionStorage.getItem('token');
+  const store = StoreService.getInstance();
   if (sessionToken) {
-    UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
-    jwt = sessionToken;
+    store.UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
+    store.jwt = sessionToken;
     window.location.hash = '#/dashboard';
     const style = sessionStorage.getItem('tableStyle');
     if (style) {
-      tableStyle = style;
+      store.tableStyle = style;
     }
     const localPallete = sessionStorage.getItem('colorPallete');
     if (localPallete) {
-      colorPallete = JSON.parse(localPallete);
+      store.colorPallete = JSON.parse(localPallete);
     }
 
   } else {
@@ -132,93 +100,51 @@ async function login() {
 }
 
 function loadLoginPage() {
-
-  document.getElementById('logo-header').innerHTML = `
-  <img id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo">
-  <div class="icon-nav me-3">
-    <span id="theme-toggle"><i class="fa fa-moon c-pointer me-3"  title="Toggle Theme"></i><span>
-  </div>
-`;
-
-  document.getElementById('app-body').innerHTML = `
-    <div class="container pt-2">
-      <form id="login-form" class="p-4 border rounded">
-        <div class="mb-3">
-          <label for="organization" class="form-label fw-bold">Organization</label>
-          <input type="text" class="form-control" id="organization" required>
-        </div>
-        <div class="mb-3">
-          <label for="username" class="form-label fw-bold">Username</label>
-          <input type="text" class="form-control" id="username" required>
-        </div>
-        <div class="mb-3">
-          <label for="password" class="form-label fw-bold">Password</label>
-          <input type="password" class="form-control" id="password" required>
-        </div>
-        <div class="d-grid">
-          <button type="submit" class="btn btn-primary bg-primary-clr">Login</button>
-        </div>
-      <div id="login-error" class="mt-3 text-danger" style="display: none;"></div>
-
-      </form>
-    </div>
-  `;
-  document.getElementById('theme-toggle').addEventListener('click', () => {
-    theme = theme === 'Light' ? 'Dark' : 'Light';
-    applyThemeClasses(theme)
-
-    document.body.classList.toggle('dark-theme', theme === 'Dark');
-    document.body.classList.toggle('light-theme', theme === 'Light');
-    swicthThemeIcon()
-  }
-  );
-  document.getElementById('login-form').addEventListener('submit', handleLogin);
+  const store = StoreService.getInstance();
+  UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
+    store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
+    UIService.applyTheme(store.theme as 'Light' | 'Dark');
+    sessionStorage.setItem('theme', store.theme);
+  });
 }
 
 async function handleLogin(event) {
   event.preventDefault();
 
-  // Get the values from the form fields
   const organization = (document.getElementById('organization') as HTMLInputElement).value;
   const username = (document.getElementById('username') as HTMLInputElement).value;
   const password = (document.getElementById('password') as HTMLInputElement).value;
-  if (organization.toLowerCase().trim() === organizationName.toLocaleLowerCase().trim()) {
-    document.getElementById('app-body').innerHTML = `
-  <div id="button-container">
 
-          <div class="loader" id="loader"></div>
-          </div
-`
-    try {
-      const data = await loginUser(organization, username, password);
-      if (data.Status === true && data['Data']) {
-        if (data['Data'].ResponseStatus) {
-          jwt = data.Data.Token;
-          const style = sessionStorage.getItem('tableStyle');
-          if (style) {
-            tableStyle = style;
-          }
+  const store = StoreService.getInstance();
 
-          const localPallete = sessionStorage.getItem('colorPallete');
-          if (localPallete) {
-            colorPallete = JSON.parse(localPallete);
-          }
-          UserRole = data.Data.UserRole;
-          sessionStorage.setItem('userRole', JSON.stringify(data.Data.UserRole));
-          sessionStorage.setItem('token', jwt)
-          sessionStorage.setItem('userId', data.Data.ID);
-          toaster('You are successfully logged in', 'success');
-          window.location.hash = '#/dashboard';
-        } else {
-          showLoginError("An error occurred during login. Please try again.")
-        }
-      } else {
-        showLoginError("An error occurred during login. Please try again.")
-      }
-    } catch (error) {
-      showLoginError("An error occurred during login. Please try again.")
-      console.error('Error during login:', error);
-      // Handle login error (e.g., show an error message)
+  if (organization.toLowerCase().trim() === store.organizationName.toLocaleLowerCase().trim()) {
+    UIService.toggleLoader(true);
+
+    // Use AuthService
+    const result = await AuthService.login(organization, username, password);
+
+    // Hide loader is handled by UI replacement or overwrite below? 
+    // Legacy code overwrote app-body with loader, so we need to be careful.
+    // Actually, legacy code replaced innerHTML with loader. calling displayMenu() replaces it again.
+
+    if (result.success) {
+      const data = result.data;
+      const store = StoreService.getInstance();
+      store.jwt = data.token;
+      store.UserRole = data.userRole;
+
+      // Preserve legacy logic for style restoring if it was there
+      const style = sessionStorage.getItem('tableStyle');
+      if (style) store.tableStyle = style;
+
+      const localPallete = sessionStorage.getItem('colorPallete');
+      if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+      toaster('You are successfully logged in', 'success');
+      displayMenu();
+      window.location.hash = '#/dashboard';
+    } else {
+      showLoginError(result.message || "Login failed");
     }
   } else {
     showLoginError("The organization specified is not associated with this document")
@@ -233,19 +159,21 @@ function showLoginError(message) {
 }
 
 function displayMenu() {
-  userId = Number(sessionStorage.getItem('userId'))
+  const store = StoreService.getInstance();
+  store.userId = Number(sessionStorage.getItem('userId'))
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument('Init');
 
 }
 
 async function getTableStyle() {
-  const tableStyleObj = await getAllCustomTables(jwt);
-  customTableStyle = tableStyleObj['Data'];
-  const selectedTable = customTableStyle.find(style => style.ID === dataList.TableCustomizationID);
+  const store = StoreService.getInstance();
+  const tableStyleObj = await getAllCustomTables(store.jwt);
+  store.customTableStyle = tableStyleObj['Data'];
+  const selectedTable = store.customTableStyle.find(style => style.ID === store.dataList.TableCustomizationID);
   if (selectedTable) {
     sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
-    colorPallete = {
+    store.colorPallete = {
       "Header": selectedTable.Setting.HeaderColor,
       "Primary": selectedTable.Setting.PrimaryColor,
       "Secondary": selectedTable.Setting.SecondaryColor,
@@ -253,169 +181,109 @@ async function getTableStyle() {
       "IsHeaderBold": selectedTable.Setting.IsHeaderBold,
       "IsSideHeaderBold": selectedTable.Setting.IsSideHeaderBold
     };
-    tableStyle = selectedTable.Setting.BaseStyle;
+    store.tableStyle = selectedTable.Setting.BaseStyle;
   }
 
 }
 
 async function fetchDocument(action) {
+  UIService.toggleLoader(true);
   try {
+    const store = StoreService.getInstance();
+    const userId = sessionStorage.getItem('userId') || '0';
+    const reportData = await DocumentService.loadReportData(store.documentID, store.jwt, userId);
 
-    const data = await getReportById(documentID, jwt);
+    // Assign to store
+    store.dataList = reportData.dataList;
+    await getTableStyle();
+    await loadPromptTemplates();
+    store.availableKeys = reportData.availableKeys;
+    store.sourceList = reportData.sourceList;
+    store.clientId = reportData.clientId;
+    // Global Assignment
+    store.aiTagList = reportData.aiTagList;
+    store.imageList = reportData.imageList;
+    store.clientList = reportData.clientList;
+    // promptBuilderList = reportData.promptBuilderList;
 
-    document.getElementById('app-body').innerHTML = ``
-    document.getElementById('logo-header').innerHTML = logoheader(storedUrl);
-
-    dataList = data['Data'];
-    const ts = sessionStorage.getItem('tableStyle');
-    if (ts) {
-      tableStyle = ts;
-    } else {
-      tableStyle = 'Plain Table 5';
+    // Handle Side Effects
+    if (action === 'AIpanel' || action === 'Refresh' || action === 'Init') {
+      if (store.mode === "Home") loadHomepage(store.availableKeys);
+      if (store.mode === "Summary") loadSummarypage(store.availableKeys);
     }
 
-    const cp = sessionStorage.getItem('colorPallete');
-    if (cp) {
-      colorPallete = JSON.parse(cp);
-    } else {
-      colorPallete = {
-        "Header": '#FFFFFF',
-        "Primary": '#FFFFFF',
-        "Secondary": '#FFFFFF',
-        "Customize": true,
-        "IsHeaderBold": true,
-        "IsSideHeaderBold": false
-      };
+    // Render navigation header
+    const logoHeaderEl = document.getElementById('logo-header');
+    if (logoHeaderEl) {
+      logoHeaderEl.innerHTML = logoheader(CONFIG.storeUrl);
     }
 
-    getTableStyle();
-    sourceList = dataList?.SourceTypeList?.filter(
-      (item) => item.SourceValue !== ''
-        && item.AIFlag === 1
-    ).map((item) => ({
-      ...item, // Spread the existing properties
-      SourceName: decodeURIComponent(transformDocumentName(item.SourceValue))
-    }));
-    clientId = dataList.ClientID;
-    const aiGroup = data['Data'].Group.find(element => element.DisplayName === 'AIGroup');
-    GroupName = aiGroup ? aiGroup.Name : '';
-    aiTagList = aiGroup ? aiGroup.GroupKey : [];
+    switchModeIcon();
+    UIService.toggleLoader(false);
+
+    // Fetch images in background
     getImages();
-    availableKeys = data['Data'].GroupKeyAll.filter(element => element.ComponentKeyDataType === 'TABLE' || element.ComponentKeyDataType === 'TEXT' || element.ComponentKeyDataType === 'TEXT');
-    availableKeys.forEach((key) => {
-      if (key.AIFlag === 1) {
-        const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
 
-        let match;
-        if ((match = regex.exec(key.EditorValue) !== null)) {
-          {
-            key.EditorValue = updateEditorFinalTable(key.EditorValue);
-            key.UserValue = key.EditorValue;
-            key.InitialTable = true;
-            key.ComponentKeyDataType = 'TABLE';
-          }
-
+    // Event Wiring
+    UIService.attachDashboardEvents({
+      onHome: async () => {
+        if (!store.isPendingResponse) {
+          if (store.isGlossaryActive) await removeMatchingContentControls();
+          loadHomepage(store.availableKeys);
+        }
+        store.mode = 'Home';
+        switchModeIcon();
+      },
+      onSummary: async () => {
+        if (!store.isPendingResponse) {
+          if (store.isGlossaryActive) await removeMatchingContentControls();
+          loadSummarypage(store.availableKeys);
+        }
+        store.mode = 'Summary';
+        switchModeIcon();
+      },
+      onGlossary: () => {
+        if (store.emptyFormat) fetchGlossary();
+      },
+      onFormat: () => {
+        if (!store.isPendingResponse) formatOptionsDisplay();
+      },
+      onRemoveFormat: () => {
+        if (Object.keys(store.capturedFormatting).length > 0) removeOptionsConfirmation();
+      },
+      onThemeToggle: () => {
+        store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
+        UIService.applyTheme(store.theme as 'Light' | 'Dark');
+        sessionStorage.setItem('theme', store.theme);
+      },
+      onLogout: async () => {
+        if (!store.isPendingResponse) {
+          if (store.isGlossaryActive) await removeMatchingContentControls();
+          logout();
         }
       }
     });
 
-    aiTagList.forEach((key, i) => {
-      const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
-
-      let match;
-      if ((match = regex.exec(key.EditorValue) !== null)) {
-        {
-          key.EditorValue = updateEditorFinalTable(key.EditorValue);
-          key.UserValue = key.EditorValue;
-          key.InitialTable = true;
-          key.ComponentKeyDataType = 'TABLE';
-        }
-
-      }
+    // Register selection change handler for tag detection
+    if (action === 'Init') {
+      Office.context.document.addHandlerAsync(
+        Office.EventType.DocumentSelectionChanged,
+        handleSelectionChange
+      );
     }
 
-    );
-    fetchClients();
-    loadPromptTemplates();
-    loadHomepage(availableKeys);
-    document.getElementById('home').addEventListener('click', async () => {
-      if (!isPendingResponse) {
-        if (isGlossaryActive) {
-          await removeMatchingContentControls();
-        }
-
-        loadHomepage(availableKeys);
-      }
-    });
-
-    document.getElementById('glossary').addEventListener('click', () => {
-      if (emptyFormat) {
-        fetchGlossary();
-      }
-    });
-
-    document.getElementById('define-formatting').addEventListener('click', () => {
-      if (!isPendingResponse) {
-        formatOptionsDisplay()
-      }
-    }
-    );
-
-
-    document.getElementById('removeFormatting').addEventListener('click', () => {
-      if (Object.keys(capturedFormatting).length > 0) {
-        removeOptionsConfirmation();
-      }
-    });
-
-
-    document.getElementById('theme-toggle').addEventListener('click', () => {
-      theme = theme === 'Light' ? 'Dark' : 'Light';
-      applyThemeClasses(theme)
-
-      document.body.classList.toggle('dark-theme', theme === 'Dark');
-      document.body.classList.toggle('light-theme', theme === 'Light');
-      swicthThemeIcon()
-    }
-    );
-
-    document.getElementById('logout').addEventListener('click', async () => {
-      if (!isPendingResponse) {
-        if (isGlossaryActive) {
-          await removeMatchingContentControls();
-        }
-
-        logout()
-      }
-    }
-    );
-
+    UIService.toggleLoader(false);
   } catch (error) {
-    console.error('Error fetching glossary data:', error);
+    console.error("Error loading document data", error);
+    UIService.showNotification("Error loading data", "error");
+    UIService.toggleLoader(false);
   }
 }
-
-async function fetchClients() {
-  try {
-    const userId = sessionStorage.getItem('userId') || '';
-
-
-    const data = await getAllClients(userId, jwt);
-
-    if (data.Status && data.Data) {
-      clientList = data['Data'];
-    } else {
-      console.warn("Failed to load clients or no clients found.");
-    }
-  } catch (error) {
-  }
-}
-
-
 
 export async function formatOptionsDisplay() {
-  if (!isTagUpdating) { // Check if isTagUpdating is false
-    if (isGlossaryActive) {
+  const store = StoreService.getInstance();
+  if (!store.isTagUpdating) { // Check if isTagUpdating is false
+    if (store.isGlossaryActive) {
       await removeMatchingContentControls();
     }
     const htmlBody = `
@@ -448,7 +316,7 @@ export async function formatOptionsDisplay() {
 
 
     document.getElementById('app-body').innerHTML = htmlBody;
-    if (Object.keys(capturedFormatting).length === 0) {
+    if (Object.keys(store.capturedFormatting).length === 0) {
       const formatDetails = document.getElementById("format-details");
       formatDetails.style.display = 'none';
       // The object is not empty
@@ -459,16 +327,16 @@ export async function formatOptionsDisplay() {
       glossaryBtn.classList.add('disabled-link');
     }
 
-    if (emptyFormat) {
+    if (store.emptyFormat) {
       clearCapturedFormatting();
     }
     else {
-      if (capturedFormatting.Bold === null || capturedFormatting.Bold === undefined ||
-        capturedFormatting.Underline === 'Mixed' || capturedFormatting.Underline === undefined ||
-        capturedFormatting.Size === null || capturedFormatting.Size === undefined ||
-        capturedFormatting["Font Name"] === null || capturedFormatting["Font Name"] === undefined ||
-        capturedFormatting["Background Color"] === '' || capturedFormatting["Background Color"] === undefined ||
-        capturedFormatting["Text Color"] === '' || capturedFormatting["Text Color"] === undefined) {
+      if (store.capturedFormatting.Bold === null || store.capturedFormatting.Bold === undefined ||
+        store.capturedFormatting.Underline === 'Mixed' || store.capturedFormatting.Underline === undefined ||
+        store.capturedFormatting.Size === null || store.capturedFormatting.Size === undefined ||
+        store.capturedFormatting["Font Name"] === null || store.capturedFormatting["Font Name"] === undefined ||
+        store.capturedFormatting["Background Color"] === '' || store.capturedFormatting["Background Color"] === undefined ||
+        store.capturedFormatting["Text Color"] === '' || store.capturedFormatting["Text Color"] === undefined) {
         const formatList = document.getElementById("format-list");
         formatList.innerHTML = "<p>Multiple style values found. Try again</p>";
         const removeFormatBtn = document.getElementById('removeFormatting') as HTMLButtonElement;
@@ -488,20 +356,20 @@ export async function formatOptionsDisplay() {
     document.getElementById("capture-format-btn").addEventListener("click", captureFormatting);
 
     const emptyFormatCheckbox = document.getElementById("empty-format-checkbox") as HTMLInputElement;
-    if (isNoFormatTextAvailable) {
+    if (store.isNoFormatTextAvailable) {
       emptyFormatCheckbox.checked = true;
       clearCapturedFormatting();
     }
 
     emptyFormatCheckbox.addEventListener("change", () => {
       if (emptyFormatCheckbox.checked) {
-        isNoFormatTextAvailable = true;
+        store.isNoFormatTextAvailable = true;
         clearCapturedFormatting();
       } else {
         const CaptureBtn = document.getElementById('capture-format-btn') as HTMLButtonElement;
         CaptureBtn.disabled = false;
-        isNoFormatTextAvailable = false;
-        emptyFormat = false;
+        store.isNoFormatTextAvailable = false;
+        store.emptyFormat = false;
         const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
         if (!glossaryBtn.classList.contains('disabled-link')) {
           glossaryBtn.classList.add('disabled-link');
@@ -515,11 +383,12 @@ export async function formatOptionsDisplay() {
 
 
 function displayCapturedFormatting() {
-  emptyFormat = false;
+  const store = StoreService.getInstance();
+  store.emptyFormat = false;
   const formatList = document.getElementById("format-list");
   formatList.innerHTML = ""; // Clear the list before adding new items
 
-  for (const [key, value] of Object.entries(capturedFormatting)) {
+  for (const [key, value] of Object.entries(store.capturedFormatting)) {
     if ((key === "Text Color" || key === "Background Color") && value) {
       formatList.innerHTML += `
         <li><strong>${key}:</strong>${value}
@@ -533,11 +402,12 @@ function displayCapturedFormatting() {
 }
 
 function clearCapturedFormatting() {
-  capturedFormatting = {}; // Clear the captured formatting object
+  const store = StoreService.getInstance();
+  store.capturedFormatting = {}; // Clear the captured formatting object
   const formatDetails = document.getElementById("format-details");
   formatDetails.style.display = 'none';
   // formatList.innerHTML = `<li>No formatting selected.</li>`;
-  emptyFormat = true;
+  store.emptyFormat = true;
   const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
   glossaryBtn.classList.remove('disabled-link');
   const CaptureBtn = document.getElementById('capture-format-btn') as HTMLButtonElement;
@@ -560,7 +430,9 @@ async function captureFormatting() {
 
       await context.sync();
 
-      capturedFormatting = {
+      const store = StoreService.getInstance();
+
+      store.capturedFormatting = {
         Bold: font.bold,
         Italic: font.italic,
         Underline: font.underline,
@@ -575,12 +447,12 @@ async function captureFormatting() {
       const formatDetails = document.getElementById("format-details");
       formatDetails.style.display = 'block';
 
-      if (capturedFormatting.Bold === null ||
-        capturedFormatting.Underline === 'Mixed' ||
-        capturedFormatting.Size === null ||
-        capturedFormatting["Font Name"] === null ||
-        capturedFormatting["Background Color"] === '' ||
-        capturedFormatting["Text Color"] === ''
+      if (store.capturedFormatting.Bold === null ||
+        store.capturedFormatting.Underline === 'Mixed' ||
+        store.capturedFormatting.Size === null ||
+        store.capturedFormatting["Font Name"] === null ||
+        store.capturedFormatting["Background Color"] === '' ||
+        store.capturedFormatting["Text Color"] === ''
 
       ) {
         const formatList = document.getElementById("format-list");
@@ -604,8 +476,9 @@ async function captureFormatting() {
 
 
 async function removeOptionsConfirmation() {
-  if (!isTagUpdating) {
-    if (isGlossaryActive) {
+  const store = StoreService.getInstance();
+  if (!store.isTagUpdating) {
+    if (store.isGlossaryActive) {
       await removeMatchingContentControls();
     } // Check if isTagUpdating is false
     const htmlBody = `
@@ -640,8 +513,8 @@ async function removeOptionsConfirmation() {
     document.getElementById('app-body').innerHTML = htmlBody;
     displayCapturedFormatting();
 
-    if (capturedFormatting['Background Color'] === null &&
-      capturedFormatting['Text Color'] === '#000000') {
+    if (store.capturedFormatting['Background Color'] === null &&
+      store.capturedFormatting['Text Color'] === '#000000') {
       const warningEle = document.getElementById('warning-rem-fmt').innerHTML = 'Warning : The captured formatting is broad. This might result in unintended text removal throughout the document. Proceed?'
     }
 
@@ -668,12 +541,14 @@ async function removeFormattedText() {
 
       await context.sync();
 
+      const store = StoreService.getInstance();
+
       // Iterate through each paragraph in the document body
       for (const paragraph of paragraphs.items) {
 
         // Check if the paragraph contains text
         if (paragraph.text.trim() !== "") {
-          const textRanges = paragraph.split([" "]); // Split paragraph into individual words/segments
+          const textRanges = paragraph.split([" "], true, true); // Split paragraph into individual words/segments
           textRanges.load("items, font");
 
           await context.sync();
@@ -686,13 +561,13 @@ async function removeFormattedText() {
 
             // Check if the text range matches the captured formatting
             if (
-              font.highlightColor === capturedFormatting['Background Color'] &&
-              font.color === capturedFormatting['Text Color'] &&
-              font.bold === capturedFormatting['Bold'] &&
-              font.italic === capturedFormatting['Italic'] &&
-              font.size === capturedFormatting['Size'] &&
-              font.underline === capturedFormatting['Underline'] &&
-              font.name === capturedFormatting['Font Name']
+              font.highlightColor === store.capturedFormatting['Background Color'] &&
+              font.color === store.capturedFormatting['Text Color'] &&
+              font.bold === store.capturedFormatting['Bold'] &&
+              font.italic === store.capturedFormatting['Italic'] &&
+              font.size === store.capturedFormatting['Size'] &&
+              font.underline === store.capturedFormatting['Underline'] &&
+              font.name === store.capturedFormatting['Font Name']
             ) {
               // Clear the range whether it's a full word or part of a word
               font.highlightColor = "#FFFFFF"; // Set new background color
@@ -707,12 +582,12 @@ async function removeFormattedText() {
       }
 
       await context.sync();
-      capturedFormatting = {}; // Clear the captured formatting object
+      store.capturedFormatting = {}; // Clear the captured formatting object
       const formatDetails = document.getElementById("format-details");
       formatDetails.style.display = 'none';
       // formatList.innerHTML = `<li>No formatting selected.</li>`;
-      emptyFormat = true;
-      isNoFormatTextAvailable = true;
+      store.emptyFormat = true;
+      store.isNoFormatTextAvailable = true;
       const glossaryBtn = document.getElementById('glossary') as HTMLButtonElement;
       glossaryBtn.classList.remove('disabled-link');
       formatOptionsDisplay()
@@ -723,144 +598,10 @@ async function removeFormattedText() {
 }
 
 
-export async function fetchAIHistory(tag) {
-  try {
+// fetchAIHistory and sendPrompt moved to AIService
+// Left empty or removed to prevent errors if these were exported.
+// Since we removed exports at the top, we can now remove the functions.
 
-    const data = await getAiHistory(tag.ID, jwt);
-
-
-    if (data.Status && data.Data) {
-      tag.ReportHeadAIHistoryList = data['Data'] || [];
-      tag.FilteredReportHeadAIHistoryList = [];
-      tag.SourceValueID = tag.ReportHeadAIHistoryList[0].SourceValue;
-      const selectedSources = sourceList.filter((list) =>
-        tag.SourceValueID.includes(String(list.VectorID))
-      );
-
-      tag.SourceName = selectedSources.map((item) => {
-        return item.SourceName;
-      });
-      tag.Sources = tag.SourceName.join(',');
-      tag.TempSourceValue = selectedSources.map((item) => {
-        return item.VectorID ? String(item.VectorID) : item.SourceValue;
-      });
-
-
-      tag.ReportHeadAIHistoryList.forEach((historyList, i) => {
-        historyList.Response = removeQuotes(historyList.Response);
-        tag.FilteredReportHeadAIHistoryList.unshift(historyList);
-
-      });
-      return tag.FilteredReportHeadAIHistoryList;
-      // Use the data here
-    } else {
-      console.warn("No AI history available.");
-    }
-
-
-  } catch (error) {
-    console.error('Error fetching AI history:', error);
-    return [];
-  }
-}
-
-export async function sendPrompt(tag, prompt) {
-  if (prompt !== '' && !isTagUpdating) {
-
-    isTagUpdating = true;
-
-    const iconelement = document.getElementById(`sendPromptButton`);
-    iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
-
-    const payload = {
-      ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
-      DocumentID: dataList.NCTID,
-      DocumentType: dataList.DocumentType,
-      TextSetting: dataList.TextSetting,
-      DocumentTemplate: dataList.ReportTemplate,
-      ReportHeadGroupKeyID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadGroupKeyID,
-      ThreadID: tag.ThreadID,
-      AssistantID: dataList.AssistantID,
-      Container: dataList.Container,
-      GroupName: GroupName,
-      Prompt: prompt,
-      PromptType: 1,
-      Response: '',
-      VectorID: dataList.VectorID,
-      Selected: 0,
-      ID: 0,
-      SourceValue: tag.TempSourceValue ? tag.TempSourceValue : []
-    };
-
-    try {
-      isPendingResponse = true;
-      const data = await addAiHistory(payload, jwt);
-
-      if (data['Data'] && data['Data'] !== 'false') {
-        tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
-        tag.FilteredReportHeadAIHistoryList = [];
-
-        tag.ReportHeadAIHistoryList.forEach((historyList) => {
-          historyList.Response = removeQuotes(historyList.Response);
-          tag.FilteredReportHeadAIHistoryList.unshift(historyList);
-        });
-        const chat = tag.ReportHeadAIHistoryList[0];
-        aiTagList.forEach(currentTag => {
-          if (currentTag.ID === tag.ID) {
-            const isTable = chat.FormattedResponse !== '';
-            const finalResponse = chat.FormattedResponse
-              ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-              : chat.Response;
-
-
-            currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-            currentTag.UserValue = finalResponse;
-            currentTag.EditorValue = finalResponse;
-            currentTag.text = finalResponse;
-            currentTag.IsApplied = tag.IsApplied;
-
-          }
-        });
-
-        availableKeys.forEach(currentTag => {
-          if (currentTag.ID === tag.ID) {
-            const isTable = chat.FormattedResponse !== '';
-            const finalResponse = chat.FormattedResponse
-              ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-              : chat.Response;
-            currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-            currentTag.UserValue = finalResponse;
-            currentTag.EditorValue = finalResponse;
-            currentTag.text = finalResponse;
-            currentTag.IsApplied = tag.IsApplied;
-
-          }
-        })
-
-
-
-        const appbody = document.getElementById('app-body')
-        appbody.innerHTML = await generateCheckboxHistory(tag);
-        isPendingResponse = false;
-
-      }
-
-      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
-      document.getElementById(`chatInput`).value = '';
-      isTagUpdating = false;
-      isPendingResponse = false;
-      // sourceListBtn.disabled = false;
-
-    } catch (error) {
-      iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
-      isTagUpdating = false;
-      isPendingResponse = false;
-      console.error('Error sending AI prompt:', error);
-    }
-  } else {
-    console.error('No empty prompt allowed');
-  }
-}
 
 
 
@@ -870,38 +611,15 @@ export async function sendPrompt(tag, prompt) {
 
 
 async function logout() {
-  if (isGlossaryActive) {
+  const store = StoreService.getInstance();
+  if (store.isGlossaryActive) {
     await removeMatchingContentControls();
   }
   sessionStorage.clear();
   window.location.hash = '#/new';
-  initialised = true;
+  store.initialised = true;
   document.getElementById('logo-header').innerHTML = ``;
   login();
-}
-
-function addAccordionListeners() {
-  const accordionButtons = document.querySelectorAll('.accordion-button');
-
-  accordionButtons.forEach(button => {
-    button.addEventListener('click', function () {
-      const collapseElement = this.nextElementSibling;
-
-      // Check if the element exists before accessing its classList
-      if (collapseElement && collapseElement.classList) {
-        collapseElement.classList.toggle('show');
-      }
-    });
-  });
-}
-
-function addCopyListeners() {
-  const copyIcons = document.querySelectorAll('.fa-copy');
-  copyIcons.forEach(icon => {
-    icon.addEventListener('click', function () {
-      const textToCopy = this.closest('.p-2').querySelector('.form-control').textContent;
-    });
-  });
 }
 
 export async function applyTagFn() {
@@ -917,14 +635,16 @@ export async function applyTagFn() {
     } catch (err) {
       toaster("Something went wrong", "error")
       console.error("Error during tag application:", err);
-      loadHomepage(availableKeys);
+      const store = StoreService.getInstance();
+      loadHomepage(store.availableKeys);
     }
   });
 }
 
 async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
-  for (let i = 0; i < imageList.length; i++) {
-    const tag = imageList[i];
+  const store = StoreService.getInstance();
+  for (let i = 0; i < store.imageList.length; i++) {
+    const tag = store.imageList[i];
     const searchResults = body.search(`$${tag.DisplayName}$`, {
       matchCase: false,
       matchWholeWord: false,
@@ -956,7 +676,7 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
   }
   await context.sync();
   toaster("AI tag application completed!", "success");
-  loadHomepage(availableKeys);
+  loadHomepage(store.availableKeys);
 }
 
 export async function applyAITagFn(
@@ -970,7 +690,8 @@ export async function applyAITagFn(
   </div>`
   toaster("Please wait... applying AI tags", "info");
 
-  for (const tag of aiTagList) {
+  const store = StoreService.getInstance();
+  for (const tag of store.aiTagList) {
     tag.EditorValue = removeQuotes(tag.EditorValue);
     if (!tag.EditorValue || tag.IsApplied) continue;
 
@@ -1060,12 +781,13 @@ export async function applyAITagFn(
                 Word.InsertLocation.after
               );
 
-              const resolvedTableStyle = resolveWordTableStyle(tableStyle);
+              const store = StoreService.getInstance();
+              const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
               if (resolvedTableStyle !== 'none') {
                 table.style = resolvedTableStyle;
               }
 
-              if (colorPallete.Customize) {
+              if (store.colorPallete.Customize) {
                 await colorTable(table, rows, context);
               } else {
                 const rowspanTracker: number[] = new Array(maxCols).fill(0);
@@ -1227,12 +949,7 @@ export async function applyAITagFn(
       }
     }
   }
-  if (imageList.length === 0) {
-    loadHomepage(availableKeys);
-  }
-  toaster("AI tag application completed!", "success");
 }
-
 
 export async function normalizeBlankLines(
   context: Word.RequestContext
@@ -1277,7 +994,8 @@ export async function removeTrailingEmptyParagraphs(
 }
 
 async function fetchGlossary() {
-  if (!isTagUpdating) {
+  const store = StoreService.getInstance();
+  if (!store.isTagUpdating) {
 
     document.getElementById('app-body').innerHTML = `
   <div id="button-container">
@@ -1327,13 +1045,13 @@ export async function applyglossary() {
         "Content": body.text.replace(/[\n\r]/g, ' ')
       };
       try {
+        const store = StoreService.getInstance();
+        const data = await fetchGlossaryTemplate(store.dataList?.ClientID, bodyText, store.jwt);
 
-        const data = await fetchGlossaryTemplate(dataList?.ClientID, bodyText, jwt);
-
-        layTerms = data.Data;
+        store.layTerms = data.Data;
 
         if (data.Data.length > 0) {
-          glossaryName = data.Data[0].GlossaryTemplate;
+          store.glossaryName = data.Data[0].GlossaryTemplate;
           loadGlossary();
         } else {
           document.getElementById('app-body').innerHTML = `
@@ -1344,12 +1062,13 @@ export async function applyglossary() {
         console.error('Error fetching glossary data:', error);
       }
       // Sort terms by length (longest first)
-      layTerms.sort((a, b) => b.ClinicalTerm.length - a.ClinicalTerm.length);
+      const store = StoreService.getInstance();
+      store.layTerms.sort((a, b) => b.ClinicalTerm.length - a.ClinicalTerm.length);
 
       const processedTerms = new Set(); // Track added larger terms
 
       // Filter out smaller terms if they are included in a larger term
-      const filteredTerms = layTerms.filter(term => {
+      const filteredTerms = store.layTerms.filter(term => {
         for (const biggerTerm of processedTerms) {
           if (typeof biggerTerm === 'string' && biggerTerm.includes(term.ClinicalTerm.toLowerCase())) {
             console.log(`Skipping "${term.ClinicalTerm}" because it's part of "${biggerTerm}"`);
@@ -1360,12 +1079,12 @@ export async function applyglossary() {
         return true;
       });
 
-      filteredGlossaryTerm = filteredTerms;
+      store.filteredGlossaryTerm = filteredTerms;
       await removeMatchingContentControls();
 
       const foundRanges = new Map(); // Track words already processed
 
-      const searchPromises = filteredGlossaryTerm.map(term => {
+      const searchPromises = store.filteredGlossaryTerm.map(term => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load("items");
         return searchResults;
@@ -1426,7 +1145,7 @@ export async function applyglossary() {
         }
       }
       // document.getElementById('glossarycheck').style.display='block';
-      isGlossaryActive = true;
+      store.isGlossaryActive = true;
       document.getElementById('app-body').innerHTML = `
       <div id="button-container">
         <button class="btn btn-secondary me-2 clear-glossary btn-sm" id="clearGlossary">Clear Glossary</button>
@@ -1460,7 +1179,17 @@ export async function applyglossary() {
 
 
 async function handleSelectionChange() {
-  await checkGlossary();
+  const store = StoreService.getInstance();
+
+  // Handle glossary mode
+  if (store.isGlossaryActive) {
+    await checkGlossary();
+  }
+
+  // Handle Home mode - detect bookmarks/tags in selection
+  if (store.mode === 'Home') {
+    await logBookmarksInSelection();
+  }
 }
 
 export async function checkGlossary() {
@@ -1479,7 +1208,8 @@ export async function checkGlossary() {
         if (loader) {
           loader.style.display = 'block';
         }
-        const searchPromises = layTerms.map(term => {
+        const store = StoreService.getInstance();
+        const searchPromises = store.layTerms.map(term => {
           const searchResults = selection.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
           searchResults.load("items");
           return searchResults;
@@ -1495,13 +1225,13 @@ export async function checkGlossary() {
 
             await context.sync();
             if (
-              font.highlightColor !== capturedFormatting['Background Color'] ||
-              font.color !== capturedFormatting['Text Color'] ||
-              font.bold !== capturedFormatting['Bold'] ||
-              font.italic !== capturedFormatting['Italic'] ||
-              font.size !== capturedFormatting['Size'] ||
-              font.underline !== capturedFormatting['Underline'] ||
-              font.name !== capturedFormatting['Font Name']
+              font.highlightColor !== store.capturedFormatting['Background Color'] ||
+              font.color !== store.capturedFormatting['Text Color'] ||
+              font.bold !== store.capturedFormatting['Bold'] ||
+              font.italic !== store.capturedFormatting['Italic'] ||
+              font.size !== store.capturedFormatting['Size'] ||
+              font.underline !== store.capturedFormatting['Underline'] ||
+              font.name !== store.capturedFormatting['Font Name']
             ) {
               selectedWords.push(range.text);
             }
@@ -1548,8 +1278,9 @@ function displayHighlightedText(words: string[]) {
     // Group lay terms by their clinical term
     const groupedTerms: { [clinicalTerm: string]: string[] } = {};
 
+    const store = StoreService.getInstance();
     words.forEach(word => {
-      layTerms.forEach(term => {
+      store.layTerms.forEach(term => {
         if (term.ClinicalTerm.toLowerCase() === word.toLowerCase()) {
           if (!groupedTerms[term.ClinicalTerm]) {
             groupedTerms[term.ClinicalTerm] = [];
@@ -1569,7 +1300,7 @@ function displayHighlightedText(words: string[]) {
 
       // Create a heading for the clinical term
       const heading = document.createElement('h3');
-      heading.textContent = `${clinicalTerm} (${glossaryName})`;
+      heading.textContent = `${clinicalTerm} (${store.glossaryName})`;
       mainBox.appendChild(heading);
 
       // Create sub-boxes for each lay term
@@ -1620,7 +1351,7 @@ async function replaceClinicalTerm(clinicalTerm: string, layTerm: string) {
           await context.sync();  // Ensure the properties are loaded before accessing them
 
           // Insert the layTerm while keeping the formatting
-          item.insertText(layTerm, 'replace');
+          item.insertText(layTerm, Word.InsertLocation.replace);
 
           // Apply the original formatting to the new text
           item.font.bold = item.font.bold;
@@ -1667,7 +1398,8 @@ export async function removeMatchingContentControls() {
       }
 
       for (const control of contentControls.items) {
-        if (control.title && filteredGlossaryTerm.some(term => term.ClinicalTerm.toLowerCase() === control.title.toLowerCase())) {
+        const store = StoreService.getInstance();
+        if (control.title && store.filteredGlossaryTerm.some(term => term.ClinicalTerm.toLowerCase() === control.title.toLowerCase())) {
           const range = control.getRange();
           range.load("text");
           await context.sync();
@@ -1688,7 +1420,8 @@ export async function removeMatchingContentControls() {
       `;
 
       await context.sync();
-      isGlossaryActive = false;
+      const store = StoreService.getInstance();
+      store.isGlossaryActive = false;
       document.getElementById('applyglossary').addEventListener('click', applyglossary);
     });
   } catch (error) {
@@ -1696,34 +1429,23 @@ export async function removeMatchingContentControls() {
   }
 }
 
-
-async function displayMentions() {
-  if (!isTagUpdating) {
-    if (isGlossaryActive) {
-      await removeMatchingContentControls();
-    }
-
-
-  }
-}
-
 export async function addGenAITags() {
+  const store = StoreService.getInstance();
+  if (!store.isTagUpdating) {
 
-  if (!isTagUpdating) {
-
-    if (isGlossaryActive) {
+    if (store.isGlossaryActive) {
       await removeMatchingContentControls();
     }
 
-    let selectedClient = clientList.filter(item => item.ID === clientId);
+    let selectedClient = store.clientList.filter(item => item.ID === store.clientId);
 
     // Build Primary Source List
     let sourceTypeList = [
-      ...new Map(
-        dataList.SourceTypeList
+      ...Array.from(new Map(
+        store.dataList.SourceTypeList
           .filter(item => item.VectorID > 0)
           .map(item => [item.SourceTypeID, { Name: item.SourceType, ID: item.SourceTypeID }])
-      ).values()
+      ).values())
     ];
 
 
@@ -1737,7 +1459,7 @@ export async function addGenAITags() {
         </li>`;
     }).join("");
 
-    let sponsorOptions = clientList.map(client => {
+    let sponsorOptions = store.clientList.map(client => {
       const isSelectedClient = selectedClient.some(selected => selected.ID === client.ID);
       return `
         <li class="sponsor-dropdown-item dropdown-item p-2" style="cursor: pointer;">
@@ -1751,10 +1473,10 @@ export async function addGenAITags() {
     document.getElementById('app-body').innerHTML = navTabs;
 
     // Inject modal
-    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions, sourceOptions);
+    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions, sourceOptions, store.mode === "Summary");
 
     const promptTemplateElement = document.getElementById('add-prompt-template');
-    setupPromptBuilderUI(promptTemplateElement, promptBuilderList);
+    setupPromptBuilderUI(promptTemplateElement, store.promptBuilderList);
 
     document.getElementById('tag-tab').addEventListener('click', () => switchToAddTag());
     document.getElementById('prompt-tab').addEventListener('click', () => switchToPromptBuilder());
@@ -1763,13 +1485,12 @@ export async function addGenAITags() {
 
     const form = document.getElementById('genai-form');
     const nameField = document.getElementById('name');
-    const descriptionField = document.getElementById('description');
-    const promptField = document.getElementById('prompt');
+    const descriptionField = document.getElementById('description') as HTMLInputElement;
+    const promptField = document.getElementById('prompt') as HTMLTextAreaElement;
     // const primarySourceField = document.getElementById('primarySource');
 
-    const saveGloballyCheckbox = document.getElementById('saveGlobally');
-
-    const availableForAllCheckbox = document.getElementById('isAvailableForAll');
+    const saveGloballyCheckbox = document.getElementById('saveGlobally') as HTMLInputElement;
+    const availableForAllCheckbox = document.getElementById('isAvailableForAll') as HTMLInputElement;
     const sponsorDropdownButton = document.getElementById('sponsorDropdown');
     const sponsorDropdownItems = document.querySelectorAll('.sponsor-dropdown-item .form-check-input');
 
@@ -1777,19 +1498,22 @@ export async function addGenAITags() {
     const sourceDropdownButton = document.getElementById('sourceDropdown');
     const sourceDropdownItems = document.querySelectorAll('.source-dropdown-item .form-check-input');
 
+    const isSummaryMode = store.mode === "Summary";
+
     document.getElementById('cancel-btn-gen-ai').addEventListener('click', () => {
-      if (!isPendingResponse) loadHomepage(availableKeys);
+      const store = StoreService.getInstance();
+      if (!store.isPendingResponse) loadHomepage(store.availableKeys);
     });
 
 
-    if (form && nameField && promptField && sponsorDropdownItems.length > 0 && sourceDropdownItems.length > 0) {
+    if (form && nameField && promptField && sponsorDropdownItems.length > 0 && (isSummaryMode || sourceDropdownItems.length > 0)) {
 
       const updateSponsorDropdownLabel = () => {
-        if (availableForAllCheckbox.checked) {
-          sponsorDropdownButton.textContent = clientList.map(x => x.Name).join(", ");
+        if ((availableForAllCheckbox as HTMLInputElement).checked) {
+          sponsorDropdownButton.textContent = store.clientList.map(x => x.Name).join(", ");
         } else {
           const selectedNames = Array.from(sponsorDropdownItems)
-            .filter(cb => cb.checked && cb.id !== 'sponsorSelectAll')
+            .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
             .map(cb => cb.parentElement.textContent.trim());
 
           sponsorDropdownButton.textContent = selectedNames.length
@@ -1800,7 +1524,7 @@ export async function addGenAITags() {
 
       const updateSourceDropdownLabel = () => {
         const selectedNames = Array.from(sourceDropdownItems)
-          .filter(cb => cb.checked && cb.id !== 'sourceSelectAll')
+          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
           .map(cb => cb.parentElement.textContent.trim());
 
         sourceDropdownButton.textContent = selectedNames.length
@@ -1820,26 +1544,29 @@ export async function addGenAITags() {
         if (!promptField.value.trim()) { promptField.classList.add('is-invalid'); valid = false; }
 
         // PRIMARY SOURCE VALIDATION
-        const selectedPrimarySources = Array.from(sourceDropdownItems)
-          .filter(cb => cb.checked && cb.id !== 'sourceSelectAll')
-          .map(cb => cb.value);
+        let selectedPrimarySources = [];
+        if (!isSummaryMode) {
+          selectedPrimarySources = Array.from(sourceDropdownItems)
+            .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
+            .map(cb => (cb as HTMLInputElement).value);
 
-        if (!selectedPrimarySources.length) {
-          document.getElementById("primarySourceError").style.display = "block";
-          valid = false;
-        } else {
-          document.getElementById("primarySourceError").style.display = "none";
+          if (!selectedPrimarySources.length) {
+            document.getElementById("primarySourceError").style.display = "block";
+            valid = false;
+          } else {
+            document.getElementById("primarySourceError").style.display = "none";
+          }
         }
 
         if (!valid) return;
 
         const selectedSponsors = Array.from(sponsorDropdownItems)
-          .filter(cb => cb.checked && cb.id !== 'sponsorSelectAll')
-          .map(cb => clientList.find(c => c.ID == cb.value));
+          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
+          .map(cb => store.clientList.find(c => c.ID == (cb as HTMLInputElement).value));
 
         const isAvailableForAll = availableForAllCheckbox.checked;
         const isSaveGlobally = saveGloballyCheckbox.checked;
-        const aigroup = dataList.Group.find(el => el.DisplayName === 'AIGroup');
+        const aigroup = store.dataList.Group.find(el => el.DisplayName === 'AIGroup');
 
         const formData = {
           DisplayName: nameField.value.trim(),
@@ -1852,11 +1579,11 @@ export async function addGenAITags() {
           ComponentKeyDataTypeID: '1',
           ComponentKeyDataAccessID: '3',
           AIFlag: 1,
-          DocumentTypeID: dataList.DocumentTypeID,
-          ReportHeadID: dataList.ID,
+          DocumentTypeID: store.dataList.DocumentTypeID,
+          ReportHeadID: store.dataList.ID,
 
           // MULTI SELECT SOURCE TYPE
-          SourceTypeID: selectedPrimarySources.join(","),
+          SourceTypeID: isSummaryMode ? "0" : selectedPrimarySources.join(","),
 
           ReportHeadGroupID: aigroup.ID,
           ReportHeadSourceID: 0
@@ -1884,7 +1611,7 @@ export async function addGenAITags() {
       };
 
       saveGloballyCheckbox.addEventListener('change', function () {
-        if (!isPendingResponse) {
+        if (!store.isPendingResponse) {
           if (this.checked) {
             availableForAllCheckbox.disabled = false;
             sponsorDropdownButton.disabled = false;
@@ -1892,12 +1619,12 @@ export async function addGenAITags() {
             enableSponsors();
             availableForAllCheckbox.checked = false;
             availableForAllCheckbox.disabled = true;
-            sponsorDropdownButton.disabled = true;
+            (sponsorDropdownButton as HTMLButtonElement).disabled = true;
 
             sponsorDropdownItems.forEach(cb => {
-              if (!cb.disabled) {
-                cb.checked = false;
-                cb.disabled = false;
+              if (!(cb as HTMLInputElement).disabled) {
+                (cb as HTMLInputElement).checked = false;
+                (cb as HTMLInputElement).disabled = false;
               }
             });
 
@@ -1909,7 +1636,7 @@ export async function addGenAITags() {
 
 
       availableForAllCheckbox.addEventListener('change', function () {
-        if (!isPendingResponse) {
+        if (!store.isPendingResponse) {
           this.checked ? checkAndDisableSponsors() : enableSponsors();
         }
       });
@@ -1927,9 +1654,9 @@ export async function addGenAITags() {
           if (!checkbox) return;
 
           if (checkbox.id === 'sponsorSelectAll') {
-            const isChecked = checkbox.checked;
+            const isChecked = (checkbox as HTMLInputElement).checked;
             sponsorDropdownItems.forEach(cb => {
-              if (!cb.disabled) cb.checked = isChecked;
+              if (!(cb as HTMLInputElement).disabled) (cb as HTMLInputElement).checked = isChecked;
             });
           }
 
@@ -1937,39 +1664,42 @@ export async function addGenAITags() {
         });
       });
 
-      document.querySelectorAll('.source-dropdown-item').forEach(item => {
-        item.addEventListener('click', function (e) {
-          e.stopPropagation();
-          const checkbox = this.querySelector('.source-dropdown-item .form-check-input');
-          if (!checkbox) return;
+      if (!isSummaryMode) {
+        document.querySelectorAll('.source-dropdown-item').forEach(item => {
+          item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const checkbox = this.querySelector('.source-dropdown-item .form-check-input');
+            if (!checkbox) return;
 
-          if (checkbox.id === 'sourceSelectAll') {
-            const isChecked = checkbox.checked;
-            sourceDropdownItems.forEach(cb => {
-              cb.checked = isChecked;
-            });
-          }
+            if (checkbox.id === 'sourceSelectAll') {
+              const isChecked = (checkbox as HTMLInputElement).checked;
+              sourceDropdownItems.forEach(cb => {
+                (cb as HTMLInputElement).checked = isChecked;
+              });
+            }
 
-          updateSourceDropdownLabel();
-          const selectedCount = Array.from(sourceDropdownItems)
-            .filter(cb => cb.checked).length;
+            updateSourceDropdownLabel();
+            const selectedCount = Array.from(sourceDropdownItems)
+              .filter(cb => (cb as HTMLInputElement).checked).length;
 
-          if (selectedCount === 0) {
-            document.getElementById("primarySourceError").style.display = "block";
-          } else {
-            document.getElementById("primarySourceError").style.display = "none";
-          }
+            if (selectedCount === 0) {
+              document.getElementById("primarySourceError").style.display = "block";
+            } else {
+              document.getElementById("primarySourceError").style.display = "none";
+            }
 
+          });
         });
-      });
+      }
 
       updateSponsorDropdownLabel();
-      updateSourceDropdownLabel();
+      if (!isSummaryMode) updateSourceDropdownLabel();
 
       [nameField, promptField].forEach(field => {
         field.addEventListener('input', function () {
-          if (this.classList.contains('is-invalid') && this.value.trim()) {
-            this.classList.remove('is-invalid');
+          const input = this as HTMLInputElement;
+          if (input.classList.contains('is-invalid') && input.value.trim()) {
+            input.classList.remove('is-invalid');
           }
         });
       });
@@ -1982,11 +1712,12 @@ export async function addGenAITags() {
 
 
 export async function customizeTable(type: string) {
+  const store = StoreService.getInstance();
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
   const customStyleName = sessionStorage.getItem("CustomStyle") || "";
-  const defaultStyle = sessionStorage.getItem("DefaultStyle") || tableStyle;
+  const defaultStyle = sessionStorage.getItem("DefaultStyle") || store.tableStyle;
   let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
   container.innerHTML = customizeTablePopup(styleObj, type);
 
@@ -1999,7 +1730,7 @@ export async function customizeTable(type: string) {
     if (!dropdown || !tablePreview) return;
     let styleObj: any;
     if (type === "Custom") {
-      styleObj = customTableStyle.find(s => s.Name === dropdown.value);
+      styleObj = store.customTableStyle.find(s => s.Name === dropdown.value);
     } else {
       styleObj = wordTableStyles.find(s => s.style === dropdown.value);
     }
@@ -2041,9 +1772,8 @@ export async function customizeTable(type: string) {
         Array.from(tablePreview.rows).forEach((row, index) => {
           Array.from(row.cells).forEach((cell, cellIndex) => {
             if (cellIndex === 0) {
-              (cell as HTMLTableCellElement).style.cssText = styleObj.sideHeader
-                ? styleObj.tableClass! + "font-weight:bold;"
-                : styleObj.tableClass!;
+              (cell as HTMLTableCellElement).style.cssText =
+                styleObj.tableClass! + "font-weight:bold;";
             } else if (index % 2 === 1) {
               (cell as HTMLTableCellElement).style.cssText = styleObj.rowClass!;
             }
@@ -2078,31 +1808,34 @@ export async function customizeTable(type: string) {
   if (okBtn && dropdown) {
     okBtn.addEventListener("click", () => {
       if (type === "Custom") {
-        const styleObj = customTableStyle.find(s => s.Name === dropdown.value);
-        colorPallete.Header = styleObj.Setting.HeaderColor;
-        colorPallete.Primary = styleObj.Setting.PrimaryColor;
-        colorPallete.Secondary = styleObj.Setting.SecondaryColor;
-        colorPallete.Customize = true;
-        colorPallete.IsSideHeaderBold = styleObj.Setting.IsSideHeaderBold;
-        colorPallete.IsHeaderBold = styleObj.Setting.IsHeaderBold;
+        const styleObj = store.customTableStyle.find(s => s.Name === dropdown.value);
+        store.colorPallete.Header = styleObj.Setting.HeaderColor;
+        store.colorPallete.Primary = styleObj.Setting.PrimaryColor;
+        store.colorPallete.Secondary = styleObj.Setting.SecondaryColor;
+        store.colorPallete.Customize = true;
+        store.colorPallete.IsSideHeaderBold = styleObj.Setting.IsSideHeaderBold;
+        store.colorPallete.IsHeaderBold = styleObj.Setting.IsHeaderBold;
         sessionStorage.setItem("CustomStyle", styleObj.Name);
-        tableStyle = styleObj.Setting.BaseStyle; // stores full object as 
+        store.tableStyle = styleObj.Setting.BaseStyle; // stores full object as 
       } else {
-        colorPallete.Customize = false;
-        tableStyle = dropdown.value; // normal style string
-        sessionStorage.setItem("DefaultStyle", tableStyle);
+        store.colorPallete.Customize = false;
+        store.tableStyle = dropdown.value; // normal style string
+        sessionStorage.setItem("DefaultStyle", store.tableStyle);
 
       }
 
-      sessionStorage.setItem("colorPallete", JSON.stringify(colorPallete));
-      sessionStorage.setItem("tableStyle", tableStyle);
+      sessionStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
+      sessionStorage.setItem("tableStyle", store.tableStyle);
 
       container.innerHTML = "";
     });
   }
 }
 
+import { addSummaryTag } from "./summary/summary.api";
+
 async function createTextGenTag(payload) {
+  const store = StoreService.getInstance();
   try {
     const iconelement = document.getElementById(`text-gen-save`);
     const cancelBtnGenAi = document.getElementById('cancel-btn-gen-ai');
@@ -2111,13 +1844,34 @@ async function createTextGenTag(payload) {
     (cancelBtnGenAi as HTMLButtonElement).disabled = true;
     iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Save`;
     (iconelement as HTMLButtonElement).disabled = true;
-    isPendingResponse = true;
+    store.isPendingResponse = true;
 
-    const data = await addGroupKey(payload, jwt);
-    isPendingResponse = false;
+    let data: any;
+    if (store.mode === "Summary") {
+      const summaryPayload = {
+        ReportHeadID: payload.ReportHeadID,
+        Name: payload.DisplayName,
+        Description: payload.Description,
+        Prompt: payload.Prompt,
+        Selected: 1,
+        SourceTypeID: payload.SourceTypeID,
+        AllClient: payload.AllClient,
+        SaveGlobally: payload.SaveGlobally ? 1 : 0,
+        SummaryTagClient: payload.GroupKeyClient
+      };
+      data = await addSummaryTag(summaryPayload, store.jwt);
+    } else {
+      data = await addGroupKey(payload, store.jwt);
+    }
 
-    if (data['Data'] && data['Status']) {
-      fetchDocument('AIpanel');
+    store.isPendingResponse = false;
+
+    if (data['Status']) {
+      if (store.mode === "Summary") {
+        loadSummarypage(store.availableKeys);
+      } else {
+        fetchDocument('AIpanel');
+      }
       toaster('Saved successfully', 'success');
     } else {
       (cancelBtnGenAi as HTMLButtonElement).disabled = false;
@@ -2134,10 +1888,12 @@ async function createTextGenTag(payload) {
 }
 
 
+
 export function mentionDropdownFn(textareaId, DropdownId, action) {
+  const store = StoreService.getInstance();
   const filterMentions = (query) => {
     // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
-    const filtered = availableKeys.filter(item => item.AIFlag === 0).filter(item =>
+    const filtered = store.availableKeys.filter(item => item.AIFlag === 0).filter(item =>
       item.DisplayName.toLowerCase().includes(query.toLowerCase())
     );
     return filtered;
@@ -2150,8 +1906,8 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
 
     // Handle input events on prompt field for mentions
     promptField.addEventListener('input', (e) => {
-      const cursorPosition = promptField.selectionStart;
-      const textBeforeCursor = promptField.value.slice(0, cursorPosition);
+      const cursorPosition = (promptField as HTMLTextAreaElement).selectionStart;
+      const textBeforeCursor = (promptField as HTMLTextAreaElement).value.slice(0, cursorPosition);
       const lastHashtag = textBeforeCursor.lastIndexOf('#');
       if (lastHashtag !== -1) {
         const query = textBeforeCursor.slice(lastHashtag + 1).trim();
@@ -2252,7 +2008,7 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
     // Handle selecting an item from the dropdown via mouse click
     mentionDropdown.addEventListener('click', (e) => {
       if (e.target && e.target.matches('li')) {
-        const editorValue = e.target.getAttribute('data-editor-value');
+        const editorValue = (e.target as HTMLLIElement).getAttribute('data-editor-value');
         selectMention(editorValue);
         mentionDropdown.style.display = 'none';  // Hide the dropdown after selection
       }
@@ -2260,7 +2016,7 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
 
     // Function to insert the selected mention into the prompt field
     const selectMention = (editorValue) => {
-      const textarea = document.getElementById(`${textareaId}`);
+      const textarea = document.getElementById(`${textareaId}`) as HTMLTextAreaElement;
       const currentValue = textarea.value;
       const cursorPosition = textarea.selectionStart;
 
@@ -2277,7 +2033,7 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
 
     // Hide the dropdown if clicked outside
     document.addEventListener('click', (e) => {
-      if (!mentionDropdown.contains(e.target) && e.target !== promptField) {
+      if (!mentionDropdown.contains(e.target as Node) && e.target !== promptField) {
         mentionDropdown.style.display = 'none';
       }
     });
@@ -2294,39 +2050,21 @@ function removeQuotes(value: string): string {
     : '';
 }
 
-function showAddTagError(message) {
-  const errorDiv = document.getElementById('submition-error');
-  errorDiv.style.display = 'block';
-  errorDiv.textContent = message;
-}
-
-function transformDocumentName(value: string): string {
-  if (!value || value.trim() === '') {
-    return value; // Return the input value unchanged
-  }
-
-  const parts = value.split('_');
-  if (parts.length <= 1) {
-    return value; // Return the input value unchanged if no underscores are present
-  }
-
-  return parts.slice(1).join('_').replace(/%20/g, ' ').replace(/%25/g, '%');
-}
-
-
-
-export function createMultiSelectDropdown(tag) {
-  const isDark = theme === 'Dark';
+export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
+  const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
   const btnClass = isDark ? 'btn-dark text-light border-0' : 'btn-light text-dark border';
   const dropdownMenuClass = isDark ? 'bg-dark text-light border-light' : 'bg-white text-dark border';
   const itemClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
 
   // Group sources by SourceType
+  const sourceList = type === 'Summary' ? store.sourceSummaryList : store.sourceList;
   const groupedSources = sourceList.reduce((groups, source) => {
     if (!groups[source.SourceType]) groups[source.SourceType] = [];
     groups[source.SourceType].push(source);
     return groups;
   }, {});
+  debugger
 
   const multiSelectHTML = `
   <div class='p-3 w-100'>
@@ -2360,8 +2098,8 @@ export function createMultiSelectDropdown(tag) {
             (source, index) => `
                   <li class="dropdown-item ps-4 ${itemClass}" style="cursor: pointer;" data-checkbox-id="source-${groupIndex}-${index}">
                     <div class="form-check">
-                      <input class="form-check-input source-checkbox" type="checkbox" value="${source.SourceName}" id="source-${groupIndex}-${index}">
-                      <label class="form-check-label w-100 text-prewrap" for="source-${groupIndex}-${index}">${source.SourceName}</label>
+                      <input class="form-check-input source-checkbox" type="checkbox" value="${type === 'Summary' ? source.FileName : source.SourceName}" id="source-${groupIndex}-${index}">
+                      <label class="form-check-label w-100 text-prewrap" for="source-${groupIndex}-${index}">${type === 'Summary' ? source.FileName : source.SourceName}</label>
                     </div>
                   </li>
                 `
@@ -2395,7 +2133,7 @@ export function createMultiSelectDropdown(tag) {
 
   let selectedSources = [];
 
-  const selectAllCheckbox = document.getElementById(`selectAll`);
+  const selectAllCheckbox = document.getElementById(`selectAll`) as HTMLInputElement;
   const groupCheckboxes = document.querySelectorAll(`.group-checkbox`);
   const individualCheckboxes = document.querySelectorAll(`.source-checkbox`);
   const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel`);
@@ -2407,11 +2145,11 @@ export function createMultiSelectDropdown(tag) {
   // Select All logic
   selectAllCheckbox.addEventListener("change", function () {
     const checked = this.checked;
-    groupCheckboxes.forEach(cb => cb.checked = checked);
+    groupCheckboxes.forEach(cb => (cb as HTMLInputElement).checked = checked);
     individualCheckboxes.forEach(cb => {
-      cb.checked = checked;
-      if (checked && !selectedSources.includes(cb.value)) {
-        selectedSources.push(cb.value);
+      (cb as HTMLInputElement).checked = checked;
+      if (checked && !selectedSources.includes((cb as HTMLInputElement).value)) {
+        selectedSources.push((cb as HTMLInputElement).value);
       }
       if (!checked) {
         selectedSources = [];
@@ -2427,17 +2165,17 @@ export function createMultiSelectDropdown(tag) {
       const groupItems = document.querySelectorAll(`[data-checkbox-id^="source-${groupIndex}-"] .source-checkbox`);
 
       groupItems.forEach(cb => {
-        cb.checked = this.checked;
-        if (this.checked && !selectedSources.includes(cb.value)) {
-          selectedSources.push(cb.value);
+        (cb as HTMLInputElement).checked = (this as HTMLInputElement).checked;
+        if ((this as HTMLInputElement).checked && !selectedSources.includes((cb as HTMLInputElement).value)) {
+          selectedSources.push((cb as HTMLInputElement).value);
         }
-        if (!this.checked) {
-          selectedSources = selectedSources.filter(s => s !== cb.value);
+        if (!(this as HTMLInputElement).checked) {
+          selectedSources = selectedSources.filter(s => s !== (cb as HTMLInputElement).value);
         }
       });
 
       // Update Select All state
-      selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => child.checked);
+      selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => (child as HTMLInputElement).checked);
       updateLabel();
     });
   });
@@ -2445,20 +2183,20 @@ export function createMultiSelectDropdown(tag) {
   // Individual checkbox logic
   individualCheckboxes.forEach(cb => {
     cb.addEventListener("change", function () {
-      if (cb.checked) {
-        if (!selectedSources.includes(cb.value)) selectedSources.push(cb.value);
+      if ((cb as HTMLInputElement).checked) {
+        if (!selectedSources.includes((cb as HTMLInputElement).value)) selectedSources.push((cb as HTMLInputElement).value);
       } else {
-        selectedSources = selectedSources.filter(s => s !== cb.value);
+        selectedSources = selectedSources.filter(s => s !== (cb as HTMLInputElement).value);
       }
 
       // Update parent group checkbox
       const groupIndex = cb.id.split("-")[1];
       const groupItems = document.querySelectorAll(`[data-checkbox-id^="source-${groupIndex}-"] .source-checkbox`);
-      const groupCheckbox = document.getElementById(`group-${groupIndex}`);
-      groupCheckbox.checked = Array.from(groupItems).every(child => child.checked);
+      const groupCheckbox = document.getElementById(`group-${groupIndex}`) as HTMLInputElement;
+      groupCheckbox.checked = Array.from(groupItems).every(child => (child as HTMLInputElement).checked);
 
       // Update Select All checkbox
-      selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => child.checked);
+      selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => (child as HTMLInputElement).checked);
 
       updateLabel();
     });
@@ -2467,9 +2205,9 @@ export function createMultiSelectDropdown(tag) {
   // Initialize with pre-selected sources
   if (tag.Sources && tag.Sources.length > 0) {
     individualCheckboxes.forEach(cb => {
-      if (tag.Sources.includes(cb.value)) {
-        cb.checked = true;
-        selectedSources.push(cb.value);
+      if (tag.Sources.includes((cb as HTMLInputElement).value)) {
+        (cb as HTMLInputElement).checked = true;
+        selectedSources.push((cb as HTMLInputElement).value);
       }
     });
 
@@ -2477,25 +2215,33 @@ export function createMultiSelectDropdown(tag) {
     groupCheckboxes.forEach(groupCb => {
       const groupIndex = groupCb.id.split("-")[1];
       const groupItems = document.querySelectorAll(`[data-checkbox-id^="source-${groupIndex}-"] .source-checkbox`);
-      groupCb.checked = Array.from(groupItems).every(child => child.checked);
+      (groupCb as HTMLInputElement).checked = Array.from(groupItems).every(child => (child as HTMLInputElement).checked);
     });
 
     // Update Select All
-    selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => child.checked);
+    selectAllCheckbox.checked = Array.from(individualCheckboxes).every(child => (child as HTMLInputElement).checked);
     updateLabel();
   }
 
   // Save
   document.getElementById(`ok-src-btn`).addEventListener("click", function () {
     tag.Sources = [...selectedSources];
-    const receivedEntry = sourceList.filter(source => selectedSources.includes(source.SourceName));
+    const store = StoreService.getInstance();
+    const receivedEntry = sourceList.filter(source => selectedSources.includes(type === 'Summary' ? source.FileName : source.SourceName));
     tag.TempSourceValue = receivedEntry.map((item) => {
       return item.VectorID ? String(item.VectorID) : item.SourceValue;
     });
+    if (type === 'Summary') {
+      tag.FileName = receivedEntry.map((item) => {
+        return item.FileName;
+      });
+    } else {
+      tag.SourceName = receivedEntry.map((item) => {
+        return item.SourceName;
+      });
+    }
 
-    tag.SourceName = receivedEntry.map((item) => {
-      return item.SourceName;
-    });
+
 
     tag.SourceValueID = receivedEntry.map((item) => {
       return String(item.VectorID);
@@ -2504,23 +2250,24 @@ export function createMultiSelectDropdown(tag) {
     tag.SourceValue = receivedEntry
       .map(source => source.SourceValue);
     accordionBody.innerHTML = chatfooter(tag);
-    initializeAIHistoryEvents(tag, jwt, availableKeys);
+    initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
   });
 
   // Cancel
   document.getElementById(`cancel-src-btn`).addEventListener("click", function () {
     accordionBody.innerHTML = chatfooter(tag);
-    initializeAIHistoryEvents(tag, jwt, availableKeys);
+    initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
   });
 }
 
 
 
 async function loadPromptTemplates() {
+  const store = StoreService.getInstance();
   try {
-    const data = await getAllPromptTemplates(jwt);
+    const data = await getAllPromptTemplates(store.jwt);
     if (data.Status && data.Data) {
-      promptBuilderList = data.Data;
+      store.promptBuilderList = data.Data;
     }
     // Do something with the data
   } catch (error) {
@@ -2544,8 +2291,9 @@ async function logBookmarksInSelection() {
       ?.classList.replace('d-none', 'd-block');
 
     if (bookmarks.length > 1) {
-      selectedNames = bookmarks;
-      renderSelectedTags(selectedNames, availableKeys);
+      const store = StoreService.getInstance();
+      store.selectedNames = bookmarks;
+      renderSelectedTags(store.selectedNames, store.availableKeys);
       return;
     }
 
@@ -2553,10 +2301,11 @@ async function logBookmarksInSelection() {
     const seachBox = document.getElementById('search-box') as HTMLInputElement;
     if (seachBox) {
       const processedName = bookmarks[0];
-      selectedNames = [processedName];
+      const store = StoreService.getInstance();
+      store.selectedNames = [processedName];
       selectMatchingBookmarkFromSelection(processedName);
 
-      const aiTag = availableKeys.find(k =>
+      const aiTag = store.availableKeys.find(k =>
         k.AIFlag === 1 &&
         (k.DisplayName.toLowerCase() === processedName.toLowerCase() ||
           `id${k.ID}`.toLowerCase() === processedName.toLowerCase())
@@ -2567,7 +2316,7 @@ async function logBookmarksInSelection() {
       const appBody = document.getElementById('app-body');
       appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-      appBody.innerHTML = await generateCheckboxHistory(aiTag);
+      appBody.innerHTML = await generateCheckboxHistory(aiTag, "AITag");
     }
 
 
@@ -2591,8 +2340,9 @@ function pickRelevantBookmarks(bookmarks: string[]) {
   const normalized = Array.from(new Set(bookmarks.map(normalizeBookmark)));
 
   // Prefer AI tags only
+  const store = StoreService.getInstance();
   return normalized.filter(name =>
-    availableKeys.some(
+    store.availableKeys.some(
       k => k.AIFlag === 1 &&
         (k.DisplayName.toLowerCase() === name.toLowerCase() ||
           `id${k.ID}`.toLowerCase() === name.toLowerCase())
@@ -2601,101 +2351,40 @@ function pickRelevantBookmarks(bookmarks: string[]) {
 }
 
 async function getImages() {
-  const generalImages = await getGeneralImages(jwt);
-  const ID = dataList.ID;
-  const documentImages = await getReportHeadImageById(ID, jwt);
-  let mappedDocumentImages = mapImagesToComponentObjects(documentImages['Data']);
-  let mappedImages = mapImagesToComponentObjects(generalImages['Data']);
-  dataList.GroupKeyAll.push(...mappedImages);
-  dataList.GroupKeyAll.push(...mappedDocumentImages);
-  availableKeys.push(...mappedImages);
-  availableKeys.push(...mappedDocumentImages);
-  imageList = dataList.GroupKeyAll.filter(element => element.ComponentKeyDataType === 'IMAGE');
-  const searchBox = document.getElementById('search-box');
-  const suggestionList = document.getElementById('suggestion-list');
-  if (!searchBox || !suggestionList) return;
-  function updateSuggestions() {
-    const searchTerm = searchBox.value.trim().toLowerCase();
-    suggestionList.replaceChildren();
+  try {
+    const store = StoreService.getInstance();
+    const userId = sessionStorage.getItem('userId') || '0';
 
-    if (searchTerm === '') {
-      suggestionList.innerHTML = '';
-      return;
+    // Fetch Images and Clients in parallel
+    const generalImagesPromise = getGeneralImages(store.jwt);
+    const documentImagesPromise = getReportHeadImageById(store.dataList.ID, store.jwt);
+    const clientsPromise = getAllClients(userId, store.jwt);
+
+    const [generalImages, documentImages, clientsData] = await Promise.all([
+      generalImagesPromise,
+      documentImagesPromise,
+      clientsPromise
+    ]);
+
+    const mappedGeneral = mapImagesToComponentObjects(generalImages['Data']);
+    const mappedDocument = mapImagesToComponentObjects(documentImages['Data']);
+
+    // Update Store with Images
+    store.dataList.GroupKeyAll.push(...mappedGeneral);
+    store.dataList.GroupKeyAll.push(...mappedDocument);
+    store.availableKeys.push(...mappedGeneral);
+    store.availableKeys.push(...mappedDocument);
+    store.imageList = store.dataList.GroupKeyAll.filter(element => element.ComponentKeyDataType === 'IMAGE');
+
+    // Update Store with Clients
+    if (clientsData.Status && clientsData.Data) {
+      store.clientList = clientsData.Data;
     }
 
-    const filteredMentions = availableKeys.filter(m =>
-      m.DisplayName.toLowerCase().includes(searchTerm)
-    );
-
-    // Split groups
-    const nonAITags = filteredMentions.filter(m => m.AIFlag === 0);
-    const aiTags = filteredMentions.filter(m => m.AIFlag === 1);
-
-    // Further split non-AI tags into: TEXT + IMAGE
-    const propertiesTags = nonAITags.filter(m => m.ComponentKeyDataType === "TEXT" || m.ComponentKeyDataType === "TABLE");
-    const imageTags = nonAITags.filter(m => m.ComponentKeyDataType === "IMAGE" && m.IsImage);
-
-    const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
-      if (mentions.length === 0) return;
-
-      const themeClasses = theme === 'Dark'
-        ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
-        : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
-
-      const label = document.createElement('li');
-      label.className = `list-group-item fw-bold text-secondary ${themeClasses.labelClass}`;
-      label.textContent = labelText;
-      suggestionList.appendChild(label);
-
-      mentions.forEach(mention => {
-        const listItem = document.createElement('li');
-        listItem.className = `list-group-item list-group-item-action ${themeClasses.itemClass}`;
-
-        // ICON LOGIC
-        let icon = `<i class="fa-solid fa-layer-group text-muted me-2"></i>`; // default (TEXT)
-        if (isAISection) icon = `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`;
-        if (isImageSection) icon = `<i class="fa-solid fa-image text-muted me-2"></i>`;
-
-        listItem.innerHTML = `${icon} ${mention.DisplayName}`;
-
-        listItem.onclick = () => {
-          if (isAISection) {
-            const appBody = document.getElementById('app-body');
-            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-            generateCheckboxHistory(mention)
-              .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
-              .then(html => { appBody.innerHTML = html; });
-          } else {
-            // Properties + Images behave same
-            replaceMention(mention, mention.ComponentKeyDataType);
-            suggestionList.replaceChildren();
-          }
-        };
-
-        suggestionList.appendChild(listItem);
-      });
-    };
-
-    // Render in desired order
-    createSection('Properties', propertiesTags);
-    createSection('AI Tags', aiTags, true);
-    createSection('Images', imageTags, false, true);
-  }
-
-  if (selectedNames.length > 0) {
-    const badgeWrapper = document.getElementById('tags-in-selected-text');
-    badgeWrapper.classList.remove('d-none');
-    badgeWrapper.classList.add('d-block');
-    renderSelectedTags(selectedNames, availableKeys);
-  }
-
-  // Add input event listener to the search box
-  let debounceTimeout;
-  searchBox.addEventListener('input', () => {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(updateSuggestions, 300); // Delay input handling by 300ms
-  });
-  if (imageList && imageList.length > 0) {
-    toaster('Images are loaded and ready for use', 'success');
+    if (store.imageList && store.imageList.length > 0) {
+      toaster('Images and data are loaded and ready for use', 'success');
+    }
+  } catch (error) {
+    console.error("Error loading background data:", error);
   }
 }

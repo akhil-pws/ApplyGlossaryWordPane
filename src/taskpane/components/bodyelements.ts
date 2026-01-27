@@ -1,7 +1,7 @@
-import { colorPallete, customTableStyle, theme } from "../taskpane";
+import { StoreService } from "../services/store.service";
 import { wordTableStyles } from "./tablestyles";
 
-function addtagbody(sponsorOptions,sourceOptions) {
+function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
   const body = `<div class="modal-dialog">
   <div class="modal-content">
     <div class="modal-body p-3 pt-0">
@@ -23,7 +23,7 @@ function addtagbody(sponsorOptions,sourceOptions) {
 
       
 
-        <div class="mb-3">
+        <div class="mb-3" ${isSummaryMode ? 'style="display: none;"' : ''}>
           <label for="source" class="form-label"><span class="text-danger">*</span> Primary Source Type</label>
           <div class="dropdown w-100">
             <button 
@@ -116,7 +116,8 @@ function addtagbody(sponsorOptions,sourceOptions) {
 
 
 function Confirmationpopup(content: string) {
-  const isDark = theme === 'Dark';
+  const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
   const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
 
   const body = `
@@ -143,24 +144,25 @@ function Confirmationpopup(content: string) {
 
 
 function customizeTablePopup(selectedValue: string, type: string) {
-  const isDark = theme === "Dark";
+  const store = StoreService.getInstance();
+  const isDark = store.theme === "Dark";
   const popupClass = isDark ? "bg-dark text-light" : "bg-light text-dark";
-  const header= type === "Custom" ? "Customized Tables" : "Default Tables";
-  const sourceList = type === "Custom" ? customTableStyle : wordTableStyles;
-  const warningContent = type === "Custom"? '':'<small class="text-secondary font-italic">Warning: The previewed table colors may vary depending on the accent or theme currently selected in Word.</small>'
+  const header = type === "Custom" ? "Customized Tables" : "Default Tables";
+  const sourceList = type === "Custom" ? store.customTableStyle : wordTableStyles;
+  const warningContent = type === "Custom" ? '' : '<small class="text-secondary font-italic">Warning: The previewed table colors may vary depending on the accent or theme currently selected in Word.</small>'
   const dropdown = `
     <select class="form-select mb-2 ${popupClass}" id="confirmation-popup-dropdown">
       ${sourceList
-        .map(opt => {
-          const value = type === "Custom" ? opt.Name : opt.style;
-          const isSelected = value === selectedValue;
-          const text = type === "Custom" ? opt.Name : opt.style;
+      .map(opt => {
+        const value = type === "Custom" ? opt.Name : opt.style;
+        const isSelected = value === selectedValue;
+        const text = type === "Custom" ? opt.Name : opt.style;
 
-          return `<option value="${value}" ${isSelected ? "selected" : ""}>
+        return `<option value="${value}" ${isSelected ? "selected" : ""}>
                     ${text}
                   </option>`;
-        })
-        .join("")}
+      })
+      .join("")}
     </select>
   `;
 
@@ -220,7 +222,8 @@ function customizeTablePopup(selectedValue: string, type: string) {
 }
 
 function DataModalPopup(selectedData) {
-  const isDark = theme === 'Dark';
+  const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
   const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
 
   return `
@@ -287,15 +290,37 @@ function toaster(message: string, type: string) {
 }
 
 function logoheader(storedUrl) {
-  const themeicon = theme === 'Dark' ? 'fa-sun' : 'fa-moon'
+  const store = StoreService.getInstance();
+  const themeicon = store.theme === 'Dark' ? 'fa-sun' : 'fa-moon'
+  const modeIcon = store.mode === 'Home' ? 'fa-home' : store.mode === 'Summary' ? 'fa-wand-magic-sparkles' : 'fa-magnifying-glass';
   const body = `
     <img id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo">
     <div class="icon-nav me-3">
-      <i class="fa fa-home c-pointer me-3" title="Home" id="home"></i>
+    <div class="dropdown d-inline">
+        <i class="fa ${modeIcon} c-pointer me-3" id="modeDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Mode"></i>
+        <ul class="dropdown-menu" aria-labelledby="modeDropdown" appendTo="body">
+        <li>
+            <a class="dropdown-item" href="#" id="home">
+              <i class="fa fa-home me-2" aria-hidden="true"></i> Draft Mode
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="#" id="summary-mode">
+              <i class="fa fa-wand-magic-sparkles me-2" aria-hidden="true"></i> Summary Mode
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item disabled-link" href="#" id="review-mode">
+              <i class="fa fa-magnifying-glass me-2" aria-hidden="true"></i> Review Mode
+            </a>
+          </li>
+        </ul>
+      </div>
+
+
       <div class="dropdown d-inline">
         <i class="fa fa-tools c-pointer me-3" id="settingsDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Settings"></i>
         <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
-        <li>
         <li>
             <a class="dropdown-item" href="#" id="define-formatting">
               <i class="fa fa-sliders-h me-2" aria-hidden="true"></i> Define Formatting
