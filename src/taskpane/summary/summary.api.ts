@@ -135,3 +135,19 @@ export async function addSummaryTag(payload: any, jwt: string): Promise<any> {
 
   return await response.json();
 }
+export async function updateSummaryTagPrompt(payload: { Name: string; Prompt: string }, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/summarytag/update-prompt`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok.');
+  }
+
+  return await response.json();
+}
