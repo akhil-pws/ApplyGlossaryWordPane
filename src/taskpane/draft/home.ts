@@ -6,7 +6,7 @@ import { AIService } from "../services/ai.service";
 import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
 import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
-import { updateSummaryHistory } from "../summary/summary.api";
+import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 
 let preview = '';
 
@@ -929,9 +929,18 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                 try {
                                     document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'true');
                                     document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'true');
-                                    let updatedTag = JSON.parse(JSON.stringify(tag));
-                                    updatedTag.Prompt = chat.Prompt;
-                                    const data = await updatePromptTemplate(updatedTag, jwt);
+                                    let data: any;
+                                    if (type === 'Summary') {
+                                        const payload = {
+                                            Name: tag.Name,
+                                            Prompt: chat.Prompt
+                                        };
+                                        data = await updateSummaryTagPrompt(payload, jwt);
+                                    } else {
+                                        let updatedTag = JSON.parse(JSON.stringify(tag));
+                                        updatedTag.Prompt = chat.Prompt;
+                                        data = await updatePromptTemplate(updatedTag, jwt);
+                                    }
                                     if (data['Status']) {
                                         toaster('Updated Succesfully', 'success');
                                         container.innerHTML = '';
