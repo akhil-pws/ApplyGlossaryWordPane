@@ -42,6 +42,7 @@ export class StoreService {
         "IsSideHeaderBold": false
     };
     public customTableStyle: any[] = [];
+    public currentChatTagId: number = -1;
 
     private constructor() { }
 

@@ -2064,7 +2064,6 @@ export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
     groups[source.SourceType].push(source);
     return groups;
   }, {});
-  debugger
 
   const multiSelectHTML = `
   <div class='p-3 w-100'>

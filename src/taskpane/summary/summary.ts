@@ -15,9 +15,6 @@ import { Confirmationpopup, toaster } from "../components/bodyelements";
 
 export var summarySelectedNames: string[] = [];
 
-let isSummaryLoading = false;
-let allSummaryTags: any[] = [];
-let currentSummaryStatus = 0;
 let currentSummaryInstance = 0;
 
 export async function loadSummarypage(availableKeys: any[]) {
@@ -120,6 +117,11 @@ export async function loadSummarypage(availableKeys: any[]) {
     if (reanalyzeBtn) reanalyzeBtn.classList.toggle("disabled", !enabled);
   }
 
+  // ✅ Local state for this instance
+  let isSummaryLoading = false;
+  let allSummaryTags: any[] = [];
+  let currentSummaryStatus = 0;
+
   // ✅ helper to normalize API response into string[]
   function normalizeNames(res: any): string[] {
     let names =
@@ -175,18 +177,13 @@ export async function loadSummarypage(availableKeys: any[]) {
       const row = document.createElement('button');
       row.type = 'button';
 
-      const isActive = currentSummaryStatus === 2;
       const themeClasses = store.theme === 'Dark'
-        ? `bg-dark text-light ${isActive ? 'list-hover-dark' : 'opacity-50'}`
-        : `bg-light text-dark ${isActive ? 'list-hover-light' : 'opacity-50'}`;
+        ? `bg-dark text-light list-hover-dark`
+        : `bg-light text-dark list-hover-light`;
 
       row.className =
         `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${themeClasses}`;
 
-      if (!isActive) {
-        row.disabled = true;
-        row.style.cursor = 'not-allowed';
-      }
 
       const tagStatus = (tag.Status === undefined || tag.Status === null) ? "1" : String(tag.Status);
 
@@ -208,23 +205,21 @@ export async function loadSummarypage(availableKeys: any[]) {
         </div>
       `;
 
-      if (isActive) {
-        row.onclick = async () => {
-          try {
-            const appBody = document.getElementById('app-body');
-            appBody.innerHTML = `
-            <div id="button-container">
-              <div class="loader" id="loader"></div>
-            </div>
-          `;
-            const html = await generateCheckboxHistory(tag, "Summary");
-            appBody.innerHTML = html;
-          } catch {
-            document.getElementById('app-body').innerHTML =
-              '<div class="text-danger p-2">Error loading data</div>';
-          }
-        };
-      }
+      row.onclick = async () => {
+        try {
+          const appBody = document.getElementById('app-body');
+          appBody.innerHTML = `
+          <div id="button-container">
+            <div class="loader" id="loader"></div>
+          </div>
+        `;
+          const html = await generateCheckboxHistory(tag, "Summary");
+          appBody.innerHTML = html;
+        } catch {
+          document.getElementById('app-body').innerHTML =
+            '<div class="text-danger p-2">Error loading data</div>';
+        }
+      };
 
       list.appendChild(row);
 
@@ -336,7 +331,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       // ✅ 2) check Data.SummaryTagGenerated from GET API response
       currentSummaryStatus = getRes?.Data?.SummaryTagGenerated;
 
-      // ✅ 3) Render tags immediately (no loader/table hide logic)
+      // ✅ 3) Render tags immediately
       allSummaryTags = getRes?.Data?.SummaryTags || [];
       store.sourceSummaryList = deduplicateSummarySources(getRes?.Data?.SummarySources || []);
       filtered = allSummaryTags;
@@ -344,7 +339,10 @@ export async function loadSummarypage(availableKeys: any[]) {
 
       const summaryStatus = currentSummaryStatus;
 
-      if (summaryStatus === 2) {
+      // Check if any tag is still processing (status 0)
+      const hasProcessingTags = allSummaryTags.some(t => String(t.Status) === "0");
+
+      if (summaryStatus === 2 && !hasProcessingTags) {
         setReanalyzeButtonState(true);
 
         if (allSummaryTags && allSummaryTags.length > 0) {
@@ -370,17 +368,21 @@ export async function loadSummarypage(availableKeys: any[]) {
         await pollSummaryUntilDone();
       }
 
-      // status 1 -> poll until 2
-      if (summaryStatus === 1) {
+      // status 1 OR (status 2 but tags still processing) -> poll until 2
+      if (summaryStatus === 1 || hasProcessingTags) {
         await pollSummaryUntilDone();
       }
 
     } catch (err) {
       console.error("Summary load failed:", err);
-      if (list) list.innerHTML = `<div class="p-3 text-danger">Failed to load Summary mode</div>`;
+      if (list && instanceId === currentSummaryInstance) {
+        list.innerHTML = `<div class="p-3 text-danger">Failed to load Summary mode</div>`;
+      }
     } finally {
-      isSummaryLoading = false;
-      disableActionButtons(false);
+      if (instanceId === currentSummaryInstance) {
+        isSummaryLoading = false;
+        disableActionButtons(false);
+      }
     }
   }
 
@@ -403,7 +405,6 @@ export async function loadSummarypage(availableKeys: any[]) {
 
       // Latest history is usually index 0 after unshift, but let's check or just take first in raw list
       const lastHistory = history[0];
-      debugger
       const payload = {
         ReportHeadID: Number(store.documentID),
         ReportHeadSummaryTagID: tag.ID || tag.ReportHeadSummaryTagID,
@@ -432,46 +433,67 @@ export async function loadSummarypage(availableKeys: any[]) {
 
   // ✅ Ping API every 10 sec until status becomes 2 and all tags processed
   async function pollSummaryUntilDone() {
-    while (instanceId === currentSummaryInstance) {
-      const statusRes = await getSummaryTagStatus(store.documentID, store.jwt);
-      const data = statusRes?.Data;
-      const status = data?.SummaryTagGenerated;
-      const tagStatuses = data?.SummaryTagStatus || [];
+    try {
+      while (instanceId === currentSummaryInstance) {
+        const statusRes = await getSummaryTagStatus(store.documentID, store.jwt);
+        if (instanceId !== currentSummaryInstance) break;
 
-      currentSummaryStatus = status;
+        const data = statusRes?.Data;
+        const status = data?.SummaryTagGenerated;
+        const tagStatuses = data?.SummaryTagStatus || [];
 
-      // Update individual tag statuses in our local list if they exist in the response
-      if (tagStatuses && tagStatuses.length > 0) {
-        tagStatuses.forEach((ts: any) => {
-          const matchingTag = allSummaryTags.find(t => (t.ReportHeadSummaryTagID || t.ID) === ts.ReportHeadSummaryTagID);
-          if (matchingTag) {
-            matchingTag.Status = ts.Status;
-          }
-        });
-        renderAll();
-      }
+        currentSummaryStatus = status;
 
-      // Check if all tags are processed (status != "0")
-      // We consider it done only if status is 2 and there are no tags with Status "0"
-      const allTagsProcessed = tagStatuses.length > 0 ? tagStatuses.every((t: any) => String(t.Status) !== "0") : true;
+        // Update individual tag statuses in our local list if they exist in the response
+        if (tagStatuses && tagStatuses.length > 0) {
+          tagStatuses.forEach((ts: any) => {
+            const matchingTag = allSummaryTags.find(t => (t.ReportHeadSummaryTagID || t.ID) === ts.ReportHeadSummaryTagID);
+            if (matchingTag) {
+              const oldStatus = String(matchingTag.Status);
+              matchingTag.Status = ts.Status;
 
-      if (status === 2 && allTagsProcessed) {
-        setReanalyzeButtonState(true);
-
-        // after done -> fetch tags again and render
-        const getRes2 = await getSummaryTagsByReportHeadId(store.documentID, store.jwt);
-        allSummaryTags = getRes2?.Data?.SummaryTags || [];
-        filtered = allSummaryTags;
-
-        if (allSummaryTags && allSummaryTags.length > 0) {
-          summarySelectedNames = normalizeNames(allSummaryTags);
+              // Auto-refresh chat if currently viewing this tag and status changed from 0
+              if (store.currentChatTagId === ts.ReportHeadSummaryTagID && oldStatus === "0" && String(ts.Status) !== "0") {
+                generateCheckboxHistory(matchingTag, "Summary").then(html => {
+                  const appBody = document.getElementById('app-body');
+                  if (appBody && store.currentChatTagId === ts.ReportHeadSummaryTagID) appBody.innerHTML = html;
+                });
+              }
+            }
+          });
+          renderAll();
         }
 
-        renderAll();
-        break;
-      }
+        // Check if all tags are processed (status != "0")
+        // We consider it done only if status is 2 and there are no tags with Status "0"
+        const allTagsProcessed = tagStatuses.length > 0 ? tagStatuses.every((t: any) => String(t.Status) !== "0") : true;
 
-      await new Promise(r => setTimeout(r, 10000));
+        if (status === 2 && allTagsProcessed) {
+          setReanalyzeButtonState(true);
+
+          // after done -> fetch tags again and render
+          const getRes2 = await getSummaryTagsByReportHeadId(store.documentID, store.jwt);
+          if (instanceId !== currentSummaryInstance) break;
+
+          allSummaryTags = getRes2?.Data?.SummaryTags || [];
+          filtered = allSummaryTags;
+
+          if (allSummaryTags && allSummaryTags.length > 0) {
+            summarySelectedNames = normalizeNames(allSummaryTags);
+          }
+
+          renderAll();
+          break;
+        }
+
+        await new Promise(r => setTimeout(r, 10000));
+      }
+    } catch (err) {
+      console.error("Polling failed:", err);
+      // restart polling after a delay if still active instance
+      if (instanceId === currentSummaryInstance) {
+        setTimeout(pollSummaryUntilDone, 10000);
+      }
     }
   }
 
@@ -512,6 +534,8 @@ export async function loadSummarypage(availableKeys: any[]) {
 
         const res = await refreshSummaryMode(payload, store.jwt);
 
+        if (instanceId !== currentSummaryInstance) return;
+
         // Immediately update state and UI from response
         if (res?.Data) {
           allSummaryTags = res.Data.SummaryTags || [];
@@ -531,7 +555,11 @@ export async function loadSummarypage(availableKeys: any[]) {
 
       } catch (err) {
         console.error("Refresh failed:", err);
-        setReanalyzeButtonState(true);
+        if (instanceId === currentSummaryInstance) {
+          setReanalyzeButtonState(true);
+          disableActionButtons(false);
+          isSummaryLoading = false;
+        }
       }
     };
 
