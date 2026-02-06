@@ -1,13 +1,19 @@
-import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "../api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, renderSelectedTags, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle } from "../functions";
-import { addGenAITags, aiTagList, applyTagFn, availableKeys, colorPallete, createMultiSelectDropdown, customizeTable, fetchAIHistory, isPendingResponse, jwt, mentionDropdownFn, selectedNames, sendPrompt, sourceList, tableStyle, theme } from "../taskpane";
-import { Confirmationpopup, DataModalPopup, toaster } from "./bodyelements";
+import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid } from "./draft-functions";
+import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, mentionDropdownFn } from "../taskpane";
+import { StoreService } from "../services/store.service";
+import { AIService } from "../services/ai.service";
+import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
+import { loadSummarypage } from "../summary/summary";
+import { summaryService } from "../services/summary.service";
+import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 
 let preview = '';
 
 
 export function loadHomepage(availableKeys) {
-    const searchBoxClass = theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
+    const store = StoreService.getInstance();
+    const searchBoxClass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
 
     document.getElementById('app-body').innerHTML = `
     <div class="container pt-3">
@@ -54,7 +60,7 @@ export function loadHomepage(availableKeys) {
         </div>
     </div>`;
 
-    const searchBox = document.getElementById('search-box');
+    const searchBox = document.getElementById('search-box') as HTMLInputElement;
     const suggestionList = document.getElementById('suggestion-list');
 
     function updateSuggestions() {
@@ -81,7 +87,7 @@ export function loadHomepage(availableKeys) {
         const createSection = (labelText, mentions, isAISection = false, isImageSection = false) => {
             if (mentions.length === 0) return;
 
-            const themeClasses = theme === 'Dark'
+            const themeClasses = store.theme === 'Dark'
                 ? { itemClass: 'bg-dark text-light list-hover-dark', labelClass: 'bg-dark text-light' }
                 : { itemClass: 'bg-light text-dark list-hover-light', labelClass: 'bg-light text-dark' };
 
@@ -105,7 +111,7 @@ export function loadHomepage(availableKeys) {
                     if (isAISection) {
                         const appBody = document.getElementById('app-body');
                         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                        generateCheckboxHistory(mention)
+                        generateCheckboxHistory(mention, "AITag")
                             .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
                             .then(html => { appBody.innerHTML = html; });
                     } else {
@@ -125,11 +131,11 @@ export function loadHomepage(availableKeys) {
         createSection('Images', imageTags, false, true);
     }
 
-    if (selectedNames.length > 0) {
+    if (store.selectedNames.length > 0) {
         const badgeWrapper = document.getElementById('tags-in-selected-text');
         badgeWrapper.classList.remove('d-none');
         badgeWrapper.classList.add('d-block');
-        renderSelectedTags(selectedNames, availableKeys);
+        renderSelectedTags(store.selectedNames, availableKeys);
     }
 
     // Add input event listener to the search box
@@ -140,25 +146,25 @@ export function loadHomepage(availableKeys) {
     });
 
     document.getElementById('add-btn-tag').addEventListener('click', () => {
-        if (!isPendingResponse) {
+        if (!store.isPendingResponse) {
             addGenAITags();
         }
     });
 
     document.getElementById('customized-table').addEventListener('click', () => {
-        if (!isPendingResponse) {
+        if (!store.isPendingResponse) {
             customizeTable('Custom');
         }
     })
 
     document.getElementById('predefined-table').addEventListener('click', () => {
-        if (!isPendingResponse) {
+        if (!store.isPendingResponse) {
             customizeTable('Pre');
         }
     })
 
     document.getElementById('apply-btn-tag').addEventListener('click', () => {
-        if (!isPendingResponse) {
+        if (!store.isPendingResponse) {
             applyTagFn();
         }
     });
@@ -208,113 +214,73 @@ export async function replaceMention(word: any, type: any) {
                                 continue;
                             }
 
-                            const maxCols = Math.max(...rows.map(row => {
-                                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                                }, 0);
-                            }));
+                            let grid = parseHtmlTableToGrid(rows);
+                            const store = StoreService.getInstance();
+                            const base = store.tableStyle.split(" - ")[0].trim();
+
+                            if (base === 'Table Grid 2') {
+                                store.isReversed = true;
+                            }
+
+                            if (store.isReversed) {
+                                grid = transposeGrid(grid);
+                            }
+
+                            const numRows = grid.length;
+                            const numCols = grid[0]?.length || 0;
 
                             const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
                             await context.sync();
 
-                            const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            const resolvedTableStyle = resolveWordTableStyle(tableStyle);
+                            const table = paragraph.insertTable(numRows, numCols, Word.InsertLocation.after);
+                            const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
                             if (resolvedTableStyle !== 'none') {
                                 table.style = resolvedTableStyle;
-                            }  // Apply built-in Word table style
+                            }
 
                             await context.sync();
-                            if (colorPallete.Customize) {
-                                await colorTable(table, rows, context);
-                            }
-                            else {
-                                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-                                let lastParamRowIndex = -1; // row index of last non-empty Parameter cell
 
-                                rows.forEach((row, rowIndex) => {
-                                    const cells = Array.from(row.querySelectorAll('td, th'));
-                                    let cellIndex = 0;
-
-                                    // track first column text in HTML row
-                                    let firstColText = "";
-
-                                    cells.forEach((cell) => {
-                                        while (rowspanTracker[cellIndex] > 0) {
-                                            rowspanTracker[cellIndex]--;
-                                            cellIndex++;
-                                        }
-
-                                        const cellText = Array.from(cell.childNodes)
-                                            .map(node => {
-                                                if (node.nodeType === Node.TEXT_NODE) {
-                                                    return node.textContent?.trim() || '';
-                                                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                    return (node as HTMLElement).innerText.trim();
-                                                }
-                                                return '';
-                                            })
-                                            .filter(text => text.length > 0)
-                                            .join(' ');
-
-                                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                                        // save first column text if this is first column
-                                        if (cellIndex === 0) {
-                                            firstColText = cellText.trim();
-                                        }
-
-                                        table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                        // colspan blank filling
-                                        for (let i = 1; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols) {
-                                                table.getCell(rowIndex, cellIndex + i).value = "";
-                                            }
-                                        }
-
-                                        // rowspan tracking
-                                        if (rowspan > 1) {
-                                            for (let i = 0; i < colspan; i++) {
-                                                if (cellIndex + i < maxCols) {
-                                                    rowspanTracker[cellIndex + i] = rowspan - 1;
-                                                }
-                                            }
-                                        }
-
-                                        cellIndex += colspan;
+                            // Population/Merging logic
+                            if (!store.isReversed) {
+                                if (!store.colorPallete.Customize) {
+                                    grid.forEach((row, rowIndex) => {
+                                        row.forEach((cellValue, cellIndex) => {
+                                            table.getCell(rowIndex, cellIndex).value = cellValue;
+                                        });
                                     });
 
-                                    // ✅ AFTER filling the row → apply merge logic for 1st column
-                                    if (rowIndex === 0) {
-                                        // header row typically
-                                        return;
-                                    }
-
-                                    if (firstColText) {
-                                        // new parameter starts
-                                        lastParamRowIndex = rowIndex;
-                                    } else {
-                                        // empty parameter row → merge vertically with previous parameter row
-                                        if (lastParamRowIndex !== -1) {
+                                    // Vertical merging logic for 1st column (standard view)
+                                    let lastParamRowIndex = -1;
+                                    grid.forEach((row, rowIndex) => {
+                                        if (rowIndex === 0) return; // skip header
+                                        const firstColText = row[0];
+                                        if (firstColText) {
+                                            lastParamRowIndex = rowIndex;
+                                        } else if (lastParamRowIndex !== -1) {
                                             const topCell = table.getCell(lastParamRowIndex, 0);
                                             const bottomCell = table.getCell(rowIndex, 0);
-
-                                            // merge bottom into top
                                             topCell.merge(bottomCell);
-
-                                            // ✅ center align merged cell
                                             try {
                                                 topCell.verticalAlignment = Word.VerticalAlignment.center;
                                                 topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
-                                            } catch (e) {
-                                                // ignore (safe fallback)
-                                            }
+                                            } catch (e) { }
                                         }
-                                    }
+                                    });
+                                }
+                            } else {
+                                // Manual population for transposed table
+                                grid.forEach((row, rowIndex) => {
+                                    row.forEach((cellValue, cellIndex) => {
+                                        table.getCell(rowIndex, cellIndex).value = cellValue;
+                                    });
                                 });
-
                             }
+
+                            // Styling logic (always call if Customize, now passing isReversed)
+                            if (store.colorPallete.Customize) {
+                                await colorTable(table, rows, context, store.isReversed);
+                            }
+
 
                             newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
                         } else {
@@ -383,9 +349,14 @@ export async function openAITag(tag) {
 
 }
 
-export async function generateCheckboxHistory(tag) {
-    if (!tag.FilteredReportHeadAIHistoryList || tag.FilteredReportHeadAIHistoryList.length === 0) {
-        await fetchAIHistory(tag);
+export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
+    var skipFetch = false;
+    if ((!tag.FilteredReportHeadAIHistoryList || tag.FilteredReportHeadAIHistoryList.length === 0) && !skipFetch) {
+        if (type !== 'Summary') {
+            await AIService.fetchAIHistory(tag);
+        } else {
+            await summaryService.fetchSummaryAIHistory(tag);
+        }
     }
 
     const history = tag.FilteredReportHeadAIHistoryList;
@@ -395,17 +366,20 @@ export async function generateCheckboxHistory(tag) {
     }
 
     // Check current theme
-    const isDark = theme === 'Dark';
+    const store = StoreService.getInstance();
+    const isDark = store.theme === 'Dark';
     const closeBtnClass = isDark
         ? 'fa-solid fa-circle-xmark bg-dark text-light'
         : 'fa-solid fa-circle-xmark bg-light text-dark';
 
+    const headerBgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
+    const DisplayName = type === 'Summary' ? tag.Name : tag.DisplayName;
     const closeBar = `
-    <div class="chat-header sticky-top bg-white z-3">
+    <div class="chat-header sticky-top ${headerBgClass} z-3">
         <div class="d-flex justify-content-between align-items-center px-2 pt-3">
             <div class="d-flex align-items-center ms-3">
                 <i class="fa fa-microchip-ai text-muted me-2"></i>
-                <span class="fw-bold">${tag.DisplayName}</span>
+                <span class="fw-bold">${DisplayName}</span>
             </div>
             <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
                 <i class="${closeBtnClass}" id="close-ai-window"></i>
@@ -427,7 +401,7 @@ export async function generateCheckboxHistory(tag) {
         </div>
     `;
 
-    initializeAIHistoryEvents(tag, jwt, availableKeys);
+    initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
 
     return `${closeBar}${chatBody}${chatFooterHtml}`;
 }
@@ -676,120 +650,70 @@ export async function insertTagPrompt(tag) {
                             const rows = Array.from(el.querySelectorAll("tr"));
                             if (!rows.length) continue;
 
-                            const maxCols = Math.max(
-                                ...rows.map(r =>
-                                    Array.from(r.querySelectorAll("td, th"))
-                                        .reduce(
-                                            (s, c) => s + parseInt(c.getAttribute("colspan") || "1"),
-                                            0
-                                        )
-                                )
-                            );
+                            let grid = parseHtmlTableToGrid(rows);
+                            const store = StoreService.getInstance();
+                            const base = store.tableStyle.split(" - ")[0].trim();
+
+                            if (base === 'Table Grid 2') {
+                                store.isReversed = true;
+                            }
+
+                            if (store.isReversed) {
+                                grid = transposeGrid(grid);
+                            }
+
+                            const numRows = grid.length;
+                            const numCols = grid[0]?.length || 0;
 
                             const p = cursor.insertParagraph("", Word.InsertLocation.after);
-                            const table = p.insertTable(
-                                rows.length,
-                                maxCols,
-                                Word.InsertLocation.after
-                            );
+                            const table = p.insertTable(numRows, numCols, Word.InsertLocation.after);
 
-                            const resolvedTableStyle = resolveWordTableStyle(tableStyle);
+                            const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
                             if (resolvedTableStyle !== 'none') {
                                 table.style = resolvedTableStyle;
                             }
 
-                            if (colorPallete.Customize) {
-                                await colorTable(table, rows, context);
-                            } else {
-                                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-                                let lastParamRowIndex = -1; // row index of last non-empty Parameter cell
-
-                                rows.forEach((row, rowIndex) => {
-                                    const cells = Array.from(row.querySelectorAll('td, th'));
-                                    let cellIndex = 0;
-
-                                    // track first column text in HTML row
-                                    let firstColText = "";
-
-                                    cells.forEach((cell) => {
-                                        while (rowspanTracker[cellIndex] > 0) {
-                                            rowspanTracker[cellIndex]--;
-                                            cellIndex++;
-                                        }
-
-                                        const cellText = Array.from(cell.childNodes)
-                                            .map(node => {
-                                                if (node.nodeType === Node.TEXT_NODE) {
-                                                    return node.textContent?.trim() || '';
-                                                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                    return (node as HTMLElement).innerText.trim();
-                                                }
-                                                return '';
-                                            })
-                                            .filter(text => text.length > 0)
-                                            .join(' ');
-
-                                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                                        // save first column text if this is first column
-                                        if (cellIndex === 0) {
-                                            firstColText = cellText.trim();
-                                        }
-
-                                        table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                        // colspan blank filling
-                                        for (let i = 1; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols) {
-                                                table.getCell(rowIndex, cellIndex + i).value = "";
-                                            }
-                                        }
-
-                                        // rowspan tracking
-                                        if (rowspan > 1) {
-                                            for (let i = 0; i < colspan; i++) {
-                                                if (cellIndex + i < maxCols) {
-                                                    rowspanTracker[cellIndex + i] = rowspan - 1;
-                                                }
-                                            }
-                                        }
-
-                                        cellIndex += colspan;
+                            // Population/Merging logic
+                            if (!store.isReversed) {
+                                if (!store.colorPallete.Customize) {
+                                    grid.forEach((rowGrid, rowIndex) => {
+                                        rowGrid.forEach((cellValue, cellIndex) => {
+                                            table.getCell(rowIndex, cellIndex).value = cellValue;
+                                        });
                                     });
 
-                                    // ✅ AFTER filling the row → apply merge logic for 1st column
-                                    if (rowIndex === 0) {
-                                        // header row typically
-                                        return;
-                                    }
-
-                                    if (firstColText) {
-                                        // new parameter starts
-                                        lastParamRowIndex = rowIndex;
-                                    } else {
-                                        // empty parameter row → merge vertically with previous parameter row
-                                        // empty parameter row → merge vertically with previous parameter row
-                                        if (lastParamRowIndex !== -1) {
+                                    // Vertical merging logic for 1st column (standard view)
+                                    let lastParamRowIndex = -1;
+                                    grid.forEach((rowGrid, rowIndex) => {
+                                        if (rowIndex === 0) return; // skip header
+                                        const firstColText = rowGrid[0];
+                                        if (firstColText) {
+                                            lastParamRowIndex = rowIndex;
+                                        } else if (lastParamRowIndex !== -1) {
                                             const topCell = table.getCell(lastParamRowIndex, 0);
                                             const bottomCell = table.getCell(rowIndex, 0);
-
-                                            // merge bottom into top
                                             topCell.merge(bottomCell);
-
-                                            // ✅ center align merged cell
                                             try {
                                                 topCell.verticalAlignment = Word.VerticalAlignment.center;
                                                 topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
-                                            } catch (e) {
-                                                // ignore (safe fallback)
-                                            }
+                                            } catch (e) { }
                                         }
-
-                                    }
+                                    });
+                                }
+                            } else {
+                                // Manual population for transposed table
+                                grid.forEach((rowGrid, rowIndex) => {
+                                    rowGrid.forEach((cellValue, cellIndex) => {
+                                        table.getCell(rowIndex, cellIndex).value = cellValue;
+                                    });
                                 });
-
                             }
+
+                            // Styling logic
+                            if (store.colorPallete.Customize) {
+                                await colorTable(table, rows, context, store.isReversed);
+                            }
+
 
                             include(table.getRange());
                             cursor = table.getRange();
@@ -869,7 +793,7 @@ export function getDateTimeStamp() {
 
 
 
-export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any) {
+export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any, type: "Summary" | "AITag") {
     setTimeout(() => {
         tag.FilteredReportHeadAIHistoryList.forEach((chat: any, index: number) => {
             // Copy buttons
@@ -913,9 +837,18 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                 try {
                                     document.getElementById('confirmation-popup-cancel')?.setAttribute('disabled', 'true');
                                     document.getElementById('confirmation-popup-confirm')?.setAttribute('disabled', 'true');
-                                    let updatedTag = JSON.parse(JSON.stringify(tag));
-                                    updatedTag.Prompt = chat.Prompt;
-                                    const data = await updatePromptTemplate(updatedTag, jwt);
+                                    let data: any;
+                                    if (type === 'Summary') {
+                                        const payload = {
+                                            Name: tag.Name,
+                                            Prompt: chat.Prompt
+                                        };
+                                        data = await updateSummaryTagPrompt(payload, jwt);
+                                    } else {
+                                        let updatedTag = JSON.parse(JSON.stringify(tag));
+                                        updatedTag.Prompt = chat.Prompt;
+                                        data = await updatePromptTemplate(updatedTag, jwt);
+                                    }
                                     if (data['Status']) {
                                         toaster('Updated Succesfully', 'success');
                                         container.innerHTML = '';
@@ -942,16 +875,27 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                 document.getElementById(`openRefferance-${index}`)?.addEventListener('click', () => {
                     const container = document.getElementById('confirmation-popup');
                     if (container) {
-                        const chatSources = chat.SourceValue.map((item: any) => {
-                            return sourceList.find(
-                                (source: any) => Number(item) === source.VectorID
-                            );
+                        const store = StoreService.getInstance();
+                        const sourceList = type === 'Summary' ? store.sourceSummaryList : store.sourceList;
+                        const rawSources = type === 'Summary' ? chat.SourceVector : chat.SourceValue;
+                        const sourceIds = Array.isArray(rawSources) ? rawSources : (rawSources ? String(rawSources).split(',') : []);
+
+                        const chatSources = sourceIds.map((item: any) => {
+                            if (type === 'Summary') {
+                                return sourceList.find(
+                                    (source: any) => String(item) === String(source.VectorID)
+                                );
+                            } else {
+                                return sourceList.find(
+                                    (source: any) => Number(item) === source.VectorID
+                                );
+                            }
                         });
 
                         const sources = chatSources.filter((src: any) => !!src);
                         const popupData = {
                             Data: chat.Evidences,
-                            Name: tag.DisplayName,
+                            Name: type === 'Summary' ? tag.Name : tag.DisplayName,
                             UserValue: chat.Response,
                             Sources: sources
                         }
@@ -999,9 +943,6 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
             document.getElementById(`copyResponse-${index}`)?.addEventListener('click', () => copyText(chat.Response));
 
-            // Close button
-            document.getElementById(`close-btn-tag`)?.addEventListener('click', () => loadHomepage(availableKeys));
-
             // Checkbox logic
             const checkbox = document.getElementById(`checkbox-${index}`) as HTMLInputElement;
             if (checkbox) {
@@ -1034,7 +975,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                     }
 
                     try {
-                        const data = await updateAiHistory(chat, jwt);
+                        const data = type === 'Summary' ? await updateSummaryHistory(chat, jwt) : await updateAiHistory(chat, jwt);
                         if (data['Data']) {
                             tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
                             tag.FilteredReportHeadAIHistoryList = [];
@@ -1069,7 +1010,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                 }
                             })
 
-                            aiTagList.forEach(currentTag => {
+                            const store = StoreService.getInstance();
+                            store.aiTagList.forEach(currentTag => {
                                 if (currentTag.ID === tag.ID) {
                                     const isTable = chat.FormattedResponse !== '';
                                     const finalResponse = chat.FormattedResponse
@@ -1092,6 +1034,16 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             }
         });
 
+        // Close button
+        document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
+            const store = StoreService.getInstance();
+            if (store.mode === "Home") {
+                loadHomepage(availableKeys)
+            } else if (store.mode === "Summary") {
+                loadSummarypage(availableKeys);
+            }
+        });
+
         // Button: Insert Tag
         document.getElementById(`insertTagButton`)?.addEventListener('click', () => {
             if (!tag.IsApplied) {
@@ -1102,17 +1054,18 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         // Button: Send Prompt
         document.getElementById(`sendPromptButton`)?.addEventListener('click', () => {
             const textareaValue = (document.getElementById(`chatInput`) as HTMLTextAreaElement).value;
-            sendPrompt(tag, textareaValue);
+            AIService.sendPrompt(tag, textareaValue, type);
         });
 
         // Button: Change Source
         document.getElementById(`changeSourceButton`)?.addEventListener('click', () => {
             const textareaValue = (document.getElementById(`chatInput`) as HTMLTextAreaElement).value;
             tag.textareavalue = textareaValue;
-            createMultiSelectDropdown(tag);
+            createMultiSelectDropdown(tag, type);
         });
 
         // Mention dropdown
         mentionDropdownFn(`chatInput`, `mention-dropdown`, 'edit');
     }, 0);
 }
+

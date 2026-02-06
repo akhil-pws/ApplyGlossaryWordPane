@@ -1,7 +1,7 @@
-import { dataUrl } from "./data";
+import { CONFIG } from "../utils/config";
 
 // api.ts
-const baseUrl = dataUrl // Set your actual base URL
+const baseUrl = CONFIG.dataUrl // Set your actual base URL
 
 export async function loginUser(organization: string, username: string, password: string): Promise<any> {
   const response = await fetch(`${baseUrl}/api/user/login`, {
