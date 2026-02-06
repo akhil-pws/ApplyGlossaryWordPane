@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags } from "./draft-functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -214,114 +214,73 @@ export async function replaceMention(word: any, type: any) {
                                 continue;
                             }
 
-                            const maxCols = Math.max(...rows.map(row => {
-                                return Array.from(row.querySelectorAll('td, th')).reduce((sum, cell) => {
-                                    return sum + (parseInt(cell.getAttribute('colspan') || '1', 10));
-                                }, 0);
-                            }));
+                            let grid = parseHtmlTableToGrid(rows);
+                            const store = StoreService.getInstance();
+                            const base = store.tableStyle.split(" - ")[0].trim();
+
+                            if (base === 'Table Grid 2') {
+                                store.isReversed = true;
+                            }
+
+                            if (store.isReversed) {
+                                grid = transposeGrid(grid);
+                            }
+
+                            const numRows = grid.length;
+                            const numCols = grid[0]?.length || 0;
 
                             const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
                             await context.sync();
 
-                            const table = paragraph.insertTable(rows.length, maxCols, Word.InsertLocation.after);
-                            const store = StoreService.getInstance();
+                            const table = paragraph.insertTable(numRows, numCols, Word.InsertLocation.after);
                             const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
                             if (resolvedTableStyle !== 'none') {
                                 table.style = resolvedTableStyle;
-                            }  // Apply built-in Word table style
+                            }
 
                             await context.sync();
-                            if (store.colorPallete.Customize) {
-                                await colorTable(table, rows, context);
-                            }
-                            else {
-                                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-                                let lastParamRowIndex = -1; // row index of last non-empty Parameter cell
 
-                                rows.forEach((row, rowIndex) => {
-                                    const cells = Array.from(row.querySelectorAll('td, th'));
-                                    let cellIndex = 0;
-
-                                    // track first column text in HTML row
-                                    let firstColText = "";
-
-                                    cells.forEach((cell) => {
-                                        while (rowspanTracker[cellIndex] > 0) {
-                                            rowspanTracker[cellIndex]--;
-                                            cellIndex++;
-                                        }
-
-                                        const cellText = Array.from(cell.childNodes)
-                                            .map(node => {
-                                                if (node.nodeType === Node.TEXT_NODE) {
-                                                    return node.textContent?.trim() || '';
-                                                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                    return (node as HTMLElement).innerText.trim();
-                                                }
-                                                return '';
-                                            })
-                                            .filter(text => text.length > 0)
-                                            .join(' ');
-
-                                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                                        // save first column text if this is first column
-                                        if (cellIndex === 0) {
-                                            firstColText = cellText.trim();
-                                        }
-
-                                        table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                        // colspan blank filling
-                                        for (let i = 1; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols) {
-                                                table.getCell(rowIndex, cellIndex + i).value = "";
-                                            }
-                                        }
-
-                                        // rowspan tracking
-                                        if (rowspan > 1) {
-                                            for (let i = 0; i < colspan; i++) {
-                                                if (cellIndex + i < maxCols) {
-                                                    rowspanTracker[cellIndex + i] = rowspan - 1;
-                                                }
-                                            }
-                                        }
-
-                                        cellIndex += colspan;
+                            // Population/Merging logic
+                            if (!store.isReversed) {
+                                if (!store.colorPallete.Customize) {
+                                    grid.forEach((row, rowIndex) => {
+                                        row.forEach((cellValue, cellIndex) => {
+                                            table.getCell(rowIndex, cellIndex).value = cellValue;
+                                        });
                                     });
 
-                                    // ✅ AFTER filling the row → apply merge logic for 1st column
-                                    if (rowIndex === 0) {
-                                        // header row typically
-                                        return;
-                                    }
-
-                                    if (firstColText) {
-                                        // new parameter starts
-                                        lastParamRowIndex = rowIndex;
-                                    } else {
-                                        // empty parameter row → merge vertically with previous parameter row
-                                        if (lastParamRowIndex !== -1) {
+                                    // Vertical merging logic for 1st column (standard view)
+                                    let lastParamRowIndex = -1;
+                                    grid.forEach((row, rowIndex) => {
+                                        if (rowIndex === 0) return; // skip header
+                                        const firstColText = row[0];
+                                        if (firstColText) {
+                                            lastParamRowIndex = rowIndex;
+                                        } else if (lastParamRowIndex !== -1) {
                                             const topCell = table.getCell(lastParamRowIndex, 0);
                                             const bottomCell = table.getCell(rowIndex, 0);
-
-                                            // merge bottom into top
                                             topCell.merge(bottomCell);
-
-                                            // ✅ center align merged cell
                                             try {
                                                 topCell.verticalAlignment = Word.VerticalAlignment.center;
                                                 topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
-                                            } catch (e) {
-                                                // ignore (safe fallback)
-                                            }
+                                            } catch (e) { }
                                         }
-                                    }
+                                    });
+                                }
+                            } else {
+                                // Manual population for transposed table
+                                grid.forEach((row, rowIndex) => {
+                                    row.forEach((cellValue, cellIndex) => {
+                                        table.getCell(rowIndex, cellIndex).value = cellValue;
+                                    });
                                 });
-
                             }
+
+                            // Styling logic (always call if Customize, now passing isReversed)
+                            if (store.colorPallete.Customize) {
+                                await colorTable(table, rows, context, store.isReversed);
+                            }
+
 
                             newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
                         } else {
@@ -691,121 +650,70 @@ export async function insertTagPrompt(tag) {
                             const rows = Array.from(el.querySelectorAll("tr"));
                             if (!rows.length) continue;
 
-                            const maxCols = Math.max(
-                                ...rows.map(r =>
-                                    Array.from(r.querySelectorAll("td, th"))
-                                        .reduce(
-                                            (s, c) => s + parseInt(c.getAttribute("colspan") || "1"),
-                                            0
-                                        )
-                                )
-                            );
+                            let grid = parseHtmlTableToGrid(rows);
+                            const store = StoreService.getInstance();
+                            const base = store.tableStyle.split(" - ")[0].trim();
+
+                            if (base === 'Table Grid 2') {
+                                store.isReversed = true;
+                            }
+
+                            if (store.isReversed) {
+                                grid = transposeGrid(grid);
+                            }
+
+                            const numRows = grid.length;
+                            const numCols = grid[0]?.length || 0;
 
                             const p = cursor.insertParagraph("", Word.InsertLocation.after);
-                            const table = p.insertTable(
-                                rows.length,
-                                maxCols,
-                                Word.InsertLocation.after
-                            );
+                            const table = p.insertTable(numRows, numCols, Word.InsertLocation.after);
 
-                            const store = StoreService.getInstance();
                             const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
                             if (resolvedTableStyle !== 'none') {
                                 table.style = resolvedTableStyle;
                             }
 
-                            if (store.colorPallete.Customize) {
-                                await colorTable(table, rows, context);
-                            } else {
-                                const rowspanTracker: number[] = new Array(maxCols).fill(0);
-                                let lastParamRowIndex = -1; // row index of last non-empty Parameter cell
-
-                                rows.forEach((row, rowIndex) => {
-                                    const cells = Array.from(row.querySelectorAll('td, th'));
-                                    let cellIndex = 0;
-
-                                    // track first column text in HTML row
-                                    let firstColText = "";
-
-                                    cells.forEach((cell) => {
-                                        while (rowspanTracker[cellIndex] > 0) {
-                                            rowspanTracker[cellIndex]--;
-                                            cellIndex++;
-                                        }
-
-                                        const cellText = Array.from(cell.childNodes)
-                                            .map(node => {
-                                                if (node.nodeType === Node.TEXT_NODE) {
-                                                    return node.textContent?.trim() || '';
-                                                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                    return (node as HTMLElement).innerText.trim();
-                                                }
-                                                return '';
-                                            })
-                                            .filter(text => text.length > 0)
-                                            .join(' ');
-
-                                        const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-                                        const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-
-                                        // save first column text if this is first column
-                                        if (cellIndex === 0) {
-                                            firstColText = cellText.trim();
-                                        }
-
-                                        table.getCell(rowIndex, cellIndex).value = cellText;
-
-                                        // colspan blank filling
-                                        for (let i = 1; i < colspan; i++) {
-                                            if (cellIndex + i < maxCols) {
-                                                table.getCell(rowIndex, cellIndex + i).value = "";
-                                            }
-                                        }
-
-                                        // rowspan tracking
-                                        if (rowspan > 1) {
-                                            for (let i = 0; i < colspan; i++) {
-                                                if (cellIndex + i < maxCols) {
-                                                    rowspanTracker[cellIndex + i] = rowspan - 1;
-                                                }
-                                            }
-                                        }
-
-                                        cellIndex += colspan;
+                            // Population/Merging logic
+                            if (!store.isReversed) {
+                                if (!store.colorPallete.Customize) {
+                                    grid.forEach((rowGrid, rowIndex) => {
+                                        rowGrid.forEach((cellValue, cellIndex) => {
+                                            table.getCell(rowIndex, cellIndex).value = cellValue;
+                                        });
                                     });
 
-                                    // ✅ AFTER filling the row → apply merge logic for 1st column
-                                    if (rowIndex === 0) {
-                                        // header row typically
-                                        return;
-                                    }
-
-                                    if (firstColText) {
-                                        // new parameter starts
-                                        lastParamRowIndex = rowIndex;
-                                    } else {
-                                        // empty parameter row → merge vertically with previous parameter row
-                                        // empty parameter row → merge vertically with previous parameter row
-                                        if (lastParamRowIndex !== -1) {
+                                    // Vertical merging logic for 1st column (standard view)
+                                    let lastParamRowIndex = -1;
+                                    grid.forEach((rowGrid, rowIndex) => {
+                                        if (rowIndex === 0) return; // skip header
+                                        const firstColText = rowGrid[0];
+                                        if (firstColText) {
+                                            lastParamRowIndex = rowIndex;
+                                        } else if (lastParamRowIndex !== -1) {
                                             const topCell = table.getCell(lastParamRowIndex, 0);
                                             const bottomCell = table.getCell(rowIndex, 0);
-
-                                            // merge bottom into top
                                             topCell.merge(bottomCell);
-
-                                            // ✅ center align merged cell
                                             try {
                                                 topCell.verticalAlignment = Word.VerticalAlignment.center;
                                                 topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
-                                            } catch (e) {
-                                                // ignore (safe fallback)
-                                            }
+                                            } catch (e) { }
                                         }
-
-                                    }
+                                    });
+                                }
+                            } else {
+                                // Manual population for transposed table
+                                grid.forEach((rowGrid, rowIndex) => {
+                                    rowGrid.forEach((cellValue, cellIndex) => {
+                                        table.getCell(rowIndex, cellIndex).value = cellValue;
+                                    });
                                 });
-
                             }
+
+                            // Styling logic
+                            if (store.colorPallete.Customize) {
+                                await colorTable(table, rows, context, store.isReversed);
+                            }
+
 
                             include(table.getRange());
                             cursor = table.getRange();
