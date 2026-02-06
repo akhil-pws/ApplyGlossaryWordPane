@@ -171,11 +171,20 @@ function jsonToHtmlTable(jsonData) {
     return result;
   }
 
-  if (!Array.isArray(jsonData)) {
-    jsonData = Object.entries(jsonData).map(([key, value]) => ({ [key]: value }));
+  let normalizedData = Array.isArray(jsonData) ? jsonData : [jsonData];
+
+  // Detect if this is a list of single-property objects (disjoint labels)
+  // If so, coalesce them into a single dense row to prevent diagonal tables.
+  if (normalizedData.length > 1 && normalizedData.every(item =>
+    typeof item === 'object' && item !== null && Object.keys(item).length === 1
+  )) {
+    const keys = normalizedData.map(item => Object.keys(item)[0]);
+    if (new Set(keys).size === normalizedData.length) {
+      normalizedData = [Object.assign({}, ...normalizedData)];
+    }
   }
 
-  jsonData.forEach(item => {
+  normalizedData.forEach(item => {
     let flattenedItem = flattenObject(item);
     Object.keys(flattenedItem).forEach(key => headers.add(key));
     rows.push(flattenedItem);
@@ -184,7 +193,7 @@ function jsonToHtmlTable(jsonData) {
   let table = '<table border="1" cellspacing="0" cellpadding="5">';
   table += '<tr>' + [...headers].map(header => `<th>${header}</th>`).join('') + '</tr>';
   rows.forEach(row => {
-    table += '<tr>' + [...headers].map(header => `<td>${row[header]}</td>`).join('') + '</tr>';
+    table += '<tr>' + [...headers].map(header => `<td>${(row[header] === undefined || row[header] === null) ? "" : row[header]}</td>`).join('') + '</tr>';
   });
 
   table += '</table>';
@@ -371,57 +380,61 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
   });
 }
 
-export async function colorTable(table: any, rows: any, context: any) {
+export async function colorTable(table: any, rows: any, context: any, isReversed: boolean = false) {
 
   // ------------------------------------------------------------
   // 1) Copy cell values DOM -> Word + MERGE FIRST COLUMN GROUPS
+  // Skip this phase if reversed, as the grid population is handled externally 
+  // and merging is disabled for transposed tables.
   // ------------------------------------------------------------
-  let lastParamRowIndex = -1; // last row index where 1st col had value
+  if (!isReversed) {
+    let lastParamRowIndex = -1; // last row index where 1st col had value
 
-  rows.forEach((row, rowIndex) => {
-    const cells = Array.from(row.querySelectorAll("td, th"));
-    let cellIndex = 0;
+    rows.forEach((row, rowIndex) => {
+      const cells = Array.from(row.querySelectorAll("td, th"));
+      let cellIndex = 0;
 
-    let firstColText = "";
+      let firstColText = "";
 
-    cells.forEach((cell) => {
-      const text = cell.innerText.trim();
+      cells.forEach((cell) => {
+        const text = cell.innerText.trim();
 
-      // capture first column text
-      if (cellIndex === 0) {
-        firstColText = text;
-      }
+        // capture first column text
+        if (cellIndex === 0) {
+          firstColText = text;
+        }
 
-      table.getCell(rowIndex, cellIndex).value = text;
-      cellIndex++;
-    });
+        table.getCell(rowIndex, cellIndex).value = text;
+        cellIndex++;
+      });
 
-    // ✅ Merge first column when empty (skip header row)
-    if (rowIndex > 0) {
-      if (firstColText) {
-        // new group starts
-        lastParamRowIndex = rowIndex;
-      } else {
-        // empty first col = merge with last non-empty parameter row
-        if (lastParamRowIndex !== -1) {
-          const topCell = table.getCell(lastParamRowIndex, 0);
-          const bottomCell = table.getCell(rowIndex, 0);
+      // ✅ Merge first column when empty (skip header row)
+      if (rowIndex > 0) {
+        if (firstColText) {
+          // new group starts
+          lastParamRowIndex = rowIndex;
+        } else {
+          // empty first col = merge with last non-empty parameter row
+          if (lastParamRowIndex !== -1) {
+            const topCell = table.getCell(lastParamRowIndex, 0);
+            const bottomCell = table.getCell(rowIndex, 0);
 
-          topCell.merge(bottomCell);
+            topCell.merge(bottomCell);
 
-          // ✅ center align merged parameter cell
-          try {
-            topCell.verticalAlignment = Word.VerticalAlignment.center;
-            topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
-          } catch (e) {
-            // ignore
+            // ✅ center align merged parameter cell
+            try {
+              topCell.verticalAlignment = Word.VerticalAlignment.center;
+              topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+            } catch (e) {
+              // ignore
+            }
           }
         }
       }
-    }
-  });
+    });
 
-  await context.sync();
+    await context.sync();
+  }
 
   // ------------------------------------------------------------
   // 2) Load rows for formatting
@@ -579,6 +592,28 @@ export async function colorTable(table: any, rows: any, context: any) {
         applyBoldIfNeeded(cell, i, cellIndex);
       });
 
+    });
+  } else if (base === "Table Grid 2") {
+    table.rows.items.forEach(row => row.cells.load("items"));
+    await context.sync();
+
+    table.rows.items.forEach((row, rowIndex) => {
+      row.cells.items.forEach((cell, cellIndex) => {
+        let bgColor = store.colorPallete.Primary;
+
+        if (cellIndex === 0) {
+          // Side header only
+          bgColor = store.colorPallete.Header;
+        } else {
+          // Rest of the cells follow alternating Primary/Secondary logic
+          bgColor = rowIndex % 2 === 0
+            ? store.colorPallete.Primary
+            : store.colorPallete.Secondary;
+        }
+
+        applyColor(cell, bgColor);
+        applyBoldIfNeeded(cell, rowIndex, cellIndex);
+      });
     });
   }
   else if (base === "Table Grid 1") {
@@ -771,4 +806,91 @@ export function resolveWordTableStyle(englishStyle: string): string {
     wordTableStyleLocales.en[englishStyle] ??
     'none'
   );
+}
+
+/**
+ * Converts an array of HTML table rows into a 2D string grid.
+ * Correctly accounts for colspan and rowspan by filling the grid cells.
+ */
+export function parseHtmlTableToGrid(rows: HTMLElement[]): string[][] {
+  if (rows.length === 0) return [];
+
+  // 1. Calculate max columns considering colspans
+  let maxCols = 0;
+  rows.forEach((row) => {
+    let colsInRow = 0;
+    Array.from(row.querySelectorAll("td, th")).forEach((cell) => {
+      colsInRow += parseInt(cell.getAttribute("colspan") || "1", 10);
+    });
+    if (colsInRow > maxCols) maxCols = colsInRow;
+  });
+
+  const rowCount = rows.length;
+  const grid: string[][] = Array.from({ length: rowCount }, () => new Array(maxCols).fill(""));
+  const occupied = Array.from({ length: rowCount }, () => new Array(maxCols).fill(false));
+
+  rows.forEach((row, rowIndex) => {
+    const cells = Array.from(row.querySelectorAll("td, th"));
+    let colIndex = 0;
+
+    cells.forEach((cell) => {
+      // Find the next available column in the grid
+      while (colIndex < maxCols && occupied[rowIndex][colIndex]) {
+        colIndex++;
+      }
+
+      if (colIndex >= maxCols) return;
+
+      const cellText = Array.from(cell.childNodes)
+        .map((node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            return node.textContent?.trim() || "";
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            return (node as HTMLElement).innerText.trim();
+          }
+          return "";
+        })
+        .filter((text) => text.length > 0)
+        .join(" ");
+
+      const colspan = parseInt(cell.getAttribute("colspan") || "1", 10);
+      const rowspan = parseInt(cell.getAttribute("rowspan") || "1", 10);
+
+      // Fill the grid cells covered by this cell's rowspan/colspan
+      for (let r = 0; r < rowspan; r++) {
+        for (let c = 0; c < colspan; c++) {
+          const targetRow = rowIndex + r;
+          const targetCol = colIndex + c;
+
+          if (targetRow < rowCount && targetCol < maxCols) {
+            // Only put text in the primary cell; others stay empty strings for merging logic
+            grid[targetRow][targetCol] = (r === 0 && c === 0) ? cellText : "";
+            occupied[targetRow][targetCol] = true;
+          }
+        }
+      }
+
+      colIndex += colspan;
+    });
+  });
+
+  return grid;
+}
+
+/**
+ * Flips the 2D grid (rows become columns and vice versa).
+ */
+export function transposeGrid(grid: string[][]): string[][] {
+  if (grid.length === 0) return [];
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const transposed = Array.from({ length: cols }, () => new Array(rows).fill(""));
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      transposed[c][r] = grid[r][c];
+    }
+  }
+
+  return transposed;
 }

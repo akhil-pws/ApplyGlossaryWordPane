@@ -43,6 +43,7 @@ export class StoreService {
     };
     public customTableStyle: any[] = [];
     public currentChatTagId: number = -1;
+    public isReversed: boolean = false;
 
     private constructor() { }
 
