@@ -34,7 +34,7 @@ Office.onReady((info) => {
         store.documentID = props.documentID;
         store.organizationName = props.organizationName;
 
-        
+
         // Check Session
         const session = AuthService.restoreSession();
         if (session) {
@@ -771,7 +771,7 @@ export async function applyAITagFn(
 
               if (base === 'Table Grid 2') {
                 store.isReversed = true;
-              }else{
+              } else {
                 store.isReversed = false;
               }
               if (store.isReversed) {
@@ -1142,8 +1142,8 @@ async function handleSelectionChange() {
     await checkGlossary();
   }
 
-  // Handle Home mode - detect bookmarks/tags in selection
-  if (store.mode === 'Home') {
+  // Handle Home or Summary mode - detect bookmarks/tags in selection
+  if (store.mode === 'Home' || store.mode === 'Summary') {
     await logBookmarksInSelection();
   }
 }
@@ -1481,11 +1481,14 @@ export async function addGenAITags() {
       const updateSourceDropdownLabel = () => {
         const selectedNames = Array.from(sourceDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-          .map(cb => cb.parentElement.textContent.trim());
+          .map(cb => cb.parentElement.querySelector('label').textContent.trim());
 
-        sourceDropdownButton.textContent = selectedNames.length
-          ? selectedNames.join(", ")
-          : "Select Source Types";
+        const labelSpan = document.getElementById('sourceDropdownLabel');
+        if (labelSpan) {
+          labelSpan.textContent = selectedNames.length
+            ? selectedNames.join(", ")
+            : "Select Source Types";
+        }
       }
 
       // Submit Handler
@@ -1499,26 +1502,28 @@ export async function addGenAITags() {
         if (!nameField.value.trim()) { nameField.classList.add('is-invalid'); valid = false; }
         if (!promptField.value.trim()) { promptField.classList.add('is-invalid'); valid = false; }
 
-        // PRIMARY SOURCE VALIDATION
+        // SOURCE VALIDATION
         let selectedPrimarySources = [];
-        if (!isSummaryMode) {
-          selectedPrimarySources = Array.from(sourceDropdownItems)
-            .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-            .map(cb => (cb as HTMLInputElement).value);
+        selectedPrimarySources = Array.from(sourceDropdownItems)
+          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
+          .map(cb => (cb as HTMLInputElement).value);
 
-          if (!selectedPrimarySources.length) {
-            document.getElementById("primarySourceError").style.display = "block";
-            valid = false;
-          } else {
-            document.getElementById("primarySourceError").style.display = "none";
-          }
+        if (!selectedPrimarySources.length && !isSummaryMode) {
+          document.getElementById("primarySourceError").style.display = "block";
+          valid = false;
+        } else {
+          document.getElementById("primarySourceError").style.display = "none";
         }
 
         if (!valid) return;
 
         const selectedSponsors = Array.from(sponsorDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
-          .map(cb => store.clientList.find(c => c.ID == (cb as HTMLInputElement).value));
+          .map(cb => (store.clientList.find(c => c.ID == (cb as HTMLInputElement).value) as any));
+
+        const selectedSources = Array.from(sourceDropdownItems)
+          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
+          .map(cb => sourceTypeList.find(s => s.ID == (cb as HTMLInputElement).value));
 
         const isAvailableForAll = availableForAllCheckbox.checked;
         const isSaveGlobally = saveGloballyCheckbox.checked;
@@ -1539,7 +1544,8 @@ export async function addGenAITags() {
           ReportHeadID: store.dataList.ID,
 
           // MULTI SELECT SOURCE TYPE
-          SourceTypeID: isSummaryMode ? "0" : selectedPrimarySources.join(","),
+          SourceTypeID: selectedPrimarySources.join(","),
+          SummaryTagClient: isSummaryMode ? selectedSponsors.map(s => ({ ClientID: s.ID, Client: s.Name })) : [],
 
           ReportHeadGroupID: aigroup.ID,
           ReportHeadSourceID: 0
@@ -1620,36 +1626,34 @@ export async function addGenAITags() {
         });
       });
 
-      if (!isSummaryMode) {
-        document.querySelectorAll('.source-dropdown-item').forEach(item => {
-          item.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const checkbox = this.querySelector('.source-dropdown-item .form-check-input');
-            if (!checkbox) return;
+      document.querySelectorAll('.source-dropdown-item').forEach(item => {
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const checkbox = this.querySelector('.source-dropdown-item .form-check-input');
+          if (!checkbox) return;
 
-            if (checkbox.id === 'sourceSelectAll') {
-              const isChecked = (checkbox as HTMLInputElement).checked;
-              sourceDropdownItems.forEach(cb => {
-                (cb as HTMLInputElement).checked = isChecked;
-              });
-            }
+          if (checkbox.id === 'sourceSelectAll') {
+            const isChecked = (checkbox as HTMLInputElement).checked;
+            sourceDropdownItems.forEach(cb => {
+              (cb as HTMLInputElement).checked = isChecked;
+            });
+          }
 
-            updateSourceDropdownLabel();
-            const selectedCount = Array.from(sourceDropdownItems)
-              .filter(cb => (cb as HTMLInputElement).checked).length;
+          updateSourceDropdownLabel();
+          const selectedCount = Array.from(sourceDropdownItems)
+            .filter(cb => (cb as HTMLInputElement).checked).length;
 
-            if (selectedCount === 0) {
-              document.getElementById("primarySourceError").style.display = "block";
-            } else {
-              document.getElementById("primarySourceError").style.display = "none";
-            }
+          if (selectedCount === 0) {
+            document.getElementById("primarySourceError").style.display = "block";
+          } else {
+            document.getElementById("primarySourceError").style.display = "none";
+          }
 
-          });
         });
-      }
+      });
 
       updateSponsorDropdownLabel();
-      if (!isSummaryMode) updateSourceDropdownLabel();
+      updateSourceDropdownLabel();
 
       [nameField, promptField].forEach(field => {
         field.addEventListener('input', function () {
@@ -1813,7 +1817,7 @@ async function createTextGenTag(payload) {
         SourceTypeID: payload.SourceTypeID,
         AllClient: payload.AllClient,
         SaveGlobally: payload.SaveGlobally ? 1 : 0,
-        SummaryTagClient: payload.GroupKeyClient
+        SummaryTagClient: payload.SummaryTagClient
       };
       data = await addSummaryTag(summaryPayload, store.jwt);
     } else {
@@ -2260,18 +2264,27 @@ async function logBookmarksInSelection() {
       store.selectedNames = [processedName];
       selectMatchingBookmarkFromSelection(processedName);
 
-      const aiTag = store.availableKeys.find(k =>
+      const aiTag = (store.mode === 'Home') ? store.availableKeys.find(k =>
         k.AIFlag === 1 &&
         (k.DisplayName.toLowerCase() === processedName.toLowerCase() ||
           `id${k.ID}`.toLowerCase() === processedName.toLowerCase())
-      );
+      ) : null;
 
-      if (!aiTag) return;
+      const summaryTag = (store.mode === 'Summary') ? store.summaryTagList.find(k =>
+      (k.Name?.toLowerCase() === processedName.toLowerCase() ||
+        `sm${k.ID || k.ReportHeadSummaryTagID}`.toLowerCase() === processedName.toLowerCase())
+      ) : null;
+
+      if (!aiTag && !summaryTag) return;
 
       const appBody = document.getElementById('app-body');
       appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-      appBody.innerHTML = await generateCheckboxHistory(aiTag, "AITag");
+      if (aiTag) {
+        appBody.innerHTML = await generateCheckboxHistory(aiTag, "AITag");
+      } else if (summaryTag) {
+        appBody.innerHTML = await generateCheckboxHistory(summaryTag, "Summary");
+      }
     }
 
 
@@ -2296,13 +2309,21 @@ function pickRelevantBookmarks(bookmarks: string[]) {
 
   // Prefer AI tags only
   const store = StoreService.getInstance();
-  return normalized.filter(name =>
-    store.availableKeys.some(
-      k => k.AIFlag === 1 &&
-        (k.DisplayName.toLowerCase() === name.toLowerCase() ||
-          `id${k.ID}`.toLowerCase() === name.toLowerCase())
-    )
-  );
+  return normalized.filter(name => {
+    if (store.mode === 'Home') {
+      return store.availableKeys.some(
+        k => k.AIFlag === 1 &&
+          (k.DisplayName.toLowerCase() === name.toLowerCase() ||
+            `id${k.ID}`.toLowerCase() === name.toLowerCase())
+      );
+    } else if (store.mode === 'Summary') {
+      return store.summaryTagList.some(
+        k => (k.Name?.toLowerCase() === name.toLowerCase() ||
+          `sm${k.ID || k.ReportHeadSummaryTagID}`.toLowerCase() === name.toLowerCase())
+      );
+    }
+    return false;
+  });
 }
 
 async function getImages() {

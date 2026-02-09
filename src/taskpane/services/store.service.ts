@@ -8,6 +8,7 @@ export class StoreService {
     public documentID: string = '';
     public organizationName: string = '';
     public aiTagList: any[] = [];
+    public summaryTagList: any[] = [];
     public imageList: any[] = [];
     public initialised: boolean = true;
     public availableKeys: any[] = [];
