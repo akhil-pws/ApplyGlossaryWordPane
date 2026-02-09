@@ -34,6 +34,7 @@ Office.onReady((info) => {
         store.documentID = props.documentID;
         store.organizationName = props.organizationName;
 
+        
         // Check Session
         const session = AuthService.restoreSession();
         if (session) {
@@ -770,6 +771,8 @@ export async function applyAITagFn(
 
               if (base === 'Table Grid 2') {
                 store.isReversed = true;
+              }else{
+                store.isReversed = false;
               }
               if (store.isReversed) {
                 grid = transposeGrid(grid);
