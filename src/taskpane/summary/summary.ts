@@ -145,6 +145,8 @@ export async function loadSummarypage(availableKeys: any[]) {
     return Array.isArray(names) ? names : [];
   }
 
+  let summaryEmptyMessage = "no available summary tags";
+
   // ✅ Pagination + filter setup
   const pageSize = 8;
   let currentPage = 1;
@@ -168,7 +170,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       if (isSummaryLoading) {
         list.innerHTML = `<div class="d-flex justify-content-center align-items-center p-5"><div class="loader"></div></div>`;
       } else {
-        list.innerHTML = `<div class="p-3 text-muted">No tags found</div>`;
+        list.innerHTML = `<div class="p-3 text-muted">${summaryEmptyMessage}</div>`;
       }
       return;
     }
@@ -213,6 +215,7 @@ export async function loadSummarypage(availableKeys: any[]) {
             <div class="loader" id="loader"></div>
           </div>
         `;
+          store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
           const html = await generateCheckboxHistory(tag, "Summary");
           appBody.innerHTML = html;
         } catch {
@@ -348,21 +351,29 @@ export async function loadSummarypage(availableKeys: any[]) {
         if (allSummaryTags && allSummaryTags.length > 0) {
           summarySelectedNames = normalizeNames(allSummaryTags);
         }
+        isSummaryLoading = false;
+        renderAll();
         return;
       }
 
       // status 0 -> activate once, then poll until 2
       if (summaryStatus === 0) {
         if (!hasActivated) {
-          hasActivated = true;
-
-          const base64Data = await getWordAsBase64();
-          const payload = {
-            ReportHeadID: store.documentID,
-            ActiveDocument: base64Data
-          };
-
-          await activateSummaryMode(payload, store.jwt);
+          try {
+            hasActivated = true;
+            const base64Data = await getWordAsBase64();
+            const payload = {
+              ReportHeadID: store.documentID,
+              ActiveDocument: base64Data
+            };
+            await activateSummaryMode(payload, store.jwt);
+          } catch (activationErr) {
+            console.error("Activation failed:", activationErr);
+            summaryEmptyMessage = "no summary tags available";
+            isSummaryLoading = false;
+            renderAll();
+            return;
+          }
         }
 
         await pollSummaryUntilDone();
@@ -382,6 +393,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       if (instanceId === currentSummaryInstance) {
         isSummaryLoading = false;
         disableActionButtons(false);
+        renderAll();
       }
     }
   }
@@ -391,7 +403,6 @@ export async function loadSummarypage(availableKeys: any[]) {
     try {
       tag.Status = "0"; // Show spinner immediately
       renderAll();
-
       const jwt = store.jwt;
       const historyRes = await getSummaryTagHistory(tag.ID || tag.ReportHeadSummaryTagID, jwt);
       const history = historyRes?.Data || [];

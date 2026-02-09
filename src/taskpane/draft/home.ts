@@ -220,8 +220,6 @@ export async function replaceMention(word: any, type: any) {
 
                             if (base === 'Table Grid 2') {
                                 store.isReversed = true;
-                            } else {
-                                store.isReversed = false;
                             }
 
                             if (store.isReversed) {
@@ -360,8 +358,18 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
             await summaryService.fetchSummaryAIHistory(tag);
         }
     }
-
     const history = tag.FilteredReportHeadAIHistoryList;
+
+    const chat = history.find((item: any) => item.Selected === 1);
+
+    const finalResponse = chat.FormattedResponse
+        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+        : chat.Response;
+
+    tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
+    tag.UserValue = finalResponse;
+    tag.EditorValue = finalResponse;
+    tag.text = finalResponse;
 
     if (history.length === 0) {
         return '<div>No AI history available.</div>';
@@ -403,9 +411,11 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
         </div>
     `;
 
+    const horizontalLoader = (String(tag.Status) === "0") ? '<div class="horizontal-loader"></div>' : '';
+
     initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
 
-    return `${closeBar}${chatBody}${chatFooterHtml}`;
+    return `${closeBar}${chatBody}${horizontalLoader}${chatFooterHtml}`;
 }
 
 
@@ -658,8 +668,6 @@ export async function insertTagPrompt(tag) {
 
                             if (base === 'Table Grid 2') {
                                 store.isReversed = true;
-                            }else{
-                                store.isReversed = false;
                             }
 
                             if (store.isReversed) {
@@ -1041,6 +1049,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         // Close button
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
             const store = StoreService.getInstance();
+            store.currentChatTagId = -1;
             if (store.mode === "Home") {
                 loadHomepage(availableKeys)
             } else if (store.mode === "Summary") {

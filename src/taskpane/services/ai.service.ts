@@ -105,6 +105,16 @@ export class AIService {
                     });
                     const chat = tag.ReportHeadAIHistoryList[0];
 
+                    const finalResponse = chat.FormattedResponse
+                        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                        : chat.Response;
+
+                    tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
+                    tag.UserValue = finalResponse;
+                    tag.EditorValue = finalResponse;
+                    tag.text = finalResponse;
+
+
                     // Update lists in Store
                     store.aiTagList.forEach((currentTag: any) => {
                         if (currentTag.ID === tag.ID) {
