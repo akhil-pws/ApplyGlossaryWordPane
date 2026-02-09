@@ -23,8 +23,11 @@ function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
 
       
 
-        <div class="mb-3" ${isSummaryMode ? 'style="display: none;"' : ''}>
-          <label for="source" class="form-label"><span class="text-danger">*</span> Primary Source Type</label>
+        <div class="mb-3">
+          <label for="source" class="form-label">
+            ${isSummaryMode ? '' : '<span class="text-danger">*</span> '}
+            ${isSummaryMode ? 'Additional Source Type' : 'Primary Source Type'}
+          </label>
           <div class="dropdown w-100">
             <button 
               class="btn btn-white border w-100 text-start d-flex justify-content-between align-items-center dropdown-toggle" 
@@ -33,7 +36,7 @@ function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
               data-bs-toggle="dropdown" 
               aria-expanded="false" 
               >
-              <span id="sponsorDropdownLabel">Select Source</span>
+              <span id="sourceDropdownLabel">Select Source</span>
               <span class="dropdown-toggle-icon"></span>
             </button>
             <ul class="dropdown-menu w-100 p-2" aria-labelledby="sourceDropdown" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
@@ -47,7 +50,7 @@ function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
             </ul>
           </div>
           <div class="invalid-feedback" id="primarySourceError" style="display:none;">
-            Primary Source is required.
+            ${isSummaryMode ? 'Additional Source Type is required.' : 'Primary Source is required.'}
           </div>
 
         </div>

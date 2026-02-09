@@ -600,7 +600,7 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 }
 
 
-export async function insertTagPrompt(tag) {
+export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") {
     return Word.run(async (context) => {
         try {
             const selection = context.document.getSelection();
@@ -670,7 +670,7 @@ export async function insertTagPrompt(tag) {
 
                             if (base === 'Table Grid 2') {
                                 store.isReversed = true;
-                            }else{
+                            } else {
                                 store.isReversed = false;
                             }
 
@@ -774,8 +774,9 @@ export async function insertTagPrompt(tag) {
                3️⃣ Create ONE bookmark covering everything
             -------------------------------------------------- */
             if (bookmarkStart && bookmarkEnd) {
+                const prefix = type === "Summary" ? "SM" : "ID";
                 const bookmarkName =
-                    `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+                    `${prefix}${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
 
                 bookmarkStart
                     .expandTo(bookmarkEnd)
@@ -1064,7 +1065,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         // Button: Insert Tag
         document.getElementById(`insertTagButton`)?.addEventListener('click', () => {
             if (!tag.IsApplied) {
-                insertTagPrompt(tag);
+                insertTagPrompt(tag, type);
             }
         });
 

@@ -336,6 +336,7 @@ export async function loadSummarypage(availableKeys: any[]) {
 
       // ✅ 3) Render tags immediately
       allSummaryTags = getRes?.Data?.SummaryTags || [];
+      store.summaryTagList = allSummaryTags;
       store.sourceSummaryList = deduplicateSummarySources(getRes?.Data?.SummarySources || []);
       filtered = allSummaryTags;
       renderAll();
@@ -487,6 +488,7 @@ export async function loadSummarypage(availableKeys: any[]) {
           if (instanceId !== currentSummaryInstance) break;
 
           allSummaryTags = getRes2?.Data?.SummaryTags || [];
+          store.summaryTagList = allSummaryTags;
           filtered = allSummaryTags;
 
           if (allSummaryTags && allSummaryTags.length > 0) {
@@ -550,6 +552,7 @@ export async function loadSummarypage(availableKeys: any[]) {
         // Immediately update state and UI from response
         if (res?.Data) {
           allSummaryTags = res.Data.SummaryTags || [];
+          store.summaryTagList = allSummaryTags;
           store.sourceSummaryList = deduplicateSummarySources(res.Data.SummarySources || []);
           currentSummaryStatus = res.Data.SummaryTagGenerated;
           filtered = allSummaryTags;
