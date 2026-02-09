@@ -5,7 +5,7 @@ export class StoreService {
     // State Variables
     public jwt: string = '';
     public UserRole: any = {};
-    public WorkbenchID: string = '';
+    public documentID: string = '';
     public organizationName: string = '';
     public aiTagList: any[] = [];
     public imageList: any[] = [];
