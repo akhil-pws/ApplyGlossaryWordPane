@@ -220,6 +220,8 @@ export async function replaceMention(word: any, type: any) {
 
                             if (base === 'Table Grid 2') {
                                 store.isReversed = true;
+                            } else {
+                                store.isReversed = false;
                             }
 
                             if (store.isReversed) {
@@ -668,6 +670,8 @@ export async function insertTagPrompt(tag) {
 
                             if (base === 'Table Grid 2') {
                                 store.isReversed = true;
+                            }else{
+                                store.isReversed = false;
                             }
 
                             if (store.isReversed) {
