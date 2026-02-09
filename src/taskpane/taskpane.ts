@@ -770,8 +770,6 @@ export async function applyAITagFn(
 
               if (base === 'Table Grid 2') {
                 store.isReversed = true;
-              }else{
-                store.isReversed = false;
               }
               if (store.isReversed) {
                 grid = transposeGrid(grid);

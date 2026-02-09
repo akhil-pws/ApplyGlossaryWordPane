@@ -1,4 +1,4 @@
-import { removeQuotes } from "../draft/draft-functions";
+import { removeQuotes, updateEditorFinalTable } from "../draft/draft-functions";
 import { getSummaryTagHistory } from "../summary/summary.api";
 import { StoreService } from "./store.service";
 
@@ -8,7 +8,6 @@ export class summaryService {
         const store = StoreService.getInstance();
         try {
             const data = await getSummaryTagHistory(tag.ID, store.jwt);
-
             if (data.Status && data.Data) {
                 tag.ReportHeadAIHistoryList = data['Data'] || [];
                 tag.FilteredReportHeadAIHistoryList = [];
@@ -20,6 +19,7 @@ export class summaryService {
                     return item.SourceName;
                 }
                 );
+
                 tag.Sources = tag.SourceName.join(',');
                 tag.TempSourceValue = selectedSources.map((item: any) => {
                     return item.VectorID ? String(item.VectorID) : item.SourceValue;

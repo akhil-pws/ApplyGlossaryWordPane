@@ -12,10 +12,10 @@ export class DocumentService {
         return parts.slice(1).join('_').replace(/%20/g, ' ').replace(/%25/g, '%');
     }
 
-    static async loadReportData(documentId: string, jwt: string, userId: string): Promise<any> {
+    static async loadReportData(WorkbenchID: string, jwt: string, userId: string): Promise<any> {
         try {
-            console.log(`Fetching report data for ID: ${documentId}`);
-            const data = await getReportById(documentId, jwt);
+            console.log(`Fetching report data for ID: ${WorkbenchID}`);
+            const data = await getReportById(WorkbenchID, jwt);
 
             if (!data.Status || !data.Data) {
                 throw new Error("Failed to fetch report data");
