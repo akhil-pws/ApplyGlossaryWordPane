@@ -79,7 +79,7 @@ export async function getAiHistory(tagId: string, jwt: string): Promise<any> {
 }
 
 export async function updateGroupKey(tag: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/report/head/groupkey`, {
+  const response = await fetch(`${baseUrl}/api/addin/workbench/group-key`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -98,7 +98,7 @@ export async function updateGroupKey(tag: any, jwt: string): Promise<any> {
 
 
 export async function addAiHistory(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/report/ai-history/add`, {
+  const response = await fetch(`${baseUrl}/api/addin/ai-history-add`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ export async function addAiHistory(payload: any, jwt: string): Promise<any> {
 
 
 export async function updateAiHistory(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/report/ai-history/update`, {
+  const response = await fetch(`${baseUrl}/api/addin/ai-history-update`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ export async function updateAiHistory(payload: any, jwt: string): Promise<any> {
 }
 
 export async function fetchGlossaryTemplate(sponsorID: string, bodyText: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/glossary-template/client-id/${sponsorID}`, {
+  const response = await fetch(`${baseUrl}/api/addin/glossary-client/${sponsorID}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -154,7 +154,7 @@ export async function fetchGlossaryTemplate(sponsorID: string, bodyText: any, jw
 
 
 export async function addGroupKey(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/report/group-key/add`, {
+  const response = await fetch(`${baseUrl}/api/addin/group-key/add`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ export async function getAllPromptTemplates(jwt): Promise<any> {
 
 
 export async function getPromptTemplateById(id: string, jwt): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/prompt-template/${id}/data`, {
+  const response = await fetch(`${baseUrl}/api/addin/prompt-builders/${id}/data`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ export async function getPromptTemplateById(id: string, jwt): Promise<any> {
 }
 
 export async function updatePromptTemplate(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/groupkey/update-prompt`, {
+  const response = await fetch(`${baseUrl}/api/addin/groupkey/update-prompt`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
