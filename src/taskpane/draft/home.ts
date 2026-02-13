@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid } from "./draft-functions";
-import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, mentionDropdownFn } from "../taskpane";
+import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, getReport, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
 import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
@@ -31,6 +31,11 @@ export function loadHomepage(availableKeys) {
                     <li>
                         <a class="dropdown-item" href="#" id="apply-btn-tag">
                             <i class="fa-solid fa-circle-check me-2"></i> Apply
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item disabled" href="#" id="sync-btn-tag">
+                            <i class="fa fa-refresh me-2" aria-hidden="true"></i> Sync
                         </a>
                     </li>
 
@@ -73,7 +78,7 @@ export function loadHomepage(availableKeys) {
         }
 
         const filteredMentions = availableKeys.filter(m =>
-            m.DisplayName.toLowerCase().includes(searchTerm)
+            m.Name.toLowerCase().includes(searchTerm)
         );
 
         // Split groups
@@ -105,7 +110,7 @@ export function loadHomepage(availableKeys) {
                 if (isAISection) icon = `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`;
                 if (isImageSection) icon = `<i class="fa-solid fa-image text-muted me-2"></i>`;
 
-                listItem.innerHTML = `${icon} ${mention.DisplayName}`;
+                listItem.innerHTML = `${icon} ${mention.Name}`;
 
                 listItem.onclick = () => {
                     if (isAISection) {
@@ -168,9 +173,217 @@ export function loadHomepage(availableKeys) {
             applyTagFn();
         }
     });
+
+    document.getElementById('sync-btn-tag').addEventListener('click', async () => {
+        if (!store.isPendingResponse && store.isSyncEnabled) {
+            syncBookmarks();
+        }
+    });
+
+    // Update sync button state based on store
+    updateSyncButtonState();
 }
 
 
+
+
+export async function insertContentAtRange(context: Word.RequestContext, range: Word.Range, word: any, type: any, updateSelection: boolean = true) {
+
+    // 1. Insert Anchor
+    const anchorChar = range.insertText("\u200B", Word.InsertLocation.replace);
+    await context.sync();
+
+    let cursor = anchorChar.getRange();
+    let bookmarkStart: Word.Range | null = null;
+    let bookmarkEnd: Word.Range | null = null;
+
+    const include = (r: Word.Range) => {
+        if (!bookmarkStart) {
+            bookmarkStart = r.getRange("Start");
+        }
+        bookmarkEnd = r.getRange("End");
+    };
+
+    let newSelection = range;
+
+    if (type === 'TABLE') {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(word.Response, 'text/html');
+        const bodyNodes = Array.from(doc.body.childNodes);
+
+        await context.sync();
+
+        for (const node of bodyNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                let textContent = node.textContent?.trim();
+                if (textContent) {
+                    textContent = textContent.replace(/\n- /g, "\n• ");
+
+                    textContent.split('\n').forEach(line => {
+                        if (line.trim()) {
+                            const p = cursor.insertParagraph(line, Word.InsertLocation.after);
+                            insertLineWithHeadingStyle(p, line);
+                            include(p.getRange());
+                            cursor = p.getRange();
+                        }
+                    });
+                }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                const element = node as HTMLElement;
+
+                if (element.tagName.toLowerCase() === 'table') {
+                    const rows = Array.from(element.querySelectorAll('tr'));
+
+                    if (rows.length === 0) {
+                        const p = cursor.insertParagraph("[Empty Table]", Word.InsertLocation.after);
+                        include(p.getRange());
+                        cursor = p.getRange();
+                        continue;
+                    }
+
+                    let grid = parseHtmlTableToGrid(rows);
+                    const store = StoreService.getInstance();
+                    const base = store.tableStyle.split(" - ")[0].trim();
+
+                    if (base === 'Table Grid 2') {
+                        store.isReversed = true;
+                    } else {
+                        store.isReversed = false;
+                    }
+
+                    if (store.isReversed) {
+                        grid = transposeGrid(grid);
+                    }
+
+                    const numRows = grid.length;
+                    const numCols = grid[0]?.length || 0;
+
+                    const paragraph = cursor.insertParagraph("", Word.InsertLocation.after);
+                    await context.sync();
+
+                    const table = paragraph.insertTable(numRows, numCols, Word.InsertLocation.after);
+                    const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
+                    if (resolvedTableStyle !== 'none') {
+                        table.style = resolvedTableStyle;
+                    }
+
+                    await context.sync();
+
+                    // Population/Merging logic
+                    if (!store.isReversed) {
+                        if (!store.colorPallete.Customize) {
+                            grid.forEach((row, rowIndex) => {
+                                row.forEach((cellValue, cellIndex) => {
+                                    table.getCell(rowIndex, cellIndex).value = cellValue;
+                                });
+                            });
+
+                            // Vertical merging logic for 1st column (standard view)
+                            let lastParamRowIndex = -1;
+                            grid.forEach((row, rowIndex) => {
+                                if (rowIndex === 0) return; // skip header
+                                const firstColText = row[0];
+                                if (firstColText) {
+                                    lastParamRowIndex = rowIndex;
+                                } else if (lastParamRowIndex !== -1) {
+                                    const topCell = table.getCell(lastParamRowIndex, 0);
+                                    const bottomCell = table.getCell(rowIndex, 0);
+                                    topCell.merge(bottomCell);
+                                    try {
+                                        topCell.verticalAlignment = Word.VerticalAlignment.center;
+                                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered;
+                                    } catch (e) { }
+                                }
+                            });
+                        }
+                    } else {
+                        // Manual population for transposed table
+                        grid.forEach((row, rowIndex) => {
+                            row.forEach((cellValue, cellIndex) => {
+                                table.getCell(rowIndex, cellIndex).value = cellValue;
+                            });
+                        });
+                    }
+
+                    // Styling logic (always call if Customize, now passing isReversed)
+                    if (store.colorPallete.Customize) {
+                        await colorTable(table, rows, context, store.isReversed);
+                    }
+
+                    include(table.getRange());
+                    cursor = table.getRange();
+                    newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
+                } else {
+                    let elementText = element.innerText.trim();
+                    if (elementText) {
+                        elementText = elementText.replace(/\n- /g, "\n• ");
+
+                        elementText.split('\n').forEach(line => {
+                            if (line.trim()) {
+                                const p = cursor.insertParagraph(line, Word.InsertLocation.after);
+                                insertLineWithHeadingStyle(p, line);
+                                include(p.getRange());
+                                cursor = p.getRange();
+                            }
+                        });
+                    }
+                    // newSelection = selection; // If it's not a table, just use the existing selection.
+                }
+            }
+        }
+    }
+    else if (type === "IMAGE") {
+        let base64Image: string = word.Response;
+
+        if (base64Image.startsWith("data:image/svg+xml")) {
+            // Convert SVG → PNG
+            base64Image = await svgBase64ToPngBase64(base64Image);
+        } else if (base64Image.startsWith("data:image")) {
+            base64Image = base64Image.split(",")[1]; // strip prefix
+        }
+
+        // Insert at cursor
+        const pic = cursor.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
+        newSelection = pic.getRange();
+    } else {
+        // TEXT / Other
+        if (word.Response === '' || word.IsApplied) {
+            const p = cursor.insertParagraph(`#${word.Name}#`, Word.InsertLocation.after);
+            include(p.getRange());
+            cursor = p.getRange();
+        } else {
+            let content = removeQuotes(word.Response);
+            let lines = content.split(/\r?\n/); // Handle both \r\n and \n
+            lines.forEach(line => {
+                const p = cursor.insertParagraph(line, Word.InsertLocation.after);
+                include(p.getRange());
+                cursor = p.getRange();
+            });
+        }
+        newSelection = cursor; // After inserting the text, set selection to it.
+    }
+
+    await context.sync();
+
+    // 3. Create Bookmark (if NOT Image)
+    if (type !== 'IMAGE' && bookmarkStart && bookmarkEnd) {
+        const bookmarkName = word.AIFlag === 1
+            ? `ID${word.ID}_Split_${getDateTimeStamp()}`
+            : `PT${word.GroupKeyID}_Split_${getDateTimeStamp()}`;
+        bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
+    }
+
+    // 4. Cleanup Anchor
+    anchorChar.delete();
+    await context.sync();
+
+    if (updateSelection) {
+        // Move the cursor to the next line after content insertion
+        const nextLineParagraph = cursor.insertParagraph("", Word.InsertLocation.after);
+        nextLineParagraph.select();
+        await context.sync();
+    }
+}
 
 export async function replaceMention(word: any, type: any) {
     return Word.run(async (context) => {
@@ -182,164 +395,142 @@ export async function replaceMention(word: any, type: any) {
                 throw new Error('Selection is invalid or not found.');
             }
 
-            let newSelection = selection;
-
-            if (type === 'TABLE') {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(word.EditorValue, 'text/html');
-                const bodyNodes = Array.from(doc.body.childNodes);
-
-                await context.sync();
-
-                for (const node of bodyNodes) {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        let textContent = node.textContent?.trim();
-                        if (textContent) {
-                            textContent = textContent.replace(/\n- /g, "\n• ");
-
-                            textContent.split('\n').forEach(line => {
-                                if (line.trim()) {
-                                    insertLineWithHeadingStyle(selection, line);
-                                }
-                            });
-                        }
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const element = node as HTMLElement;
-
-                        if (element.tagName.toLowerCase() === 'table') {
-                            const rows = Array.from(element.querySelectorAll('tr'));
-
-                            if (rows.length === 0) {
-                                selection.insertParagraph("[Empty Table]", Word.InsertLocation.before);
-                                continue;
-                            }
-
-                            let grid = parseHtmlTableToGrid(rows);
-                            const store = StoreService.getInstance();
-                            const base = store.tableStyle.split(" - ")[0].trim();
-
-                            if (base === 'Table Grid 2') {
-                                store.isReversed = true;
-                            } else {
-                                store.isReversed = false;
-                            }
-
-                            if (store.isReversed) {
-                                grid = transposeGrid(grid);
-                            }
-
-                            const numRows = grid.length;
-                            const numCols = grid[0]?.length || 0;
-
-                            const paragraph = selection.insertParagraph("", Word.InsertLocation.before);
-                            await context.sync();
-
-                            const table = paragraph.insertTable(numRows, numCols, Word.InsertLocation.after);
-                            const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
-                            if (resolvedTableStyle !== 'none') {
-                                table.style = resolvedTableStyle;
-                            }
-
-                            await context.sync();
-
-                            // Population/Merging logic
-                            if (!store.isReversed) {
-                                if (!store.colorPallete.Customize) {
-                                    grid.forEach((row, rowIndex) => {
-                                        row.forEach((cellValue, cellIndex) => {
-                                            table.getCell(rowIndex, cellIndex).value = cellValue;
-                                        });
-                                    });
-
-                                    // Vertical merging logic for 1st column (standard view)
-                                    let lastParamRowIndex = -1;
-                                    grid.forEach((row, rowIndex) => {
-                                        if (rowIndex === 0) return; // skip header
-                                        const firstColText = row[0];
-                                        if (firstColText) {
-                                            lastParamRowIndex = rowIndex;
-                                        } else if (lastParamRowIndex !== -1) {
-                                            const topCell = table.getCell(lastParamRowIndex, 0);
-                                            const bottomCell = table.getCell(rowIndex, 0);
-                                            topCell.merge(bottomCell);
-                                            try {
-                                                topCell.verticalAlignment = Word.VerticalAlignment.center;
-                                                topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
-                                            } catch (e) { }
-                                        }
-                                    });
-                                }
-                            } else {
-                                // Manual population for transposed table
-                                grid.forEach((row, rowIndex) => {
-                                    row.forEach((cellValue, cellIndex) => {
-                                        table.getCell(rowIndex, cellIndex).value = cellValue;
-                                    });
-                                });
-                            }
-
-                            // Styling logic (always call if Customize, now passing isReversed)
-                            if (store.colorPallete.Customize) {
-                                await colorTable(table, rows, context, store.isReversed);
-                            }
-
-
-                            newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
-                        } else {
-                            let elementText = element.innerText.trim();
-                            if (elementText) {
-                                elementText = elementText.replace(/\n- /g, "\n• ");
-
-                                elementText.split('\n').forEach(line => {
-                                    if (line.trim()) {
-                                        insertLineWithHeadingStyle(selection, line);
-                                    }
-                                });
-                            }
-                            newSelection = selection; // If it's not a table, just use the existing selection.
-                        }
-                    }
-                }
-            }
-            else if (type === "IMAGE") {
-                let base64Image: string = word.EditorValue;
-
-                if (base64Image.startsWith("data:image/svg+xml")) {
-                    // Convert SVG → PNG
-                    base64Image = await svgBase64ToPngBase64(base64Image);
-                } else if (base64Image.startsWith("data:image")) {
-                    base64Image = base64Image.split(",")[1]; // strip prefix
-                }
-
-                selection.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
-                newSelection = selection;
-            } else {
-                if (word.EditorValue === '' || word.IsApplied) {
-                    selection.insertParagraph(`#${word.DisplayName}#`, Word.InsertLocation.before);
-                } else {
-                    let content = removeQuotes(word.EditorValue);
-                    let lines = content.split(/\r?\n/); // Handle both \r\n and \n
-                    lines.forEach(line => {
-                        selection.insertParagraph(line, Word.InsertLocation.before);
-                    });
-                }
-                newSelection = selection; // After inserting the text, set selection to it.
-            }
-
-            // Move the cursor to the next line after content insertion
-            const nextLineParagraph = selection.insertParagraph("", Word.InsertLocation.after);
-            await context.sync();
-
-            // Set the new cursor position after content
-            newSelection = nextLineParagraph;
-            selection.select(); // Select the new paragraph where the cursor will be
-            await context.sync();
+            await insertContentAtRange(context, selection, word, type, true);
 
         } catch (error) {
             console.error('Detailed error:', error);
         }
     });
 }
+
+export async function syncBookmarks() {
+    return Word.run(async (context) => {
+        try {
+            const bookmarks = context.document.bookmarks;
+            bookmarks.load("items/name");
+            await context.sync();
+
+            const store = StoreService.getInstance();
+            const availableKeys = store.availableKeys;
+
+            for (let i = 0; i < bookmarks.items.length; i++) {
+                const bookmark = bookmarks.items[i];
+                const name = bookmark.name;
+
+                // Only process PT bookmarks
+                if (!name.startsWith("PT")) continue;
+
+                const parts = name.split("_");
+                if (parts.length < 3) continue;
+
+                const idPart = parts[0].substring(2);
+                const groupKeyId = parseInt(idPart);
+
+                if (isNaN(groupKeyId)) continue;
+
+                const word = availableKeys.find(
+                    (k: any) => k.GroupKeyID === groupKeyId
+                );
+                if (!word) continue;
+
+                // Get bookmark range
+                const range = context.document.getBookmarkRange(name);
+
+                // 🔥 Replace content
+                range.insertText(
+                    word.Response ?? "",
+                    Word.InsertLocation.replace
+                );
+
+                // 🔥 Recreate bookmark using range method
+                const newBookmarkName = `PT${groupKeyId}_Split_${Date.now()}`;
+                range.insertBookmark(newBookmarkName);
+            }
+
+            await context.sync();
+
+            toaster("Sync completed!", "success");
+
+            // Disable sync button after successful sync
+            store.isSyncEnabled = false;
+            updateSyncButtonState();
+
+        } catch (err) {
+            console.error("Sync error:", err);
+            toaster("Sync failed", "error");
+        }
+    });
+}
+
+export async function checkBookmarksForSync(): Promise<boolean> {
+    return Word.run(async (context) => {
+        try {
+            const bookmarks = context.document.bookmarks;
+            bookmarks.load("items/name");
+            await context.sync();
+            const store = StoreService.getInstance();
+            const availableKeys = store.availableKeys;
+
+            let hasChanges = false;
+
+            for (let i = 0; i < bookmarks.items.length; i++) {
+                const bookmark = bookmarks.items[i];
+                const name = bookmark.name;
+
+                // Only process PT bookmarks
+                if (!name.startsWith("PT")) continue;
+
+                const parts = name.split("_");
+                if (parts.length < 3) continue;
+
+                const idPart = parts[0].substring(2);
+                const groupKeyId = parseInt(idPart);
+
+                if (isNaN(groupKeyId)) continue;
+
+                // Find matching tag by GroupKeyID
+                const word = availableKeys.find(
+                    (k: any) => k.GroupKeyID === groupKeyId
+                );
+                if (!word) continue;
+
+                // Get bookmark content
+                const range = context.document.getBookmarkRange(name);
+                range.load("text");
+                await context.sync();
+
+                const bookmarkContent = range.text.trim();
+                const tagResponse = (word.Response ?? "").trim();
+
+                // If content is different, we have changes
+                if (bookmarkContent !== tagResponse) {
+                    hasChanges = true;
+                    break; // No need to check further
+                }
+            }
+
+            return hasChanges;
+
+        } catch (err) {
+            console.error("Error checking bookmarks for sync:", err);
+            return false;
+        }
+    });
+}
+
+export function updateSyncButtonState() {
+    const store = StoreService.getInstance();
+    const syncBtn = document.getElementById('sync-btn-tag');
+
+    if (syncBtn) {
+        if (store.isSyncEnabled) {
+            syncBtn.classList.remove('disabled');
+        } else {
+            syncBtn.classList.add('disabled');
+        }
+    }
+}
+
 
 
 export async function openAITag(tag) {
@@ -362,15 +553,15 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     }
     const history = tag.FilteredReportHeadAIHistoryList;
 
-    const chat = history.find((item: any) => item.Selected === 1);
+    const chat = history.find((item: any) => item.Selected);
 
     const finalResponse = chat.FormattedResponse
         ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
         : chat.Response;
 
     tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-    tag.UserValue = finalResponse;
-    tag.EditorValue = finalResponse;
+    // tag.UserValue = finalResponse;
+    tag.Response = finalResponse;
     tag.text = finalResponse;
 
     if (history.length === 0) {
@@ -385,13 +576,13 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
         : 'fa-solid fa-circle-xmark bg-light text-dark';
 
     const headerBgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
-    const DisplayName = type === 'Summary' ? tag.Name : tag.DisplayName;
+    const Name = type === 'Summary' ? tag.Name : tag.Name;
     const closeBar = `
     <div class="chat-header sticky-top ${headerBgClass} z-3">
         <div class="d-flex justify-content-between align-items-center px-2 pt-3">
             <div class="d-flex align-items-center ms-3">
                 <i class="fa fa-microchip-ai text-muted me-2"></i>
-                <span class="fw-bold">${DisplayName}</span>
+                <span class="fw-bold">${Name}</span>
             </div>
             <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
                 <i class="${closeBtnClass}" id="close-ai-window"></i>
@@ -416,7 +607,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     const horizontalLoader = (String(tag.Status) === "0") ? '<div class="horizontal-loader"></div>' : '';
 
     initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
-
+    console.log(chatBody);
     return `${closeBar}${chatBody}${horizontalLoader}${chatFooterHtml}`;
 }
 
@@ -634,7 +825,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             -------------------------------------------------- */
             if (tag.ComponentKeyDataType === "TABLE") {
                 const parser = new DOMParser();
-                const doc = parser.parseFromString(tag.EditorValue, "text/html");
+                const doc = parser.parseFromString(tag.Response, "text/html");
                 const bodyNodes = Array.from(doc.body.childNodes);
 
                 for (const node of bodyNodes) {
@@ -756,7 +947,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
 
             // NON-TABLE CONTENT
             else {
-                const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
+                const txt = tag.Response.replace(/\n- /g, "\n• ").trim();
 
                 for (const line of txt.split("\n")) {
                     if (!line.trim()) continue;
@@ -912,8 +1103,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                         const sources = chatSources.filter((src: any) => !!src);
                         const popupData = {
                             Data: chat.Evidences,
-                            Name: type === 'Summary' ? tag.Name : tag.DisplayName,
-                            UserValue: chat.Response,
+                            Name: type === 'Summary' ? tag.Name : tag.Name,
+                            // UserValue: chat.Response,
                             Sources: sources
                         }
 
@@ -1007,8 +1198,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                 : chat.Response;
 
                             tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-                            tag.UserValue = finalResponse;
-                            tag.EditorValue = finalResponse;
+                            // tag.UserValue = finalResponse;
+                            tag.Response = finalResponse;
                             tag.text = finalResponse;
 
                             const currentlySelected = tag.FilteredReportHeadAIHistoryList.some((item: any) => item.Selected === 1);
@@ -1020,8 +1211,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                                         ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
                                         : chat.Response;
                                     currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                    currentTag.UserValue = finalResponse;
-                                    currentTag.EditorValue = finalResponse;
+                                    // currentTag.UserValue = finalResponse;
+                                    currentTag.Response = finalResponse;
                                     currentTag.text = finalResponse;
                                     currentTag.IsApplied = tag.IsApplied;
                                 }
@@ -1037,8 +1228,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
 
                                     currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                    currentTag.UserValue = finalResponse;
-                                    currentTag.EditorValue = finalResponse;
+                                    // currentTag.UserValue = finalResponse;
+                                    currentTag.Response = finalResponse;
                                     currentTag.text = finalResponse;
                                     currentTag.IsApplied = tag.IsApplied;
                                 }

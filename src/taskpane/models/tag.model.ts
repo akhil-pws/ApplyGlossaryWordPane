@@ -1,6 +1,6 @@
 export interface AITag {
     ID: number;
-    DisplayName: string;
+    Name: string;
     AIFlag: number;
     [key: string]: any; // Allow flexibility for now
 }

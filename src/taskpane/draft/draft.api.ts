@@ -4,15 +4,16 @@ import { CONFIG } from "../utils/config";
 const baseUrl = CONFIG.dataUrl // Set your actual base URL
 
 export async function loginUser(organization: string, username: string, password: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/user/login`, {
+  const response = await fetch(`${baseUrl}/api/addin/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      ClientName: organization,
+      CompanyName: organization,
       Username: username,
-      Password: password
+      Password: password,
+      "ApplicationCode": "LINK"
     })
   });
 
@@ -27,8 +28,8 @@ export async function loginUser(organization: string, username: string, password
 
 // api.ts
 
-export async function getReportById(documentID: string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/report/id/${documentID}`, {
+export async function getReportById(WorkbenchID: string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/addin/workbench/${WorkbenchID}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${jwt}`
@@ -44,8 +45,8 @@ export async function getReportById(documentID: string, jwt: string): Promise<an
 }
 
 
-export async function getAllClients(userId: string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/client/all/${userId}`, {
+export async function getAllSponsors(jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/addin/sponsor/all`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${jwt}`
@@ -62,7 +63,7 @@ export async function getAllClients(userId: string, jwt: string): Promise<any> {
 
 
 export async function getAiHistory(tagId: string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/report/ai-history/${tagId}`, {
+  const response = await fetch(`${baseUrl}/api/addin/workbench/ai-history/${tagId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${jwt}`
@@ -133,8 +134,8 @@ export async function updateAiHistory(payload: any, jwt: string): Promise<any> {
   return data;
 }
 
-export async function fetchGlossaryTemplate(clientId: string, bodyText: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/glossary-template/client-id/${clientId}`, {
+export async function fetchGlossaryTemplate(sponsorID: string, bodyText: any, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/glossary-template/client-id/${sponsorID}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -172,7 +173,7 @@ export async function addGroupKey(payload: any, jwt: string): Promise<any> {
 
 
 export async function getAllPromptTemplates(jwt): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/prompt-template/all`, {
+  const response = await fetch(`${baseUrl}/api/addin/prompt-builders/all`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -225,7 +226,7 @@ export async function updatePromptTemplate(payload: any, jwt: string): Promise<a
 }
 
 export async function getAllCustomTables(jwt): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/custom-table/all`, {
+  const response = await fetch(`${baseUrl}/api/addin/custom-table/all`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -242,7 +243,7 @@ export async function getAllCustomTables(jwt): Promise<any> {
 }
 
 export async function getGeneralImages(jwt): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/image/general`, {
+  const response = await fetch(`${baseUrl}/api/addin/image/general`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -259,7 +260,7 @@ export async function getGeneralImages(jwt): Promise<any> {
 }
 
 export async function getReportHeadImageById(id: string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/image/report-head/${id}`, {
+  const response = await fetch(`${baseUrl}/api/addin/image/workbench/${id}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

@@ -35,7 +35,7 @@ export class AuthService {
                 if (data['Data'].ResponseStatus) {
                     const jwt = data.Data.Token;
                     const userRole = data.Data.UserRole;
-                    const userId = data.Data.ID;
+                    const userId = data.Data.UserID;
 
                     // Store interactions in Session
                     sessionStorage.setItem('token', jwt);

@@ -237,7 +237,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
                 class="form-check-input c-pointer me-2 response-checkbox"
                 type="checkbox"
                 id="checkbox-${index}"
-                ${chat.Selected === 1 ? 'checked' : ''}>
+                ${chat.Selected ? 'checked' : ''}>
               <span id="responseText-${index}">${chat.Response}</span>
               <i class="fa fa-copy text-secondary c-pointer ms-2"
                 title="Copy Response"
@@ -307,15 +307,15 @@ export function renderSelectedTags(selectedNames, availableKeys) {
         );
       } else {
         aiTag = availableKeys.find(
-          mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
+          mention => mention.AIFlag === 1 && mention.Name.toLowerCase() === name.toLowerCase()
         );
       }
-      if (aiTag?.DisplayName) {
+      if (aiTag?.Name) {
 
         const badge = document.createElement('span');
         badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
         badge.style.cursor = 'pointer';
-        badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+        badge.innerHTML = `${aiTag.Name} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
         badge.addEventListener('click', async () => {
           await selectMatchingBookmarkFromSelection(name);
 
@@ -751,9 +751,9 @@ export function mapImagesToComponentObjects(input: any): any[] {
   // 2️⃣ Map to required structure
   return flatImages.map(img => ({
     Name: img.ImageName,
-    DisplayName: img.ImageName,
-    EditorValue: img.ImageData,
-    UserValue: img.ImageData,
+    Name: img.ImageName,
+    Response: img.ImageData,
+    // UserValue: img.ImageData,
     ComponentKeyDataType: "IMAGE",
     AIFlag: 0,
     IsImage: true
