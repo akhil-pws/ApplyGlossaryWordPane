@@ -922,7 +922,7 @@ export async function applyPropertyTagsFn(
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
         const bookmarkName = tag.AIFlag === 1
-          ? `ID${tag.ID}_Split_${getDateTimeStamp()}`
+          ? `ID${tag.GroupKeyID}_Split_${getDateTimeStamp()}`
           : `PT${tag.GroupKeyID}_Split_${getDateTimeStamp()}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
@@ -2290,7 +2290,7 @@ async function logBookmarksInSelection() {
       const aiTag = (store.mode === 'Home') ? store.availableKeys.find(k =>
         k.AIFlag === 1 &&
         (k.Name.toLowerCase() === processedName.toLowerCase() ||
-          `id${k.ID}`.toLowerCase() === processedName.toLowerCase())
+          `id${k.GroupKeyID}`.toLowerCase() === processedName.toLowerCase())
       ) : null;
 
       const summaryTag = (store.mode === 'Summary') ? store.summaryTagList.find(k =>
@@ -2337,7 +2337,7 @@ function pickRelevantBookmarks(bookmarks: string[]) {
       return store.availableKeys.some(
         k => k.AIFlag === 1 &&
           (k.Name.toLowerCase() === name.toLowerCase() ||
-            `id${k.ID}`.toLowerCase() === name.toLowerCase())
+            `id${k.GroupKeyID}`.toLowerCase() === name.toLowerCase())
       );
     } else if (store.mode === 'Summary') {
       return store.summaryTagList.some(

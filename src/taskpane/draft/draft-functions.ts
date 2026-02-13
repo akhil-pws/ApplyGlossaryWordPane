@@ -205,7 +205,7 @@ function jsonToHtmlTable(jsonData) {
 export function generateChatHistoryHtml(chatList: any[]): string {
   const store = StoreService.getInstance();
   const promptclass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
-  const globalPromptUpdate = store.UserRole.UserRoleEntityAccessList.find(
+  const globalPromptUpdate = store.UserRole?.UserRoleEntityAccessList?.find(
     (item: any) => item.UserRoleEntity === 'Global Prompt Update'
   );
 
@@ -303,7 +303,7 @@ export function renderSelectedTags(selectedNames, availableKeys) {
 
       if (/^ID\d+$/i.test(name)) {
         aiTag = availableKeys.find(
-          mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
+          mention => mention.AIFlag === 1 && `id${mention.GroupKeyID}`.toLowerCase() === name.toLowerCase()
         );
       } else {
         aiTag = availableKeys.find(
