@@ -138,7 +138,7 @@ export async function loadSummarypage(availableKeys: any[]) {
 
     if (Array.isArray(names) && names.length > 0 && typeof names[0] === "object") {
       return names
-        .map((x: any) => x.DisplayName || x.Name || x.TagName)
+        .map((x: any) => x.Name || x.Name || x.TagName)
         .filter(Boolean);
     }
 
@@ -329,7 +329,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       setReanalyzeButtonState(false);
 
       // ✅ 1) FIRST call GET tags API
-      const getRes = await getSummaryTagsByReportHeadId(store.documentID, store.jwt);
+      const getRes = await getSummaryTagsByReportHeadId(store.WorkbenchID, store.jwt);
 
       // ✅ 2) check Data.SummaryTagGenerated from GET API response
       currentSummaryStatus = getRes?.Data?.SummaryTagGenerated;
@@ -364,7 +364,7 @@ export async function loadSummarypage(availableKeys: any[]) {
             hasActivated = true;
             const base64Data = await getWordAsBase64();
             const payload = {
-              ReportHeadID: store.documentID,
+              ReportHeadID: store.WorkbenchID,
               ActiveDocument: base64Data
             };
             await activateSummaryMode(payload, store.jwt);
@@ -418,7 +418,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       // Latest history is usually index 0 after unshift, but let's check or just take first in raw list
       const lastHistory = history[0];
       const payload = {
-        ReportHeadID: Number(store.documentID),
+        ReportHeadID: Number(store.WorkbenchID),
         ReportHeadSummaryTagID: tag.ID || tag.ReportHeadSummaryTagID,
         Prompt: lastHistory.Prompt,
         Response: "",
@@ -447,7 +447,7 @@ export async function loadSummarypage(availableKeys: any[]) {
   async function pollSummaryUntilDone() {
     try {
       while (instanceId === currentSummaryInstance) {
-        const statusRes = await getSummaryTagStatus(store.documentID, store.jwt);
+        const statusRes = await getSummaryTagStatus(store.WorkbenchID, store.jwt);
         if (instanceId !== currentSummaryInstance) break;
 
         const data = statusRes?.Data;
@@ -484,7 +484,7 @@ export async function loadSummarypage(availableKeys: any[]) {
           setReanalyzeButtonState(true);
 
           // after done -> fetch tags again and render
-          const getRes2 = await getSummaryTagsByReportHeadId(store.documentID, store.jwt);
+          const getRes2 = await getSummaryTagsByReportHeadId(store.WorkbenchID, store.jwt);
           if (instanceId !== currentSummaryInstance) break;
 
           allSummaryTags = getRes2?.Data?.SummaryTags || [];
@@ -540,7 +540,7 @@ export async function loadSummarypage(availableKeys: any[]) {
 
         const base64Data = await getWordAsBase64();
         const payload = {
-          ReportHeadID: Number(store.documentID),
+          ReportHeadID: Number(store.WorkbenchID),
           RefreshSummaryTag: refresh,
           ActiveDocument: base64Data
         };

@@ -11,12 +11,12 @@ export class AIService {
     static async fetchAIHistory(tag: any): Promise<any[]> {
         const store = StoreService.getInstance();
         try {
-            const data = await getAiHistory(tag.ID, store.jwt);
+            const data = await getAiHistory(tag.GroupKeyID, store.jwt);
 
             if (data.Status && data.Data) {
                 tag.ReportHeadAIHistoryList = data['Data'] || [];
                 tag.FilteredReportHeadAIHistoryList = [];
-                tag.SourceValueID = tag.ReportHeadAIHistoryList[0].SourceValue;
+                tag.SourceValueID = tag.ReportHeadAIHistoryList[0].SourceVector;
 
                 const selectedSources = store.sourceList.filter((list: any) =>
                     tag.SourceValueID.includes(String(list.VectorID))
@@ -70,7 +70,7 @@ export class AIService {
             } else {
                 payload = {
                     ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
-                    DocumentID: store.dataList.NCTID,
+                    WorkbenchID: store.dataList.NCTID,
                     DocumentType: store.dataList.DocumentType,
                     TextSetting: store.dataList.TextSetting,
                     DocumentTemplate: store.dataList.ReportTemplate,
@@ -110,8 +110,8 @@ export class AIService {
                         : chat.Response;
 
                     tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-                    tag.UserValue = finalResponse;
-                    tag.EditorValue = finalResponse;
+                    // tag.UserValue = finalResponse;
+                    tag.Response = finalResponse;
                     tag.text = finalResponse;
 
 
@@ -158,8 +158,8 @@ export class AIService {
             : chat.Response;
 
         currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-        currentTag.UserValue = finalResponse;
-        currentTag.EditorValue = finalResponse;
+        // currentTag.UserValue = finalResponse;
+        currentTag.Response = finalResponse;
         currentTag.text = finalResponse;
         currentTag.IsApplied = isApplied;
     }
