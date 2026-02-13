@@ -659,7 +659,8 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
     // Populate template dropdown
     promptBuilderList.forEach((item) => {
         const option = document.createElement('option');
-        option.value = item.ID.toString();
+        const id = item.ID || item.id;
+        option.value = id ? id.toString() : '';
         option.textContent = item.Name;
         templateSelect.appendChild(option);
     });
@@ -671,9 +672,9 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
         const data = await getPromptTemplateById(templateId, jwt);
         if (data.Status && data.Data) {
             fieldsList = data.Data;
-            preview = promptBuilderList.find((item) => item.ID.toString() === templateId).Template;
+            preview = promptBuilderList.find((item) => (item.ID || item.id || '').toString() === templateId).Template;
 
-            templateText = promptBuilderList.find((item) => item.ID.toString() === templateId).Template;
+            templateText = promptBuilderList.find((item) => (item.ID || item.id || '').toString() === templateId).Template;
         }
         if (!templateId) {
             templateError.classList.remove('d-none');
