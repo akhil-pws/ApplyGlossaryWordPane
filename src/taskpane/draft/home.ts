@@ -368,7 +368,7 @@ export async function insertContentAtRange(context: Word.RequestContext, range: 
     // 3. Create Bookmark (if NOT Image)
     if (type !== 'IMAGE' && bookmarkStart && bookmarkEnd) {
         const bookmarkName = word.AIFlag === 1
-            ? `ID${word.ID}_Split_${getDateTimeStamp()}`
+            ? `ID${word.GroupKeyID}_Split_${getDateTimeStamp()}`
             : `PT${word.GroupKeyID}_Split_${getDateTimeStamp()}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
     }
@@ -551,9 +551,13 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
             await summaryService.fetchSummaryAIHistory(tag);
         }
     }
-    const history = tag.FilteredReportHeadAIHistoryList;
+    const history = tag.FilteredReportHeadAIHistoryList || [];
+    if (history.length === 0) {
+        return '<div>No AI history available.</div>';
+    }
 
-    const chat = history.find((item: any) => item.Selected);
+    // Default to the first (latest) item if none is explicitly selected
+    const chat = history.find((item: any) => item.Selected) || history[0];
 
     const finalResponse = chat.FormattedResponse
         ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
@@ -563,10 +567,6 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     // tag.UserValue = finalResponse;
     tag.Response = finalResponse;
     tag.text = finalResponse;
-
-    if (history.length === 0) {
-        return '<div>No AI history available.</div>';
-    }
 
     // Check current theme
     const store = StoreService.getInstance();
@@ -967,7 +967,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             if (bookmarkStart && bookmarkEnd) {
                 const prefix = type === "Summary" ? "SM" : "ID";
                 const bookmarkName =
-                    `${prefix}${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
+                    `${prefix}${tag.GroupKeyID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
 
                 bookmarkStart
                     .expandTo(bookmarkEnd)
