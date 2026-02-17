@@ -59,15 +59,19 @@ export class AIService {
             let payload: any;
             if (type === 'Summary') {
                 payload = {
+                    Prompt: prompt,
                     WorkbenchSummaryTagID: tag.WorkbenchSummaryTagID,
-                    Content: prompt
+                    WorkbenchID: Number(store.WorkbenchID),
+                    Response: "",
+                    SourceVector: tag.SourceValueID || "",
+                    SummarySourceID: tag.WorkbenchSourceID || 1
                 };
             } else {
 
                 payload = {
                     WorkbenchSourceID: tag.WorkbenchSourceID || 1,
                     Prompt: prompt,
-                    GroupKey: tag.GroupName || tag.Name,
+                    GroupKey: tag.Name,
                     WorkbenchGroupKeyID: tag.GroupKeyID,
                     WorkbenchID: Number(store.WorkbenchID),
                     WorkbenchName: store.dataList?.WorkbenchName || "",
