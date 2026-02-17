@@ -21,6 +21,15 @@ Office.onReady((info) => {
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("footer").innerText = `© ${new Date().getFullYear()} - TrialAssure LINK AI Assistant ${CONFIG.version}`;
 
+    // Platform Detection
+    if (Office.context.platform === Office.PlatformType.OfficeOnline) {
+      console.log("Running in Word on the Web (Online)");
+    } else if (Office.context.platform === Office.PlatformType.PC) {
+      console.log("Running in Word Desktop on Windows");
+    } else if (Office.context.platform === Office.PlatformType.Mac) {
+      console.log("Running in Word Desktop on Mac");
+    }
+
     // Initialize Services
     // AuthService.init(); // if needed
 
@@ -1158,16 +1167,20 @@ export async function applyglossary() {
 
 
 async function handleSelectionChange() {
-  const store = StoreService.getInstance();
+  try {
+    const store = StoreService.getInstance();
 
-  // Handle glossary mode
-  if (store.isGlossaryActive) {
-    await checkGlossary();
-  }
+    // Handle glossary mode
+    if (store.isGlossaryActive) {
+      await checkGlossary();
+    }
 
-  // Handle Home or Summary mode - detect bookmarks/tags in selection
-  if (store.mode === 'Home' || store.mode === 'Summary') {
-    await logBookmarksInSelection();
+    // Handle Home or Summary mode - detect bookmarks/tags in selection
+    if (store.mode === 'Home' || store.mode === 'Summary') {
+      await logBookmarksInSelection();
+    }
+  } catch (error) {
+    console.error("Error in handleSelectionChange:", error);
   }
 }
 
@@ -1421,7 +1434,7 @@ export async function addGenAITags() {
     // Build Primary Source List
     let sourceTypeList = [
       ...Array.from(new Map(
-        store.dataList.SourceTypeList
+        store.dataList.WorkbenchSourceFiles
           .filter(item => item.VectorID > 0)
           .map(item => [item.SourceTypeID, { Name: item.SourceType, ID: item.SourceTypeID }])
       ).values())

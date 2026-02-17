@@ -24,9 +24,9 @@ export class DocumentService {
             const dataList = data.Data;
 
             // Basic processing
-            if (!dataList.SourceTypeList) dataList.SourceTypeList = [];
+            if (!dataList.WorkbenchSourceFiles) dataList.WorkbenchSourceFiles = [];
 
-            const sourceList = dataList.SourceTypeList
+            const sourceList = dataList.WorkbenchSourceFiles
                 .filter((item: any) => item.SourceValue !== '' && item.AIFlag === 1)
                 .map((item: any) => ({
                     ...item,
