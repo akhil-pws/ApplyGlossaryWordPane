@@ -8,10 +8,10 @@ import { AIService } from "./services/ai.service";
 // Note: GlossaryService import removed if unused or moved
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
-import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
+import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI, checkBookmarksForSync, updateSyncButtonState } from "./draft/home";
 import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllSponsors, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
 import { renderSelectedTags } from "./draft/draft-functions";
 import { loadSummarypage } from "./summary/summary";
@@ -21,6 +21,15 @@ Office.onReady((info) => {
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("footer").innerText = `© ${new Date().getFullYear()} - TrialAssure LINK AI Assistant ${CONFIG.version}`;
 
+    // Platform Detection
+    if (Office.context.platform === Office.PlatformType.OfficeOnline) {
+      console.log("Running in Word on the Web (Online)");
+    } else if (Office.context.platform === Office.PlatformType.PC) {
+      console.log("Running in Word Desktop on Windows");
+    } else if (Office.context.platform === Office.PlatformType.Mac) {
+      console.log("Running in Word Desktop on Mac");
+    }
+
     // Initialize Services
     // AuthService.init(); // if needed
 
@@ -28,10 +37,8 @@ Office.onReady((info) => {
     DocumentService.retrieveDocumentProperties().then((props) => {
       if (props) {
         // Update local state for legacy compatibility
-        // documentID = props.documentID; // Moved to Store
-        // organizationName = props.organizationName; // Moved to Store
         const store = StoreService.getInstance();
-        store.documentID = props.documentID;
+        store.WorkbenchID = props.WorkbenchID;
         store.organizationName = props.organizationName;
 
 
@@ -54,7 +61,7 @@ Office.onReady((info) => {
       } else {
         document.getElementById('app-body').innerHTML = `
         <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
-        console.log(`Custom property "documentID" not found.`);
+        console.log(`Custom property "WorkbenchID" not found.`);
       }
     }).catch(err => {
       console.error("Failed to initialize", err);
@@ -171,18 +178,19 @@ async function getTableStyle() {
   const store = StoreService.getInstance();
   const tableStyleObj = await getAllCustomTables(store.jwt);
   store.customTableStyle = tableStyleObj['Data'];
-  const selectedTable = store.customTableStyle.find(style => style.ID === store.dataList.TableCustomizationID);
+  const selectedTable = store.customTableStyle.find(style => style.ID === store.dataList?.TableCustomizationID);
   if (selectedTable) {
-    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.TableCustomizationName : '');
+    const setting = selectedTable.Setting ? selectedTable.Setting : selectedTable;
     store.colorPallete = {
-      "Header": selectedTable.Setting.HeaderColor,
-      "Primary": selectedTable.Setting.PrimaryColor,
-      "Secondary": selectedTable.Setting.SecondaryColor,
+      "Header": setting.HeaderColor,
+      "Primary": setting.PrimaryColor,
+      "Secondary": setting.SecondaryColor,
       "Customize": true,
-      "IsHeaderBold": selectedTable.Setting.IsHeaderBold,
-      "IsSideHeaderBold": selectedTable.Setting.IsSideHeaderBold
+      "IsHeaderBold": setting.IsHeaderBold || true,
+      "IsSideHeaderBold": setting.IsSideHeaderBold || false
     };
-    store.tableStyle = selectedTable.Setting.BaseStyle;
+    store.tableStyle = setting.BaseStyle;
   }
 
 }
@@ -192,15 +200,14 @@ async function fetchDocument(action) {
   try {
     const store = StoreService.getInstance();
     const userId = sessionStorage.getItem('userId') || '0';
-    const reportData = await DocumentService.loadReportData(store.documentID, store.jwt, userId);
-
+    const reportData = await DocumentService.loadReportData(store.WorkbenchID, store.jwt, userId);
     // Assign to store
     store.dataList = reportData.dataList;
     await getTableStyle();
     await loadPromptTemplates();
     store.availableKeys = reportData.availableKeys;
     store.sourceList = reportData.sourceList;
-    store.clientId = reportData.clientId;
+    store.sponsorID = reportData.sponsorID;
     // Global Assignment
     store.aiTagList = reportData.aiTagList;
     store.imageList = reportData.imageList;
@@ -271,6 +278,14 @@ async function fetchDocument(action) {
         Office.EventType.DocumentSelectionChanged,
         handleSelectionChange
       );
+
+      // Check if PT bookmarks exist and have changed content (only on initial load)
+      const hasChanges = await checkBookmarksForSync();
+      store.isSyncEnabled = hasChanges;
+      if (hasChanges) {
+        toaster("Properties have been updated in the application. Click on Sync to refresh.", "info");
+      }
+      updateSyncButtonState();
     }
 
     UIService.toggleLoader(false);
@@ -279,6 +294,21 @@ async function fetchDocument(action) {
     UIService.showNotification("Error loading data", "error");
     UIService.toggleLoader(false);
   }
+}
+
+export async function getReport() {
+  await fetchDocument('Refresh');
+
+  // Check if PT bookmarks exist and have changed content
+  const store = StoreService.getInstance();
+  const hasChanges = await checkBookmarksForSync();
+  store.isSyncEnabled = hasChanges;
+  if (hasChanges) {
+    toaster("Properties have been updated in the application. Click on Sync to refresh.", "info");
+  }
+
+  // Update sync button state in the UI
+  updateSyncButtonState();
 }
 
 export async function formatOptionsDisplay() {
@@ -631,7 +661,7 @@ export async function applyTagFn() {
 
       context.load(body, 'text');
       await context.sync();
-      await applyAITagFn(body, context);
+      await applyPropertyTagsFn(body, context);
       await applyImageTagFn(body, context);
     } catch (err) {
       toaster("Something went wrong", "error")
@@ -646,7 +676,7 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
   const store = StoreService.getInstance();
   for (let i = 0; i < store.imageList.length; i++) {
     const tag = store.imageList[i];
-    const searchResults = body.search(`$${tag.DisplayName}$`, {
+    const searchResults = body.search(`$${tag.Name}$`, {
       matchCase: false,
       matchWholeWord: false,
     });
@@ -654,8 +684,8 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
     await context.sync();
 
     for (const item of searchResults.items) {
-      if (tag.EditorValue !== "") {
-        let base64Image: string = tag.EditorValue;
+      if (tag.Response !== "") {
+        let base64Image: string = tag.Response;
 
         // Clean base64
         if (!base64Image) continue;
@@ -680,7 +710,7 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
   loadHomepage(store.availableKeys);
 }
 
-export async function applyAITagFn(
+export async function applyPropertyTagsFn(
   body: Word.Body,
   context: Word.RequestContext
 ) {
@@ -689,14 +719,14 @@ export async function applyAITagFn(
     <div class="loader" id="loader"></div>
     <div id="highlighted-text"></div>
   </div>`
-  toaster("Please wait... applying AI tags", "info");
+  toaster("Please wait... applying tags", "info");
 
   const store = StoreService.getInstance();
-  for (const tag of store.aiTagList) {
-    tag.EditorValue = removeQuotes(tag.EditorValue);
-    if (!tag.EditorValue || tag.IsApplied) continue;
+  for (const tag of store.availableKeys) {
+    tag.Response = removeQuotes(tag.Response);
+    if (!tag.Response || tag.IsApplied) continue;
 
-    const results = body.search(`#${tag.DisplayName}#`, {
+    const results = body.search(`#${tag.Name}#`, {
       matchCase: false,
       matchWholeWord: false
     });
@@ -734,7 +764,7 @@ export async function applyAITagFn(
       // TABLE CONTENT
       if (tag.ComponentKeyDataType === "TABLE") {
         const parser = new DOMParser();
-        const doc = parser.parseFromString(tag.EditorValue, "text/html");
+        const doc = parser.parseFromString(tag.Response, "text/html");
         const nodes = Array.from(doc.body.childNodes);
 
         for (const node of nodes) {
@@ -815,7 +845,7 @@ export async function applyAITagFn(
                       topCell.merge(bottomCell);
                       try {
                         topCell.verticalAlignment = Word.VerticalAlignment.center;
-                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered;
                       } catch (e) { }
                     }
                   });
@@ -860,7 +890,7 @@ export async function applyAITagFn(
 
       // IMAGE CONTENT
       else if (tag.ComponentKeyDataType === "IMAGE") {
-        let base64 = tag.EditorValue;
+        let base64 = tag.Response;
 
         if (base64.startsWith("data:image/svg+xml")) {
           base64 = await svgBase64ToPngBase64(base64);
@@ -879,7 +909,7 @@ export async function applyAITagFn(
 
       // TEXT CONTENT
       else {
-        const txt = tag.EditorValue
+        const txt = tag.Response
           .replace(/\n- /g, "\n• ")
           .trim();
 
@@ -900,7 +930,9 @@ export async function applyAITagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const bookmarkName = `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+        const bookmarkName = tag.AIFlag === 1
+          ? `ID${tag.GroupKeyID}_Split_${getDateTimeStamp()}`
+          : `PT${tag.GroupKeyID}_Split_${getDateTimeStamp()}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
@@ -1002,7 +1034,7 @@ export async function applyglossary() {
       };
       try {
         const store = StoreService.getInstance();
-        const data = await fetchGlossaryTemplate(store.dataList?.ClientID, bodyText, store.jwt);
+        const data = await fetchGlossaryTemplate(store.dataList?.SponsorID, bodyText, store.jwt);
 
         store.layTerms = data.Data;
 
@@ -1135,16 +1167,20 @@ export async function applyglossary() {
 
 
 async function handleSelectionChange() {
-  const store = StoreService.getInstance();
+  try {
+    const store = StoreService.getInstance();
 
-  // Handle glossary mode
-  if (store.isGlossaryActive) {
-    await checkGlossary();
-  }
+    // Handle glossary mode
+    if (store.isGlossaryActive) {
+      await checkGlossary();
+    }
 
-  // Handle Home or Summary mode - detect bookmarks/tags in selection
-  if (store.mode === 'Home' || store.mode === 'Summary') {
-    await logBookmarksInSelection();
+    // Handle Home or Summary mode - detect bookmarks/tags in selection
+    if (store.mode === 'Home' || store.mode === 'Summary') {
+      await logBookmarksInSelection();
+    }
+  } catch (error) {
+    console.error("Error in handleSelectionChange:", error);
   }
 }
 
@@ -1393,12 +1429,12 @@ export async function addGenAITags() {
       await removeMatchingContentControls();
     }
 
-    let selectedClient = store.clientList.filter(item => item.ID === store.clientId);
+    let selectedClient = store.clientList.filter(item => item.ID === store.sponsorID);
 
     // Build Primary Source List
     let sourceTypeList = [
       ...Array.from(new Map(
-        store.dataList.SourceTypeList
+        store.dataList.WorkbenchSourceFiles
           .filter(item => item.VectorID > 0)
           .map(item => [item.SourceTypeID, { Name: item.SourceType, ID: item.SourceTypeID }])
       ).values())
@@ -1527,10 +1563,10 @@ export async function addGenAITags() {
 
         const isAvailableForAll = availableForAllCheckbox.checked;
         const isSaveGlobally = saveGloballyCheckbox.checked;
-        const aigroup = store.dataList.Group.find(el => el.DisplayName === 'AIGroup');
+        const aigroup = store.dataList.Group.find(el => el.Name === 'AIGroup');
 
         const formData = {
-          DisplayName: nameField.value.trim(),
+          Name: nameField.value.trim(),
           Prompt: promptField.value.trim(),
           Description: descriptionField.value.trim(),
           GroupKeyClient: selectedSponsors,
@@ -1545,7 +1581,7 @@ export async function addGenAITags() {
 
           // MULTI SELECT SOURCE TYPE
           SourceTypeID: selectedPrimarySources.join(","),
-          SummaryTagClient: isSummaryMode ? selectedSponsors.map(s => ({ ClientID: s.ID, Client: s.Name })) : [],
+          SummaryTagClient: isSummaryMode ? selectedSponsors.map(s => ({ SponsorID: s.ID, Client: s.Name })) : [],
 
           ReportHeadGroupID: aigroup.ID,
           ReportHeadSourceID: 0
@@ -1810,7 +1846,7 @@ async function createTextGenTag(payload) {
     if (store.mode === "Summary") {
       const summaryPayload = {
         ReportHeadID: payload.ReportHeadID,
-        Name: payload.DisplayName,
+        Name: payload.Name,
         Description: payload.Description,
         Prompt: payload.Prompt,
         Selected: 1,
@@ -1852,9 +1888,9 @@ async function createTextGenTag(payload) {
 export function mentionDropdownFn(textareaId, DropdownId, action) {
   const store = StoreService.getInstance();
   const filterMentions = (query) => {
-    // Assuming availableKeys is an array of objects with DisplayName and EditorValue properties
+    // Assuming availableKeys is an array of objects with Name and Response properties
     const filtered = store.availableKeys.filter(item => item.AIFlag === 0).filter(item =>
-      item.DisplayName.toLowerCase().includes(query.toLowerCase())
+      item.Name.toLowerCase().includes(query.toLowerCase())
     );
     return filtered;
   };
@@ -1878,12 +1914,12 @@ export function mentionDropdownFn(textareaId, DropdownId, action) {
             mentionDropdown.innerHTML = mentions.map(item => {
               let editorValue = '';
               if (action === 'add') {
-                editorValue = `#${item.DisplayName}#`;
+                editorValue = `#${item.Name}#`;
               } else {
-                editorValue = item.EditorValue || `#${item.DisplayName}#`;
+                editorValue = item.Response || `#${item.Name}#`;
               }
 
-              return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.DisplayName}</li>`;
+              return `<li class="dropdown-item" data-editor-value="${editorValue}">${item.Name}</li>`;
             }).join('');
 
             // Get the position of the textarea and place the dropdown above it
@@ -2266,8 +2302,8 @@ async function logBookmarksInSelection() {
 
       const aiTag = (store.mode === 'Home') ? store.availableKeys.find(k =>
         k.AIFlag === 1 &&
-        (k.DisplayName.toLowerCase() === processedName.toLowerCase() ||
-          `id${k.ID}`.toLowerCase() === processedName.toLowerCase())
+        (k.Name.toLowerCase() === processedName.toLowerCase() ||
+          `id${k.GroupKeyID}`.toLowerCase() === processedName.toLowerCase())
       ) : null;
 
       const summaryTag = (store.mode === 'Summary') ? store.summaryTagList.find(k =>
@@ -2313,8 +2349,8 @@ function pickRelevantBookmarks(bookmarks: string[]) {
     if (store.mode === 'Home') {
       return store.availableKeys.some(
         k => k.AIFlag === 1 &&
-          (k.DisplayName.toLowerCase() === name.toLowerCase() ||
-            `id${k.ID}`.toLowerCase() === name.toLowerCase())
+          (k.Name.toLowerCase() === name.toLowerCase() ||
+            `id${k.GroupKeyID}`.toLowerCase() === name.toLowerCase())
       );
     } else if (store.mode === 'Summary') {
       return store.summaryTagList.some(
@@ -2329,12 +2365,29 @@ function pickRelevantBookmarks(bookmarks: string[]) {
 async function getImages() {
   try {
     const store = StoreService.getInstance();
-    const userId = sessionStorage.getItem('userId') || '0';
+
+    if (!store) {
+      console.error("getImages: StoreService.getInstance() returned undefined/null");
+      return;
+    }
+
+    if (!store.jwt) {
+      console.warn("getImages: JWT is missing, skipping fetch");
+      return;
+    }
+
+    if (!store.dataList || !store.dataList.WorkbenchID) {
+      console.warn("getImages: dataList or WorkbenchID is missing, skipping fetch");
+      return;
+    }
+
+
 
     // Fetch Images and Clients in parallel
     const generalImagesPromise = getGeneralImages(store.jwt);
-    const documentImagesPromise = getReportHeadImageById(store.dataList.ID, store.jwt);
-    const clientsPromise = getAllClients(userId, store.jwt);
+    console.log(store.dataList.WorkbenchID)
+    const documentImagesPromise = getReportHeadImageById(store.dataList.WorkbenchID, store.jwt);
+    const clientsPromise = getAllSponsors(store.jwt);
 
     const [generalImages, documentImages, clientsData] = await Promise.all([
       generalImagesPromise,
@@ -2342,18 +2395,32 @@ async function getImages() {
       clientsPromise
     ]);
 
+    if (!generalImages || !generalImages['Data']) {
+      console.error("getImages: generalImages data is missing");
+      return;
+    }
+
+    if (!documentImages || !documentImages['Data']) {
+      console.error("getImages: documentImages data is missing");
+      return;
+    }
+
     const mappedGeneral = mapImagesToComponentObjects(generalImages['Data']);
     const mappedDocument = mapImagesToComponentObjects(documentImages['Data']);
 
     // Update Store with Images
+    if (!store.dataList.GroupKeyAll) store.dataList.GroupKeyAll = [];
     store.dataList.GroupKeyAll.push(...mappedGeneral);
     store.dataList.GroupKeyAll.push(...mappedDocument);
+
+    if (!store.availableKeys) store.availableKeys = [];
     store.availableKeys.push(...mappedGeneral);
     store.availableKeys.push(...mappedDocument);
+
     store.imageList = store.dataList.GroupKeyAll.filter(element => element.ComponentKeyDataType === 'IMAGE');
 
     // Update Store with Clients
-    if (clientsData.Status && clientsData.Data) {
+    if (clientsData && clientsData.Status && clientsData.Data) {
       store.clientList = clientsData.Data;
     }
 
