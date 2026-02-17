@@ -59,34 +59,23 @@ export class AIService {
             let payload: any;
             if (type === 'Summary') {
                 payload = {
-                    ReportHeadID: store.dataList.ID,
-                    ReportHeadSummaryTagID: tag.ID,
-                    Prompt: prompt,
-                    Response: "",
-                    Selected: 1,
-                    SourceVector: tag.TempSourceValue ? tag.TempSourceValue.join(",") : "",
-                    Name: tag.Name
+                    WorkbenchSummaryTagID: tag.WorkbenchSummaryTagID,
+                    Content: prompt
                 };
             } else {
+
                 payload = {
-                    ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
-                    WorkbenchID: store.dataList.NCTID,
-                    DocumentType: store.dataList.DocumentType,
-                    TextSetting: store.dataList.TextSetting,
-                    DocumentTemplate: store.dataList.ReportTemplate,
-                    ReportHeadGroupKeyID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadGroupKeyID,
-                    ThreadID: tag.ThreadID,
-                    AssistantID: store.dataList.AssistantID,
-                    Container: store.dataList.Container,
-                    GroupName: store.GroupName,
+                    WorkbenchSourceID: tag.WorkbenchSourceID || 1,
                     Prompt: prompt,
-                    PromptType: 1,
-                    Response: '',
-                    VectorID: store.dataList.VectorID,
-                    Selected: 0,
-                    ID: 0,
-                    SourceValue: tag.TempSourceValue ? tag.TempSourceValue : []
+                    GroupKey: tag.GroupName || tag.Name,
+                    WorkbenchGroupKeyID: tag.GroupKeyID,
+                    WorkbenchID: Number(store.WorkbenchID),
+                    WorkbenchName: store.dataList?.WorkbenchName || "",
+                    Response: "",
+                    SourceVector: tag.SourceValueID || "",
+                    FormattedResponse: ""
                 };
+
             }
 
             try {
