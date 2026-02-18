@@ -5,7 +5,7 @@ export class StoreService {
     // State Variables
     public jwt: string = '';
     public UserRole: any = {};
-    public WorkbenchID: string = '';
+    public documentID: string = '';
     public organizationName: string = '';
     public aiTagList: any[] = [];
     public summaryTagList: any[] = [];
@@ -22,7 +22,7 @@ export class StoreService {
     public capturedFormatting: any = {};
     public emptyFormat: boolean = false;
     public isNoFormatTextAvailable: boolean = false;
-    public sponsorID: string = '0';
+    public clientId: string = '0';
     public userId: number = 0;
     public clientList: any[] = [];
     public currentYear: number = new Date().getFullYear();
@@ -45,22 +45,13 @@ export class StoreService {
     public customTableStyle: any[] = [];
     public currentChatTagId: number = -1;
     public isReversed: boolean = false;
-    public isSyncEnabled: boolean = false;
 
     private constructor() { }
 
     public static getInstance(): StoreService {
         if (!StoreService.instance) {
-            console.log("StoreService: Initializing new instance");
             StoreService.instance = new StoreService();
         }
-
-        if (!StoreService.instance) {
-            console.error("StoreService: Critical Error - instance is still undefined after initialization attempt!");
-            // Fallback: create it again or throw an error to fail fast
-            StoreService.instance = new StoreService();
-        }
-
         return StoreService.instance;
     }
 }

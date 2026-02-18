@@ -11,12 +11,12 @@ export class AIService {
     static async fetchAIHistory(tag: any): Promise<any[]> {
         const store = StoreService.getInstance();
         try {
-            const data = await getAiHistory(tag.GroupKeyID, store.jwt);
+            const data = await getAiHistory(tag.ID, store.jwt);
 
             if (data.Status && data.Data) {
                 tag.ReportHeadAIHistoryList = data['Data'] || [];
                 tag.FilteredReportHeadAIHistoryList = [];
-                tag.SourceValueID = tag.ReportHeadAIHistoryList[0].SourceVector;
+                tag.SourceValueID = tag.ReportHeadAIHistoryList[0].SourceValue;
 
                 const selectedSources = store.sourceList.filter((list: any) =>
                     tag.SourceValueID.includes(String(list.VectorID))
@@ -59,23 +59,34 @@ export class AIService {
             let payload: any;
             if (type === 'Summary') {
                 payload = {
-                    WorkbenchSummaryTagID: tag.WorkbenchSummaryTagID,
-                    Content: prompt
+                    ReportHeadID: store.dataList.ID,
+                    ReportHeadSummaryTagID: tag.ID,
+                    Prompt: prompt,
+                    Response: "",
+                    Selected: 1,
+                    SourceVector: tag.TempSourceValue ? tag.TempSourceValue.join(",") : "",
+                    Name: tag.Name
                 };
             } else {
-
                 payload = {
-                    WorkbenchSourceID: tag.WorkbenchSourceID || 1,
+                    ReportHeadID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadID,
+                    DocumentID: store.dataList.NCTID,
+                    DocumentType: store.dataList.DocumentType,
+                    TextSetting: store.dataList.TextSetting,
+                    DocumentTemplate: store.dataList.ReportTemplate,
+                    ReportHeadGroupKeyID: tag.FilteredReportHeadAIHistoryList[0].ReportHeadGroupKeyID,
+                    ThreadID: tag.ThreadID,
+                    AssistantID: store.dataList.AssistantID,
+                    Container: store.dataList.Container,
+                    GroupName: store.GroupName,
                     Prompt: prompt,
-                    GroupKey: tag.GroupName || tag.Name,
-                    WorkbenchGroupKeyID: tag.GroupKeyID,
-                    WorkbenchID: Number(store.WorkbenchID),
-                    WorkbenchName: store.dataList?.WorkbenchName || "",
-                    Response: "",
-                    SourceVector: tag.SourceValueID || "",
-                    FormattedResponse: ""
+                    PromptType: 1,
+                    Response: '',
+                    VectorID: store.dataList.VectorID,
+                    Selected: 0,
+                    ID: 0,
+                    SourceValue: tag.TempSourceValue ? tag.TempSourceValue : []
                 };
-
             }
 
             try {
@@ -99,8 +110,8 @@ export class AIService {
                         : chat.Response;
 
                     tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-                    // tag.UserValue = finalResponse;
-                    tag.Response = finalResponse;
+                    tag.UserValue = finalResponse;
+                    tag.EditorValue = finalResponse;
                     tag.text = finalResponse;
 
 
@@ -147,8 +158,8 @@ export class AIService {
             : chat.Response;
 
         currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-        // currentTag.UserValue = finalResponse;
-        currentTag.Response = finalResponse;
+        currentTag.UserValue = finalResponse;
+        currentTag.EditorValue = finalResponse;
         currentTag.text = finalResponse;
         currentTag.IsApplied = isApplied;
     }
