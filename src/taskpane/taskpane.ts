@@ -16,6 +16,11 @@ import { wordTableStyles } from "./components/tablestyles";
 import { renderSelectedTags } from "./draft/draft-functions";
 import { loadSummarypage } from "./summary/summary";
 
+
+let isInitialized = false;
+let selectionHandlerRegistered = false;
+let selectionDebounceTimer: any = null;
+
 Office.onReady((info) => {
   if (info.host === Office.HostType.Word) {
     document.getElementById("app-body").style.display = "flex";
@@ -23,11 +28,11 @@ Office.onReady((info) => {
 
     // Platform Detection
     if (Office.context.platform === Office.PlatformType.OfficeOnline) {
-      console.log("Running in Word on the Web (Online)");
+      console.log("Running in Word on the Web (Online)", Office.context.document.url);
     } else if (Office.context.platform === Office.PlatformType.PC) {
-      console.log("Running in Word Desktop on Windows");
+      console.log("Running in Word Desktop on Windows", Office.context.document.url);
     } else if (Office.context.platform === Office.PlatformType.Mac) {
-      console.log("Running in Word Desktop on Mac");
+      console.log("Running in Word Desktop on Mac", Office.context.document.url);
     }
 
     // Initialize Services

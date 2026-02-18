@@ -55,16 +55,15 @@ export class AIService {
             // For now, keeping direct DOM manipulation as in original code, but cleaner would be callbacks.
             const iconelement = document.getElementById(`sendPromptButton`);
             if (iconelement) iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
-
+            debugger;
             let payload: any;
             if (type === 'Summary') {
                 payload = {
-                    Prompt: prompt,
-                    WorkbenchSummaryTagID: tag.WorkbenchSummaryTagID,
                     WorkbenchID: Number(store.WorkbenchID),
-                    Response: "",
-                    SourceVector: tag.SourceValueID || "",
-                    SummarySourceID: tag.WorkbenchSourceID || 1
+                    WorkbenchSummaryTagID: tag.WorkbenchSummaryTagID,
+                    Name: tag.Name || "",
+                    Prompt: prompt,
+                    SourceVector: Array.isArray(tag.SourceValueID) ? tag.SourceValueID.join(',') : (tag.SourceValueID || "")
                 };
             } else {
 

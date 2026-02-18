@@ -12,7 +12,7 @@ export class summaryService {
             if (data.Status && data.Data) {
                 tag.ReportHeadAIHistoryList = data['Data'] || [];
                 tag.FilteredReportHeadAIHistoryList = [];
-                tag.SourceValueID = tag.ReportHeadAIHistoryList[0]?.SourceValue;
+                tag.SourceValueID = tag.ReportHeadAIHistoryList[0]?.SourceVector;
                 const selectedSources = store.sourceSummaryList.filter((list: any) =>
                     tag.SourceVector.includes(String(list.VectorID))
                 );
