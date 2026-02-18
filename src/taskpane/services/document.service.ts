@@ -1,6 +1,6 @@
 /* global Word */
 import { DocumentProperty } from "../models/app.model";
-import { getReportById, getAllSponsors, getAllPromptTemplates, getGeneralImages, getReportHeadImageById } from "../draft/draft.api";
+import { getReportById, getAllClients, getAllPromptTemplates, getGeneralImages, getReportHeadImageById } from "../draft/draft.api";
 import { updateEditorFinalTable, mapImagesToComponentObjects } from "../draft/draft-functions";
 
 export class DocumentService {
@@ -12,10 +12,10 @@ export class DocumentService {
         return parts.slice(1).join('_').replace(/%20/g, ' ').replace(/%25/g, '%');
     }
 
-    static async loadReportData(WorkbenchId: string, jwt: string, userId: string): Promise<any> {
+    static async loadReportData(documentId: string, jwt: string, userId: string): Promise<any> {
         try {
-            console.log(`Fetching report data for ID: ${WorkbenchId}`);
-            const data = await getReportById(WorkbenchId, jwt);
+            console.log(`Fetching report data for ID: ${documentId}`);
+            const data = await getReportById(documentId, jwt);
 
             if (!data.Status || !data.Data) {
                 throw new Error("Failed to fetch report data");
@@ -24,29 +24,27 @@ export class DocumentService {
             const dataList = data.Data;
 
             // Basic processing
-            if (!dataList.WorkbenchSourceFiles) dataList.WorkbenchSourceFiles = [];
+            if (!dataList.SourceTypeList) dataList.SourceTypeList = [];
 
-            const sourceList = dataList.WorkbenchSourceFiles
+            const sourceList = dataList.SourceTypeList
                 .filter((item: any) => item.SourceValue !== '' && item.AIFlag === 1)
                 .map((item: any) => ({
                     ...item,
                     SourceName: decodeURIComponent(DocumentService.transformDocumentName(item.SourceValue))
                 }));
 
-            const sponsorID = dataList.SponsorID;
-            const aiGroup = dataList.Groups.find((element: any) => element.Name === 'AIGroup');
+            const clientId = dataList.ClientID;
+            const aiGroup = dataList.Group.find((element: any) => element.DisplayName === 'AIGroup');
             const groupName = aiGroup ? aiGroup.Name : '';
-            const aiTagList = aiGroup ? aiGroup.Properties : [];
+            const aiTagList = aiGroup ? aiGroup.GroupKey : [];
 
             // Image processing - Deferred to background (getImages)
-            let GroupKeyAll = dataList.Groups.flatMap((group: any) => group.Properties);
+
             // Available Keys filtering
-            let availableKeys = GroupKeyAll.filter((element: any) =>
+            let availableKeys = dataList.GroupKeyAll.filter((element: any) =>
                 element.ComponentKeyDataType === 'TABLE' ||
                 element.ComponentKeyDataType === 'TEXT'
             );
-
-            dataList.GroupKeyAll = GroupKeyAll;
 
             const imageList: any[] = [];
 
@@ -54,9 +52,9 @@ export class DocumentService {
             const processKey = (key: any) => {
                 if (key.AIFlag === 1) {
                     const regex = /<TableStart>([\s\S]*?)<TableEnd>/gi;
-                    if (regex.exec(key.Response) !== null) {
-                        key.Response = updateEditorFinalTable(key.Response);
-                        // key.UserValue = key.Response;
+                    if (regex.exec(key.EditorValue) !== null) {
+                        key.EditorValue = updateEditorFinalTable(key.EditorValue);
+                        key.UserValue = key.EditorValue;
                         key.InitialTable = true;
                         key.ComponentKeyDataType = 'TABLE';
                     }
@@ -70,7 +68,7 @@ export class DocumentService {
                 dataList,
                 availableKeys,
                 sourceList,
-                sponsorID,
+                clientId,
                 groupName,
                 aiTagList,
                 imageList,
@@ -84,7 +82,7 @@ export class DocumentService {
         }
     }
 
-    static async retrieveDocumentProperties(): Promise<{ WorkbenchID: string, organizationName: string } | null> {
+    static async retrieveDocumentProperties(): Promise<{ documentID: string, organizationName: string } | null> {
         try {
             return await Word.run(async (context) => {
                 const properties = context.document.properties.customProperties;
@@ -92,12 +90,12 @@ export class DocumentService {
 
                 await context.sync();
 
-                const property = properties.items.find(prop => prop.key === 'WorkbenchID');
+                const property = properties.items.find(prop => prop.key === 'DocumentID');
                 const orgName = properties.items.find(prop => prop.key === 'Organization');
 
                 if (property && orgName) {
                     return {
-                        WorkbenchID: property.value,
+                        documentID: property.value,
                         organizationName: orgName.value
                     };
                 } else {

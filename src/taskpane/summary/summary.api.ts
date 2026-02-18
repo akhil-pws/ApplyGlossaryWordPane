@@ -3,8 +3,8 @@ import { CONFIG } from "../utils/config";
 // api.ts
 const baseUrl = CONFIG.dataUrl // Set your actual base URL
 
-export async function getSummaryTagsByWorkbenchId(workbenchId: number | string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summary-tag/workbench/${workbenchId}`, {
+export async function getSummaryTagsByReportHeadId(reportHeadId: number | string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/summarytag/reportHead/${reportHeadId}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -21,7 +21,7 @@ export async function getSummaryTagsByWorkbenchId(workbenchId: number | string, 
 
 
 export async function activateSummaryMode(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summary-tag/activate-mode`, {
+  const response = await fetch(`${baseUrl}/api/report/activate-summarymode`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -36,9 +36,8 @@ export async function activateSummaryMode(payload: any, jwt: string): Promise<an
 
   return await response.json(); // if API returns JSON
 }
-
-export async function refreshSummaryMode(payload: { WorkbenchID: number; RefreshSummaryTag: boolean; ActiveDocument: string }, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summary-tag/refresh-mode`, {
+export async function refreshSummaryMode(payload: { ReportHeadID: number; RefreshSummaryTag: boolean; ActiveDocument: string }, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/report/refresh-summarymode`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -54,8 +53,8 @@ export async function refreshSummaryMode(payload: { WorkbenchID: number; Refresh
   return await response.json();
 }
 
-export async function getSummaryTagHistory(workbenchSummaryTagID: number | string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summarytag/history/${workbenchSummaryTagID}`, {
+export async function getSummaryTagHistory(reportHeadSummaryTagID: number | string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/summarytag/history/${reportHeadSummaryTagID}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -70,8 +69,8 @@ export async function getSummaryTagHistory(workbenchSummaryTagID: number | strin
   return await response.json();
 }
 
-export async function getSummaryTagStatus(workbenchId: number | string, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summarytag/status/${workbenchId}`, {
+export async function getSummaryTagStatus(reportHeadSummaryTagID: number | string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/summarytag/status/${reportHeadSummaryTagID}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -87,7 +86,7 @@ export async function getSummaryTagStatus(workbenchId: number | string, jwt: str
 }
 
 export async function addSummaryHistory(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summary-history/add`, {
+  const response = await fetch(`${baseUrl}/api/report/summary-history/add`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -104,8 +103,8 @@ export async function addSummaryHistory(payload: any, jwt: string): Promise<any>
 }
 
 export async function updateSummaryHistory(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summary-history/update`, {
-    method: 'POST',
+  const response = await fetch(`${baseUrl}/api/report/summary-history/update`, {
+    method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${jwt}`
@@ -121,7 +120,7 @@ export async function updateSummaryHistory(payload: any, jwt: string): Promise<a
 }
 
 export async function addSummaryTag(payload: any, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summary-tag/add`, {
+  const response = await fetch(`${baseUrl}/api/report/summary-tag/add`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -136,9 +135,8 @@ export async function addSummaryTag(payload: any, jwt: string): Promise<any> {
 
   return await response.json();
 }
-
 export async function updateSummaryTagPrompt(payload: { Name: string; Prompt: string }, jwt: string): Promise<any> {
-  const response = await fetch(`${baseUrl}/api/addin/summarytag/update-prompt`, {
+  const response = await fetch(`${baseUrl}/api/summarytag/update-prompt`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

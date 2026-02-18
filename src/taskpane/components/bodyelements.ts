@@ -276,81 +276,20 @@ function DataModalPopup(selectedData) {
 
 
 
-// Toaster queue management
-let toasterQueue: { id: string; element: HTMLElement }[] = [];
-const TOASTER_DURATION = 4000; // 4 seconds
-const TOASTER_SPACING = 10; // 10px between toasters
-const TOASTER_START_TOP = 10; // Initial top position
-
 function toaster(message: string, type: string) {
-  const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
-  const color = `#ffffff`;
-
-  // Generate unique ID for this toaster
-  const toasterId = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  // Create toaster element
-  const toasterDiv = document.createElement('div');
-  toasterDiv.id = toasterId;
-  toasterDiv.className = 'toast show';
-  toasterDiv.style.cssText = `
-    position: fixed;
-    right: 10px;
-    z-index: 1050;
-    max-width: fit-content;
-    background-color: #808080;
-    color: #ffffff;
-    transition: top 0.3s ease;
-  `;
-
-  toasterDiv.innerHTML = `
-    <div class="toast-body" style="text-align: center;">
-      <i class="fa ${icon} me-2" style="color: ${color};"></i> ${message}
+  const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+  // const color = type === 'success' ? '#28a745' : '#dc3545';
+  const color = `#ffffff`
+  const body = `<div class="toast show" style="position: fixed; top: 10px; right: 10px; z-index: 1050; max-width: fit-content; background-color: #808080; color: #ffffff;">
+    <div class="toast-body">
+         <i class="fa ${icon} me-2" style="color: ${color};"></i> ${message}
     </div>
-  `;
+  </div>`;
 
-  // Calculate position based on existing toasters
-  const topPosition = TOASTER_START_TOP + toasterQueue.length * (60 + TOASTER_SPACING); // Assuming ~60px height per toaster
-  toasterDiv.style.top = `${topPosition}px`;
-
-  // Add to DOM
-  const toastrContainer = document.getElementById('toastr');
-  if (toastrContainer) {
-    toastrContainer.appendChild(toasterDiv);
-  }
-
-  // Add to queue
-  toasterQueue.push({ id: toasterId, element: toasterDiv });
-
-  // Remove after duration
+  document.getElementById('toastr').innerHTML = body;
   setTimeout(() => {
-    removeToaster(toasterId);
-  }, TOASTER_DURATION);
-}
-
-function removeToaster(toasterId: string) {
-  // Find toaster in queue
-  const index = toasterQueue.findIndex(t => t.id === toasterId);
-  if (index === -1) return;
-
-  // Remove from DOM
-  const toaster = toasterQueue[index];
-  if (toaster.element && toaster.element.parentNode) {
-    toaster.element.parentNode.removeChild(toaster.element);
-  }
-
-  // Remove from queue
-  toasterQueue.splice(index, 1);
-
-  // Reposition remaining toasters
-  repositionToasters();
-}
-
-function repositionToasters() {
-  toasterQueue.forEach((toaster, index) => {
-    const newTop = TOASTER_START_TOP + index * (60 + TOASTER_SPACING);
-    toaster.element.style.top = `${newTop}px`;
-  });
+    document.getElementById('toastr').innerHTML = ``;
+  }, 4000);
 }
 
 function logoheader(storedUrl) {

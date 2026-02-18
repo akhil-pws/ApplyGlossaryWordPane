@@ -205,7 +205,7 @@ function jsonToHtmlTable(jsonData) {
 export function generateChatHistoryHtml(chatList: any[]): string {
   const store = StoreService.getInstance();
   const promptclass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
-  const globalPromptUpdate = store.UserRole?.UserRoleEntityAccessList?.find(
+  const globalPromptUpdate = store.UserRole.UserRoleEntityAccessList.find(
     (item: any) => item.UserRoleEntity === 'Global Prompt Update'
   );
 
@@ -237,7 +237,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
                 class="form-check-input c-pointer me-2 response-checkbox"
                 type="checkbox"
                 id="checkbox-${index}"
-                ${chat.Selected ? 'checked' : ''}>
+                ${chat.Selected === 1 ? 'checked' : ''}>
               <span id="responseText-${index}">${chat.Response}</span>
               <i class="fa fa-copy text-secondary c-pointer ms-2"
                 title="Copy Response"
@@ -303,19 +303,19 @@ export function renderSelectedTags(selectedNames, availableKeys) {
 
       if (/^ID\d+$/i.test(name)) {
         aiTag = availableKeys.find(
-          mention => mention.AIFlag === 1 && `id${mention.GroupKeyID}`.toLowerCase() === name.toLowerCase()
+          mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
         );
       } else {
         aiTag = availableKeys.find(
-          mention => mention.AIFlag === 1 && mention.Name.toLowerCase() === name.toLowerCase()
+          mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
         );
       }
-      if (aiTag?.Name) {
+      if (aiTag?.DisplayName) {
 
         const badge = document.createElement('span');
         badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
         badge.style.cursor = 'pointer';
-        badge.innerHTML = `${aiTag.Name} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+        badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
         badge.addEventListener('click', async () => {
           await selectMatchingBookmarkFromSelection(name);
 
@@ -751,9 +751,9 @@ export function mapImagesToComponentObjects(input: any): any[] {
   // 2️⃣ Map to required structure
   return flatImages.map(img => ({
     Name: img.ImageName,
-    Name: img.ImageName,
-    Response: img.ImageData,
-    // UserValue: img.ImageData,
+    DisplayName: img.ImageName,
+    EditorValue: img.ImageData,
+    UserValue: img.ImageData,
     ComponentKeyDataType: "IMAGE",
     AIFlag: 0,
     IsImage: true
