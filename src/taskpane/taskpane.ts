@@ -165,10 +165,13 @@ async function handleLogin(event) {
 }
 
 function showLoginError(message) {
+  UIService.toggleLoader(false);
   loadLoginPage();  // Reload the form UI
   const errorDiv = document.getElementById('login-error');
-  errorDiv.style.display = 'block';
-  errorDiv.textContent = message;
+  if (errorDiv) {
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = message;
+  }
 }
 
 function displayMenu() {

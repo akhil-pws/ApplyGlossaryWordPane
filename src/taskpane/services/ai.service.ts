@@ -55,7 +55,7 @@ export class AIService {
             // For now, keeping direct DOM manipulation as in original code, but cleaner would be callbacks.
             const iconelement = document.getElementById(`sendPromptButton`);
             if (iconelement) iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
-            debugger;
+            
             let payload: any;
             if (type === 'Summary') {
                 payload = {
