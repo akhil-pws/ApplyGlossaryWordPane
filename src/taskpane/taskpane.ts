@@ -39,7 +39,7 @@ Office.onReady((info) => {
     // AuthService.init(); // if needed
 
     // Retrieve Properties via Service
-    DocumentService.retrieveDocumentProperties().then((props) => {
+    DocumentService.retrieveDocumentProperties().then(async (props) => {
       if (props) {
         // Update local state for legacy compatibility
         const store = StoreService.getInstance();
@@ -48,13 +48,22 @@ Office.onReady((info) => {
 
 
         // Check Session
-        const session = AuthService.restoreSession();
+        const session = await AuthService.restoreSession();
         if (session) {
           // Restore session state
           store.jwt = session.jwt;
           store.UserRole = session.userRole;
+          store.userId = session.userId;
           if (session.tableStyle) store.tableStyle = session.tableStyle;
           if (session.colorPallete) store.colorPallete = session.colorPallete;
+          if (session.mode) store.mode = session.mode;
+          if (session.theme) {
+            store.theme = session.theme;
+            UIService.applyTheme(session.theme as 'Light' | 'Dark');
+          }
+          if (session.currentChatTagId) {
+            store.currentChatTagId = session.currentChatTagId;
+          }
 
           window.location.hash = '#/dashboard';
           toaster('You are successfully logged in', 'success');
@@ -176,10 +185,48 @@ function showLoginError(message) {
 
 function displayMenu() {
   const store = StoreService.getInstance();
-  store.userId = Number(sessionStorage.getItem('userId'))
+  // If userId was restored from session, it will be in store.userId
+  // Otherwise it might be in sessionStorage from legacy calls
+  if (!store.userId) {
+    store.userId = Number(sessionStorage.getItem('userId'))
+  }
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument('Init');
 
+}
+
+export async function saveAppState() {
+  const store = StoreService.getInstance();
+  const state = {
+    jwt: store.jwt,
+    userRole: store.UserRole,
+    userId: store.userId,
+    mode: store.mode,
+    tableStyle: store.tableStyle,
+    colorPallete: store.colorPallete,
+    organizationName: store.organizationName,
+    WorkbenchID: store.WorkbenchID,
+    theme: store.theme,
+    currentChatTagId: store.currentChatTagId
+  };
+
+  // Sync with SessionStorage for priority refresh logic
+  sessionStorage.setItem('token', store.jwt); // Legacy support
+  if (store.UserRole) sessionStorage.setItem('userRole', JSON.stringify(store.UserRole));
+  if (store.userId) sessionStorage.setItem('userId', store.userId.toString());
+  if (store.mode) sessionStorage.setItem('mode', store.mode);
+  if (store.tableStyle) sessionStorage.setItem('tableStyle', store.tableStyle);
+  if (store.colorPallete) sessionStorage.setItem('colorPallete', JSON.stringify(store.colorPallete));
+  if (store.theme) sessionStorage.setItem('theme', store.theme);
+  if (store.currentChatTagId) {
+    sessionStorage.setItem('currentChatTagId', store.currentChatTagId.toString());
+  } else {
+    sessionStorage.removeItem('currentChatTagId');
+  }
+
+  // Sync with Persistent Storage (Encrypted LocalStorage) for taskpane closing
+  const { PersistenceService } = await import("./services/persistence.service");
+  await PersistenceService.saveState(state);
 }
 
 async function getTableStyle() {
@@ -224,8 +271,34 @@ async function fetchDocument(action) {
 
     // Handle Side Effects
     if (action === 'AIpanel' || action === 'Refresh' || action === 'Init') {
-      if (store.mode === "Home") loadHomepage(store.availableKeys);
-      if (store.mode === "Summary") loadSummarypage(store.availableKeys);
+      if (store.mode === "Home") {
+        loadHomepage(store.availableKeys);
+        if (store.currentChatTagId && store.currentChatTagId !== -1) {
+          const tag = store.availableKeys.find(k => (k.ID || k.GroupKeyID) === store.currentChatTagId);
+          if (tag) {
+            const { generateCheckboxHistory } = await import("./draft/home");
+            generateCheckboxHistory(tag, "AITag").then(html => {
+              const appBody = document.getElementById('app-body');
+              if (appBody) appBody.innerHTML = html;
+            });
+          }
+        }
+      }
+      if (store.mode === "Summary") {
+        loadSummarypage(store.availableKeys);
+        if (store.currentChatTagId && store.currentChatTagId !== -1) {
+          // The loadSummarypage might be async or handle tag list internally, 
+          // but we can try to find the tag in the store.summaryTagList if populated
+          const tag = store.summaryTagList?.find(k => (k.ID || k.ReportHeadSummaryTagID) === store.currentChatTagId);
+          if (tag) {
+            const { generateCheckboxHistory } = await import("./draft/home");
+            generateCheckboxHistory(tag, "Summary").then(html => {
+              const appBody = document.getElementById('app-body');
+              if (appBody) appBody.innerHTML = html;
+            });
+          }
+        }
+      }
     }
 
     // Render navigation header
@@ -249,6 +322,7 @@ async function fetchDocument(action) {
         }
         store.mode = 'Home';
         switchModeIcon();
+        await saveAppState();
       },
       onSummary: async () => {
         if (!store.isPendingResponse) {
@@ -257,6 +331,7 @@ async function fetchDocument(action) {
         }
         store.mode = 'Summary';
         switchModeIcon();
+        await saveAppState();
       },
       onGlossary: () => {
         if (store.emptyFormat) fetchGlossary();
@@ -267,10 +342,11 @@ async function fetchDocument(action) {
       onRemoveFormat: () => {
         if (Object.keys(store.capturedFormatting).length > 0) removeOptionsConfirmation();
       },
-      onThemeToggle: () => {
+      onThemeToggle: async () => {
         store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
         UIService.applyTheme(store.theme as 'Light' | 'Dark');
         sessionStorage.setItem('theme', store.theme);
+        await saveAppState();
       },
       onLogout: async () => {
         if (!store.isPendingResponse) {

@@ -1,29 +1,66 @@
 import { CONFIG } from "../utils/config";
-import { UserProfile } from "../models/user.model";
 import { loginUser } from "../draft/draft.api";
+import { PersistenceService } from "./persistence.service";
+import { StoreService } from "./store.service";
 
 export class AuthService {
-    private static readonly TOKEN_KEY = 'user_token';
     private static readonly USER_ROLE_KEY = 'userRole';
     private static readonly STYLE_KEY = 'tableStyle';
     private static readonly PALETTE_KEY = 'colorPallete';
+    private static readonly TAG_ID_KEY = 'currentChatTagId';
 
     static getStoredToken(): string | null {
-        return sessionStorage.getItem('token'); // Legacy code used sessionStorage for token
+        // We still check sessionStorage for immediate token access if needed, 
+        // but preferred way is restoreSession
+        return sessionStorage.getItem('token');
     }
 
-    static restoreSession(): any {
+    /**
+     * Restores session. Priority: sessionStorage (refresh) > PersistenceService (reopen).
+     */
+    static async restoreSession(): Promise<any> {
+        // Check SessionStorage first (survives refresh)
         const sessionToken = sessionStorage.getItem('token');
         if (sessionToken) {
+            console.log("AuthService: Restoring session from sessionStorage");
             return {
                 jwt: sessionToken,
                 userRole: JSON.parse(sessionStorage.getItem(this.USER_ROLE_KEY) || '{}'),
                 tableStyle: sessionStorage.getItem(this.STYLE_KEY),
                 colorPallete: JSON.parse(sessionStorage.getItem(this.PALETTE_KEY) || 'null'),
-                userId: sessionStorage.getItem('userId')
+                userId: sessionStorage.getItem('userId'),
+                mode: sessionStorage.getItem('mode') || 'Home',
+                currentChatTagId: sessionStorage.getItem(this.TAG_ID_KEY) ? Number(sessionStorage.getItem(this.TAG_ID_KEY)) : null
             };
         }
+
+        // Check PersistenceService (survives closing)
+        const state = await PersistenceService.loadState();
+        if (state) {
+            console.log("AuthService: Restoring session from decrypted localStorage");
+            // For legacy components that might still read from sessionStorage
+            this.syncToSessionStorage(state);
+            return state;
+        }
         return null;
+    }
+
+    /**
+     * Syncs state to sessionStorage for legacy support.
+     */
+    private static syncToSessionStorage(state: any): void {
+        if (state.jwt) sessionStorage.setItem('token', state.jwt);
+        if (state.userRole) sessionStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(state.userRole));
+        if (state.userId) sessionStorage.setItem('userId', state.userId.toString());
+        if (state.tableStyle) sessionStorage.setItem(this.STYLE_KEY, state.tableStyle);
+        if (state.colorPallete) sessionStorage.setItem(this.PALETTE_KEY, JSON.stringify(state.colorPallete));
+        if (state.currentChatTagId !== undefined) {
+            if (state.currentChatTagId === null || state.currentChatTagId === -1) {
+                sessionStorage.removeItem(this.TAG_ID_KEY);
+            } else {
+                sessionStorage.setItem(this.TAG_ID_KEY, state.currentChatTagId.toString());
+            }
+        }
     }
 
     static async login(organization: string, username: string, password: string): Promise<{ success: boolean, message?: string, data?: any }> {
@@ -37,18 +74,24 @@ export class AuthService {
                     const userRole = data.Data.UserRole;
                     const userId = data.Data.UserID;
 
-                    // Store interactions in Session
-                    sessionStorage.setItem('token', jwt);
-                    sessionStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
-                    sessionStorage.setItem('userId', userId);
+                    const store = StoreService.getInstance();
 
-                    // Note: tableStyle and colorPallete are typically stored sequentially or retrieved from profile
-                    // For now, we just ensure session is clean or updated as per legacy flow which checked sessionStorage items?
-                    // Legacy flow: 
-                    // const style = sessionStorage.getItem('tableStyle');
-                    // const localPallete = sessionStorage.getItem('colorPallete');
-                    // It seems legacy flow READS from session storage if available, it doesn't SET them from login response?
-                    // Actually, it seemed to just re-read them.
+                    const state = {
+                        jwt: jwt,
+                        userRole: userRole,
+                        userId: userId,
+                        mode: store.mode || 'Home',
+                        tableStyle: store.tableStyle,
+                        colorPallete: store.colorPallete,
+                        organizationName: organization,
+                        WorkbenchID: store.WorkbenchID
+                    };
+
+                    // Store interactions in Persistence (Encrypted LocalStorage)
+                    await PersistenceService.saveState(state);
+
+                    // Also sync to Session for legacy support
+                    this.syncToSessionStorage(state);
 
                     return {
                         success: true,
@@ -72,9 +115,8 @@ export class AuthService {
     }
 
     static logout(): void {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem(this.USER_ROLE_KEY);
-        // Add other keys
-        console.log("Logged out");
+        PersistenceService.clearState();
+        sessionStorage.clear();
+        console.log("Logged out and state cleared");
     }
 }
