@@ -1,5 +1,5 @@
 import { generateCheckboxHistory } from "../draft/home";
-import { addGenAITags } from "../taskpane";
+import { addGenAITags, saveAppState } from "../taskpane";
 import {
   activateSummaryMode,
   getSummaryTagsByWorkbenchId,
@@ -216,6 +216,7 @@ export async function loadSummarypage(availableKeys: any[]) {
           </div>
         `;
           store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
+          saveAppState();
           const html = await generateCheckboxHistory(tag, "Summary");
           appBody.innerHTML = html;
         } catch {

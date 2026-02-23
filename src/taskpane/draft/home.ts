@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid } from "./draft-functions";
-import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, getReport, mentionDropdownFn } from "../taskpane";
+import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, getReport, mentionDropdownFn, saveAppState } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
 import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
@@ -114,6 +114,10 @@ export function loadHomepage(availableKeys) {
 
                 listItem.onclick = () => {
                     if (isAISection) {
+                        const store = StoreService.getInstance();
+                        store.currentChatTagId = mention.ID || mention.GroupKeyID;
+                        saveAppState();
+
                         const appBody = document.getElementById('app-body');
                         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
                         generateCheckboxHistory(mention, "AITag")
@@ -1247,6 +1251,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
             const store = StoreService.getInstance();
             store.currentChatTagId = -1;
+            saveAppState();
             if (store.mode === "Home") {
                 loadHomepage(availableKeys)
             } else if (store.mode === "Summary") {
