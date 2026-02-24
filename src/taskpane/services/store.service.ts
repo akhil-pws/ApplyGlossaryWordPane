@@ -47,6 +47,26 @@ export class StoreService {
     public isReversed: boolean = false;
     public isSyncEnabled: boolean = false;
 
+    // Draft States for forms
+    public tagDraft: any = {
+        name: '',
+        description: '',
+        prompt: '',
+        saveGlobally: true,
+        isAvailableForAll: true,
+        selectedSponsors: [],
+        selectedSources: []
+    };
+    public summaryTagDraft: any = {
+        name: '',
+        description: '',
+        prompt: '',
+        saveGlobally: true,
+        isAvailableForAll: true,
+        selectedSponsors: [],
+        selectedSources: []
+    };
+
     private constructor() { }
 
     public static getInstance(): StoreService {

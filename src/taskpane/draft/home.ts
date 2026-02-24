@@ -4,7 +4,6 @@ import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, ge
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
 import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
-import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 
@@ -122,7 +121,10 @@ export function loadHomepage(availableKeys) {
                         appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
                         generateCheckboxHistory(mention, "AITag")
                             .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
-                            .then(html => { appBody.innerHTML = html; });
+                            .then(html => {
+                                appBody.innerHTML = html;
+                                initializeAIHistoryEvents(mention, store.jwt, store.availableKeys, 'AITag');
+                            });
                     } else {
                         // Properties + Images behave same
                         replaceMention(mention, mention.ComponentKeyDataType);
@@ -180,12 +182,28 @@ export function loadHomepage(availableKeys) {
 
     document.getElementById('sync-btn-tag').addEventListener('click', async () => {
         if (!store.isPendingResponse && store.isSyncEnabled) {
-            syncBookmarks();
+            loadSyncScreen();
         }
     });
 
     // Update sync button state based on store
     updateSyncButtonState();
+
+    // Reopen last active AI Tag if applicable
+    if (store.currentChatTagId !== -1) {
+        const activeTag = availableKeys.find(k => (k.ID || k.GroupKeyID) === store.currentChatTagId);
+        if (activeTag && activeTag.AIFlag === 1) {
+            const appBody = document.getElementById('app-body')!;
+            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+            generateCheckboxHistory(activeTag, "AITag")
+                .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+                .then(html => {
+                    if (html) {
+                        appBody.innerHTML = html;
+                    }
+                });
+        }
+    }
 }
 
 
@@ -522,6 +540,275 @@ export async function checkBookmarksForSync(): Promise<boolean> {
     });
 }
 
+interface SyncItem {
+    propertyName: string;
+    updatedValue: string;
+    existingValue: string;
+    location: string;
+    bookmarkName: string;
+    tagId: number;
+}
+
+export async function getDesyncedBookmarks(): Promise<SyncItem[]> {
+    return Word.run(async (context) => {
+        const syncItems: SyncItem[] = [];
+        try {
+            const bookmarks = context.document.bookmarks;
+            bookmarks.load("items/name");
+            await context.sync();
+
+            const store = StoreService.getInstance();
+            const availableKeys = store.availableKeys;
+
+            for (let i = 0; i < bookmarks.items.length; i++) {
+                const bookmark = bookmarks.items[i];
+                const name = bookmark.name;
+
+                if (!name.startsWith("PT")) continue;
+
+                const parts = name.split("_");
+                if (parts.length < 3) continue;
+
+                const idPart = parts[0].substring(2);
+                const groupKeyId = parseInt(idPart);
+
+                if (isNaN(groupKeyId)) continue;
+
+                const word = availableKeys.find((k: any) => k.GroupKeyID === groupKeyId);
+                if (!word) continue;
+
+                const range = context.document.getBookmarkRange(name);
+                range.load("text");
+                const paragraph = range.paragraphs.getFirstOrNullObject();
+                paragraph.load("text");
+
+                await context.sync();
+
+                const bookmarkContent = range.text.trim();
+                const tagResponse = (word.Response ?? "").trim();
+
+                if (bookmarkContent !== tagResponse) {
+                    // Extract a snippet from the paragraph text
+                    let pText = paragraph.isNullObject ? "" : paragraph.text;
+                    if (pText.length > 150) pText = pText.substring(0, 150) + "...";
+
+                    syncItems.push({
+                        propertyName: word.Name,
+                        updatedValue: tagResponse,
+                        existingValue: bookmarkContent,
+                        location: pText || "Unknown",
+                        bookmarkName: name,
+                        tagId: groupKeyId
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching desynced bookmarks:", err);
+            toaster("Error fetching sync details.", "error");
+        }
+        return syncItems;
+    });
+}
+
+export async function syncSingleBookmark(bookmarkName: string, groupKeyId: number): Promise<boolean> {
+    return Word.run(async (context) => {
+        try {
+            const store = StoreService.getInstance();
+            const word = store.availableKeys.find((k: any) => k.GroupKeyID === groupKeyId);
+            if (!word) return false;
+
+            const range = context.document.getBookmarkRange(bookmarkName);
+            range.insertText(word.Response ?? "", Word.InsertLocation.replace);
+
+            const newBookmarkName = `PT${groupKeyId}_Split_${Date.now()}`;
+            range.insertBookmark(newBookmarkName);
+
+            await context.sync();
+            toaster(`${word.Name} synced!`, "success");
+            return true;
+        } catch (err) {
+            console.error("Error syncing single bookmark:", err);
+            toaster("Failed to sync property.", "error");
+            return false;
+        }
+    });
+}
+
+export async function selectBookmarkByName(bookmarkName: string) {
+    return Word.run(async (context) => {
+        try {
+            const range = context.document.getBookmarkRangeOrNullObject(bookmarkName);
+            range.load('isNullObject');
+            await context.sync();
+
+            if (!range.isNullObject) {
+                range.select();
+                await context.sync();
+            } else {
+                toaster("Bookmark not found in document.", "error");
+            }
+        } catch (err) {
+            console.error("Error selecting bookmark:", err);
+            toaster("Failed to navigate to property.", "error");
+        }
+    });
+}
+
+export async function loadSyncScreen() {
+    const store = StoreService.getInstance();
+    const appBody = document.getElementById('app-body');
+    const isDark = store.theme === 'Dark';
+    const bgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
+    const cardBgClass = isDark ? 'bg-secondary text-light' : 'bg-light text-dark';
+    const btnClass = isDark ? 'btn-outline-light' : 'btn-outline-primary';
+
+    appBody.innerHTML = `
+        <div class="chat-header sticky-top ${bgClass} z-3">
+            <div class="d-flex justify-content-between align-items-center px-2 pt-3">
+                <div class="d-flex align-items-center ms-3 c-pointer" id="back-from-sync">
+                    <i class="fa fa-arrow-left text-muted me-2"></i>
+                    <span class="fw-bold">Sync Properties</span>
+                </div>
+                <div class="d-flex justify-content-center align-items-center me-3">
+                    <button class="btn btn-sm btn-primary" id="apply-all-sync">Apply All</button>
+                </div>
+            </div>
+            <hr class="mt-2 mb-1 mx-3">
+        </div>
+        <div class="container pt-3 pb-5" id="sync-items-container">
+            <div class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Scanning document...</div>
+        </div>
+    `;
+
+    document.getElementById('back-from-sync')?.addEventListener('click', () => {
+        loadHomepage(store.availableKeys);
+    });
+
+    document.getElementById('apply-all-sync')?.addEventListener('click', async () => {
+        const btn = document.getElementById('apply-all-sync') as HTMLButtonElement;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Applying...';
+        await syncBookmarks();
+        loadHomepage(store.availableKeys);
+    });
+
+    // Fetch desynced items
+    const desyncedItems = await getDesyncedBookmarks();
+    const container = document.getElementById('sync-items-container');
+
+    if (desyncedItems.length === 0) {
+        if (container) {
+            container.innerHTML = '<div class="text-center text-muted mt-3">All properties are in sync.</div>';
+        }
+        store.isSyncEnabled = false;
+        return;
+    }
+
+    // Group items by property name
+    const groupedItems: { [key: string]: { items: SyncItem[], currentIndex: number } } = {};
+    desyncedItems.forEach(item => {
+        if (!groupedItems[item.propertyName]) {
+            groupedItems[item.propertyName] = { items: [], currentIndex: 0 };
+        }
+        groupedItems[item.propertyName].items.push(item);
+    });
+
+    if (container) {
+        container.innerHTML = '';
+        Object.keys(groupedItems).forEach(propName => {
+            const group = groupedItems[propName];
+            const card = document.createElement('div');
+            card.className = `card mb-3 ${cardBgClass}`;
+            card.id = `sync-card-${propName.replace(/\s+/g, '-')}`;
+
+            const updateCardUI = () => {
+                const currentItem = group.items[group.currentIndex];
+                card.innerHTML = `
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-truncate">${propName}</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary rounded-pill small" style="font-size: 0.7rem;">
+                                    ${group.currentIndex + 1} / ${group.items.length}
+                                </span>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-sm ${btnClass} sync-prev-btn" ${group.items.length <= 1 ? 'disabled' : ''}>
+                                        <i class="fa-solid fa-chevron-up"></i>
+                                    </button>
+                                    <button class="btn btn-sm ${btnClass} sync-next-btn" ${group.items.length <= 1 ? 'disabled' : ''}>
+                                        <i class="fa-solid fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-muted small mb-1 border-bottom pb-1">
+                            <div class="text-success"><strong>Updated Value:</strong> <span class="text-break">${currentItem.updatedValue}</span></div>
+                            <div class="text-danger mt-1"><strong>Existing Value:</strong> <span class="text-break">${currentItem.existingValue}</span></div>
+                        </div>
+                        <div class="d-flex justify-content-end mt-2">
+                            <button class="btn btn-sm ${btnClass} sync-single-btn">
+                                <i class="fa fa-refresh"></i> Update
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // Add listeners to new elements
+                card.querySelector('.sync-prev-btn')?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    group.currentIndex = (group.currentIndex - 1 + group.items.length) % group.items.length;
+                    updateCardUI();
+                    selectBookmarkByName(group.items[group.currentIndex].bookmarkName);
+                });
+
+                card.querySelector('.sync-next-btn')?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    group.currentIndex = (group.currentIndex + 1) % group.items.length;
+                    updateCardUI();
+                    selectBookmarkByName(group.items[group.currentIndex].bookmarkName);
+                });
+
+                card.querySelector('.sync-single-btn')?.addEventListener('click', async (e) => {
+                    const button = e.currentTarget as HTMLButtonElement;
+                    button.disabled = true;
+                    button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+                    const itemToSync = group.items[group.currentIndex];
+                    const success = await syncSingleBookmark(itemToSync.bookmarkName, itemToSync.tagId);
+
+                    if (success) {
+                        // Remove item from group
+                        group.items.splice(group.currentIndex, 1);
+                        if (group.items.length === 0) {
+                            card.remove();
+                            delete groupedItems[propName];
+
+                            // Check if all gone
+                            if (Object.keys(groupedItems).length === 0) {
+                                store.isSyncEnabled = false;
+                                updateSyncButtonState();
+                                loadHomepage(store.availableKeys);
+                            }
+                        } else {
+                            // Adjust index and refresh
+                            if (group.currentIndex >= group.items.length) {
+                                group.currentIndex = group.items.length - 1;
+                            }
+                            updateCardUI();
+                        }
+                    } else {
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fa fa-refresh"></i> Update';
+                    }
+                });
+            };
+
+            updateCardUI();
+            container.appendChild(card);
+        });
+    }
+}
+
 export function updateSyncButtonState() {
     const store = StoreService.getInstance();
     const syncBtn = document.getElementById('sync-btn-tag');
@@ -582,17 +869,17 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     const headerBgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
     const Name = type === 'Summary' ? tag.Name : tag.Name;
     const closeBar = `
-    <div class="chat-header sticky-top ${headerBgClass} z-3">
-        <div class="d-flex justify-content-between align-items-center px-2 pt-3">
-            <div class="d-flex align-items-center ms-3">
-                <i class="fa fa-microchip-ai text-muted me-2"></i>
-                <span class="fw-bold">${Name}</span>
+        <div class="chat-header sticky-top ${headerBgClass} z-3">
+            <div class="d-flex justify-content-between align-items-center px-2 pt-3">
+                <div class="d-flex align-items-center ms-3">
+                    <i class="fa fa-microchip-ai text-muted me-2"></i>
+                    <span class="fw-bold">${Name}</span>
+                </div>
+                <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
+                    <i class="${closeBtnClass}" id="close-ai-window"></i>
+                </div>
             </div>
-            <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
-                <i class="${closeBtnClass}" id="close-ai-window"></i>
-            </div>
-        </div>
-        <hr class="mt-2 mb-1 mx-3">
+            <hr class="mt-2 mb-1 mx-3">
         </div>
     `;
 
@@ -611,7 +898,6 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     const horizontalLoader = (String(tag.Status) === "0") ? '<div class="horizontal-loader"></div>' : '';
 
     initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
-    console.log(chatBody);
     return `${closeBar}${chatBody}${horizontalLoader}${chatFooterHtml}`;
 }
 
@@ -630,26 +916,26 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
     // Create the form container
     // Create the form container
     container.innerHTML = `
-  <div class="form-group mb-3 p-3 pt-0">
-    <label class='form-label'><span class="text-danger">*</span> Prompt Builder Template</label>
-    <select id="promptBuilderTemplate" class="form-control">
-      <option value="" disabled selected>Select a template</option>
-    </select>
-    <div id="templateError" class="invalid-feedback d-none">Type is required.</div>
-  </div>
+        <div class="form-group mb-3 p-3 pt-0">
+            <label class='form-label'><span class="text-danger">* </span> Prompt Builder Template</label>
+            <select id="promptBuilderTemplate" class="form-control">
+                <option value="" disabled selected>Select a template</option>
+            </select>
+            <div id="templateError" class="invalid-feedback d-none">Type is required.</div>
+        </div>
 
-  <div id="fieldsContainer"></div>
+        <div id="fieldsContainer"></div>
 
-  <div class="form-group mb-3 p-3 pt-0" id="previewContainer" style="display: none;">
-    <label class="mb-2">Preview</label>
-    <div id="preview" class="form-control"></div>
-  </div>
+        <div class="form-group mb-3 p-3 pt-0" id="previewContainer" style="display: none;">
+            <label class="mb-2">Preview</label>
+            <div id="preview" class="form-control"></div>
+        </div>
 
-  <div class="d-flex justify-content-between px-3 align-items-center mt-3">
-    <span id="resetBtn" class="text-primary fw-bold" style="cursor: pointer;">Reset</span>
-    <button id="applyBtn" class="btn btn-primary text-white" disabled>Apply Prompt</button>
-  </div>
-`;
+        <div class="d-flex justify-content-between px-3 align-items-center mt-3">
+            <span id="resetBtn" class="text-primary fw-bold" style="cursor: pointer;">Reset</span>
+            <button id="applyBtn" class="btn btn-primary text-white" disabled>Apply Prompt</button>
+        </div>
+    `;
 
     // Element references
     const templateSelect = container.querySelector('#promptBuilderTemplate') as HTMLSelectElement;
@@ -1255,6 +1541,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             if (store.mode === "Home") {
                 loadHomepage(availableKeys)
             } else if (store.mode === "Summary") {
+                const { loadSummarypage } = require("../summary/summary");
                 loadSummarypage(availableKeys);
             }
         });

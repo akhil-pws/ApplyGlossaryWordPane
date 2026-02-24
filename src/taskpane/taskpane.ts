@@ -64,6 +64,8 @@ Office.onReady((info) => {
           if (session.currentChatTagId) {
             store.currentChatTagId = session.currentChatTagId;
           }
+          if (session.tagDraft) store.tagDraft = session.tagDraft;
+          if (session.summaryTagDraft) store.summaryTagDraft = session.summaryTagDraft;
 
           window.location.hash = '#/dashboard';
           toaster('You are successfully logged in', 'success');
@@ -207,7 +209,9 @@ export async function saveAppState() {
     organizationName: store.organizationName,
     WorkbenchID: store.WorkbenchID,
     theme: store.theme,
-    currentChatTagId: store.currentChatTagId
+    currentChatTagId: store.currentChatTagId,
+    tagDraft: store.tagDraft,
+    summaryTagDraft: store.summaryTagDraft
   };
 
   // Sync with SessionStorage for priority refresh logic
@@ -223,6 +227,9 @@ export async function saveAppState() {
   } else {
     sessionStorage.removeItem('currentChatTagId');
   }
+
+  if (store.tagDraft) sessionStorage.setItem('tagDraft', JSON.stringify(store.tagDraft));
+  if (store.summaryTagDraft) sessionStorage.setItem('summaryTagDraft', JSON.stringify(store.summaryTagDraft));
 
   // Sync with Persistent Storage (Encrypted LocalStorage) for taskpane closing
   const { PersistenceService } = await import("./services/persistence.service");
@@ -1560,37 +1567,83 @@ export async function addGenAITags() {
     mentionDropdownFn('prompt', 'mention-dropdown', 'add');
 
     const form = document.getElementById('genai-form');
-    const nameField = document.getElementById('name');
-    const descriptionField = document.getElementById('description') as HTMLInputElement;
+    const nameField = document.getElementById('name') as HTMLInputElement;
+    const descriptionField = document.getElementById('description') as HTMLTextAreaElement;
     const promptField = document.getElementById('prompt') as HTMLTextAreaElement;
-    // const primarySourceField = document.getElementById('primarySource');
 
     const saveGloballyCheckbox = document.getElementById('saveGlobally') as HTMLInputElement;
     const availableForAllCheckbox = document.getElementById('isAvailableForAll') as HTMLInputElement;
-    const sponsorDropdownButton = document.getElementById('sponsorDropdown');
+    const sponsorDropdownButton = document.getElementById('sponsorDropdown') as HTMLButtonElement;
     const sponsorDropdownItems = document.querySelectorAll('.sponsor-dropdown-item .form-check-input');
 
 
-    const sourceDropdownButton = document.getElementById('sourceDropdown');
+    const sourceDropdownButton = document.getElementById('sourceDropdown') as HTMLButtonElement;
     const sourceDropdownItems = document.querySelectorAll('.source-dropdown-item .form-check-input');
 
     const isSummaryMode = store.mode === "Summary";
+    const draft = isSummaryMode ? store.summaryTagDraft : store.tagDraft;
 
     document.getElementById('cancel-btn-gen-ai').addEventListener('click', () => {
       const store = StoreService.getInstance();
       if (!store.isPendingResponse) loadHomepage(store.availableKeys);
     });
 
-
     if (form && nameField && promptField && sponsorDropdownItems.length > 0 && (isSummaryMode || sourceDropdownItems.length > 0)) {
 
+      // Load from Draft
+      if (draft) {
+        if (draft.name) (nameField as HTMLInputElement).value = draft.name;
+        if (draft.description) descriptionField.value = draft.description;
+        if (draft.prompt) promptField.value = draft.prompt;
+        if (draft.saveGlobally !== undefined) saveGloballyCheckbox.checked = draft.saveGlobally;
+        if (draft.isAvailableForAll !== undefined) availableForAllCheckbox.checked = draft.isAvailableForAll;
+
+        if (draft.selectedSponsors && draft.selectedSponsors.length > 0) {
+          sponsorDropdownItems.forEach(cb => {
+            if (draft.selectedSponsors.includes((cb as HTMLInputElement).value)) {
+              (cb as HTMLInputElement).checked = true;
+            }
+          });
+        }
+
+        if (draft.selectedSources && draft.selectedSources.length > 0) {
+          sourceDropdownItems.forEach(cb => {
+            if (draft.selectedSources.includes((cb as HTMLInputElement).value)) {
+              (cb as HTMLInputElement).checked = true;
+            }
+          });
+        }
+      }
+
+      const saveDraft = async () => {
+        const currentDraft = {
+          name: (nameField as HTMLInputElement).value,
+          description: descriptionField.value,
+          prompt: promptField.value,
+          saveGlobally: saveGloballyCheckbox.checked,
+          isAvailableForAll: availableForAllCheckbox.checked,
+          selectedSponsors: Array.from(sponsorDropdownItems)
+            .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
+            .map(cb => (cb as HTMLInputElement).value),
+          selectedSources: Array.from(sourceDropdownItems)
+            .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
+            .map(cb => (cb as HTMLInputElement).value)
+        };
+        if (isSummaryMode) {
+          store.summaryTagDraft = currentDraft;
+        } else {
+          store.tagDraft = currentDraft;
+        }
+        await saveAppState();
+      };
+
       const updateSponsorDropdownLabel = () => {
-        if ((availableForAllCheckbox as HTMLInputElement).checked) {
+        if (availableForAllCheckbox.checked) {
           sponsorDropdownButton.textContent = store.clientList.map(x => x.Name).join(", ");
         } else {
           const selectedNames = Array.from(sponsorDropdownItems)
             .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
-            .map(cb => cb.parentElement.textContent.trim());
+            .map(cb => cb.parentElement!.textContent!.trim());
 
           sponsorDropdownButton.textContent = selectedNames.length
             ? selectedNames.join(", ")
@@ -1601,7 +1654,7 @@ export async function addGenAITags() {
       const updateSourceDropdownLabel = () => {
         const selectedNames = Array.from(sourceDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-          .map(cb => cb.parentElement.querySelector('label').textContent.trim());
+          .map(cb => (cb.parentElement!.querySelector('label') as HTMLElement).textContent!.trim());
 
         const labelSpan = document.getElementById('sourceDropdownLabel');
         if (labelSpan) {
@@ -1643,7 +1696,7 @@ export async function addGenAITags() {
 
         const selectedSources = Array.from(sourceDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-          .map(cb => sourceTypeList.find(s => s.ID == (cb as HTMLInputElement).value));
+          .map(cb => sourceTypeList.find((s: any) => s.ID == Number((cb as HTMLInputElement).value)));
 
         const isAvailableForAll = availableForAllCheckbox.checked;
         const isSaveGlobally = saveGloballyCheckbox.checked;
@@ -1675,17 +1728,20 @@ export async function addGenAITags() {
       });
 
       const checkAndDisableSponsors = () => {
-        sponsorDropdownItems.forEach(cb => {
+        sponsorDropdownItems.forEach(cb_node => {
+          const cb = cb_node as HTMLInputElement;
           if (!cb.disabled) {
             cb.checked = true;
             cb.disabled = true;
           }
         });
         updateSponsorDropdownLabel();
+        saveDraft();
       };
 
       const enableSponsors = () => {
-        sponsorDropdownItems.forEach(cb => {
+        sponsorDropdownItems.forEach(cb_node => {
+          const cb = cb_node as HTMLInputElement;
           const isSelectedClient = selectedClient.some(sel => sel.ID === parseInt(cb.value));
           if (!isSelectedClient) cb.disabled = false;
         });
@@ -1701,7 +1757,7 @@ export async function addGenAITags() {
             enableSponsors();
             availableForAllCheckbox.checked = false;
             availableForAllCheckbox.disabled = true;
-            (sponsorDropdownButton as HTMLButtonElement).disabled = true;
+            sponsorDropdownButton.disabled = true;
 
             sponsorDropdownItems.forEach(cb => {
               if (!(cb as HTMLInputElement).disabled) {
@@ -1712,6 +1768,7 @@ export async function addGenAITags() {
 
             updateSponsorDropdownLabel();
           }
+          saveDraft();
         }
       });
 
@@ -1720,6 +1777,7 @@ export async function addGenAITags() {
       availableForAllCheckbox.addEventListener('change', function () {
         if (!store.isPendingResponse) {
           this.checked ? checkAndDisableSponsors() : enableSponsors();
+          saveDraft();
         }
       });
 
@@ -1743,6 +1801,7 @@ export async function addGenAITags() {
           }
 
           updateSponsorDropdownLabel();
+          saveDraft();
         });
       });
 
@@ -1760,6 +1819,7 @@ export async function addGenAITags() {
           }
 
           updateSourceDropdownLabel();
+          saveDraft();
           const selectedCount = Array.from(sourceDropdownItems)
             .filter(cb => (cb as HTMLInputElement).checked).length;
 
@@ -1775,12 +1835,13 @@ export async function addGenAITags() {
       updateSponsorDropdownLabel();
       updateSourceDropdownLabel();
 
-      [nameField, promptField].forEach(field => {
+      [nameField, promptField, descriptionField].forEach(field => {
         field.addEventListener('input', function () {
           const input = this as HTMLInputElement;
           if (input.classList.contains('is-invalid') && input.value.trim()) {
             input.classList.remove('is-invalid');
           }
+          saveDraft();
         });
       });
 
@@ -1917,13 +1978,13 @@ import { addSummaryTag } from "./summary/summary.api";
 async function createTextGenTag(payload) {
   const store = StoreService.getInstance();
   try {
-    const iconelement = document.getElementById(`text-gen-save`);
-    const cancelBtnGenAi = document.getElementById('cancel-btn-gen-ai');
+    const iconelement = document.getElementById(`text-gen-save`) as HTMLButtonElement;
+    const cancelBtnGenAi = document.getElementById('cancel-btn-gen-ai') as HTMLButtonElement;
 
 
-    (cancelBtnGenAi as HTMLButtonElement).disabled = true;
+    cancelBtnGenAi.disabled = true;
     iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white me-2"></i>Save`;
-    (iconelement as HTMLButtonElement).disabled = true;
+    iconelement.disabled = true;
     store.isPendingResponse = true;
 
     let data: any;
@@ -1948,10 +2009,13 @@ async function createTextGenTag(payload) {
 
     if (data['Status']) {
       if (store.mode === "Summary") {
+        store.summaryTagDraft = { name: '', description: '', prompt: '', saveGlobally: true, isAvailableForAll: true, selectedSponsors: [], selectedSources: [] };
         loadSummarypage(store.availableKeys);
       } else {
+        store.tagDraft = { name: '', description: '', prompt: '', saveGlobally: true, isAvailableForAll: true, selectedSponsors: [], selectedSources: [] };
         fetchDocument('AIpanel');
       }
+      await saveAppState();
       toaster('Saved successfully', 'success');
     } else {
       (cancelBtnGenAi as HTMLButtonElement).disabled = false;

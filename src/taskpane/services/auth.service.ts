@@ -30,7 +30,9 @@ export class AuthService {
                 colorPallete: JSON.parse(sessionStorage.getItem(this.PALETTE_KEY) || 'null'),
                 userId: sessionStorage.getItem('userId'),
                 mode: sessionStorage.getItem('mode') || 'Home',
-                currentChatTagId: sessionStorage.getItem(this.TAG_ID_KEY) ? Number(sessionStorage.getItem(this.TAG_ID_KEY)) : null
+                currentChatTagId: sessionStorage.getItem(this.TAG_ID_KEY) ? Number(sessionStorage.getItem(this.TAG_ID_KEY)) : null,
+                tagDraft: JSON.parse(sessionStorage.getItem('tagDraft') || 'null'),
+                summaryTagDraft: JSON.parse(sessionStorage.getItem('summaryTagDraft') || 'null')
             };
         }
 
@@ -45,9 +47,6 @@ export class AuthService {
         return null;
     }
 
-    /**
-     * Syncs state to sessionStorage for legacy support.
-     */
     private static syncToSessionStorage(state: any): void {
         if (state.jwt) sessionStorage.setItem('token', state.jwt);
         if (state.userRole) sessionStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(state.userRole));
@@ -61,6 +60,8 @@ export class AuthService {
                 sessionStorage.setItem(this.TAG_ID_KEY, state.currentChatTagId.toString());
             }
         }
+        if (state.tagDraft) sessionStorage.setItem('tagDraft', JSON.stringify(state.tagDraft));
+        if (state.summaryTagDraft) sessionStorage.setItem('summaryTagDraft', JSON.stringify(state.summaryTagDraft));
     }
 
     static async login(organization: string, username: string, password: string): Promise<{ success: boolean, message?: string, data?: any }> {

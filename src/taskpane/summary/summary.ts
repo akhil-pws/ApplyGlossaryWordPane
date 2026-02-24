@@ -462,9 +462,11 @@ export async function loadSummarypage(availableKeys: any[]) {
 
               // Auto-refresh chat if currently viewing this tag and status changed from 0
               if (store.currentChatTagId === ts.ReportHeadSummaryTagID && oldStatus === "0" && String(ts.Status) !== "0") {
-                generateCheckboxHistory(matchingTag, "Summary").then(html => {
+                generateCheckboxHistory(ts, "Summary").then(html => {
                   const appBody = document.getElementById('app-body');
-                  if (appBody && store.currentChatTagId === ts.ReportHeadSummaryTagID) appBody.innerHTML = html;
+                  if (appBody && store.currentChatTagId === ts.ReportHeadSummaryTagID) {
+                    appBody.innerHTML = html;
+                  }
                 });
               }
             }
@@ -579,6 +581,22 @@ export async function loadSummarypage(availableKeys: any[]) {
 
   // ✅ Final: run new logic
   await firstLoadAndRender();
+
+  // Reopen last active Summary Tag if applicable
+  if (store.currentChatTagId !== -1) {
+    const activeTag = allSummaryTags.find(t => (t.ID || t.ReportHeadSummaryTagID) === store.currentChatTagId);
+    if (activeTag) {
+      const appBody = document.getElementById('app-body')!;
+      appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+      generateCheckboxHistory(activeTag, "Summary")
+        .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+        .then(html => {
+          if (html) {
+            appBody.innerHTML = html;
+          }
+        });
+    }
+  }
 }
 
 // ------------------ Base64 utils (unchanged) ------------------
