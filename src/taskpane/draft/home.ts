@@ -33,7 +33,7 @@ export function loadHomepage(availableKeys) {
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item disabled" href="#" id="sync-btn-tag">
+                        <a class="dropdown-item" href="#" id="sync-btn-tag">
                             <i class="fa fa-refresh me-2" aria-hidden="true"></i> Sync
                         </a>
                     </li>
@@ -181,7 +181,7 @@ export function loadHomepage(availableKeys) {
     });
 
     document.getElementById('sync-btn-tag').addEventListener('click', async () => {
-        if (!store.isPendingResponse && store.isSyncEnabled) {
+        if (!store.isPendingResponse) {
             loadSyncScreen();
         }
     });
@@ -334,7 +334,7 @@ export async function insertContentAtRange(context: Word.RequestContext, range: 
 
                     include(table.getRange());
                     cursor = table.getRange();
-                    newSelection = table.getCell(0, 0); // Set the cursor to the start of the table
+                    newSelection = table.getCell(0, 0).body.getRange(); // Set the cursor to the start of the table
                 } else {
                     let elementText = element.innerText.trim();
                     if (elementText) {
@@ -698,9 +698,17 @@ export async function loadSyncScreen() {
 
     if (desyncedItems.length === 0) {
         if (container) {
-            container.innerHTML = '<div class="text-center text-muted mt-3">All properties are in sync.</div>';
+            container.innerHTML = `
+                <div class="text-center mt-5">
+                    <i class="fa-solid fa-circle-check text-success fa-3x mb-3"></i>
+                    <p class="text-muted">No desynchronized properties detected.</p>
+                </div>
+            `;
         }
-        store.isSyncEnabled = false;
+        // Disable "Apply All" as there is nothing to sync
+        const applyAllBtn = document.getElementById('apply-all-sync') as HTMLButtonElement;
+        if (applyAllBtn) applyAllBtn.classList.add('d-none');
+
         return;
     }
 
@@ -810,15 +818,9 @@ export async function loadSyncScreen() {
 }
 
 export function updateSyncButtonState() {
-    const store = StoreService.getInstance();
     const syncBtn = document.getElementById('sync-btn-tag');
-
     if (syncBtn) {
-        if (store.isSyncEnabled) {
-            syncBtn.classList.remove('disabled');
-        } else {
-            syncBtn.classList.add('disabled');
-        }
+        syncBtn.classList.remove('disabled');
     }
 }
 
@@ -1193,7 +1195,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                                             topCell.merge(bottomCell);
                                             try {
                                                 topCell.verticalAlignment = Word.VerticalAlignment.center;
-                                                topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+                                                topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered;
                                             } catch (e) { }
                                         }
                                     });
