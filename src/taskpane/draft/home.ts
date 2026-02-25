@@ -123,7 +123,6 @@ export function loadHomepage(availableKeys) {
                             .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
                             .then(html => {
                                 appBody.innerHTML = html;
-                                initializeAIHistoryEvents(mention, store.jwt, store.availableKeys, 'AITag');
                             });
                     } else {
                         // Properties + Images behave same
