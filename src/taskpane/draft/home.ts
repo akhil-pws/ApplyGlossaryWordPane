@@ -739,10 +739,10 @@ export async function loadSyncScreen() {
                                     ${group.currentIndex + 1} / ${group.items.length}
                                 </span>
                                 <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-sm ${btnClass} sync-prev-btn" ${group.items.length <= 1 ? 'disabled' : ''}>
+                                    <button class="btn btn-sm ${btnClass} sync-prev-btn">
                                         <i class="fa-solid fa-chevron-up"></i>
                                     </button>
-                                    <button class="btn btn-sm ${btnClass} sync-next-btn" ${group.items.length <= 1 ? 'disabled' : ''}>
+                                    <button class="btn btn-sm ${btnClass} sync-next-btn">
                                         <i class="fa-solid fa-chevron-down"></i>
                                     </button>
                                 </div>
