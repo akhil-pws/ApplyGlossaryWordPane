@@ -34,7 +34,7 @@ export function loadHomepage(availableKeys) {
                     </li>
                     <li>
                         <a class="dropdown-item" href="#" id="sync-btn-tag">
-                            <i class="fa fa-refresh me-2" aria-hidden="true"></i> Sync
+                            <i class="fa fa-refresh me-2" aria-hidden="true"></i> Refresh Properties
                         </a>
                     </li>
 
@@ -470,7 +470,7 @@ export async function syncBookmarks() {
 
             await context.sync();
 
-            toaster("Sync completed!", "success");
+            toaster("Properties refreshed!", "success");
 
             // Disable sync button after successful sync
             store.isSyncEnabled = false;
@@ -478,7 +478,7 @@ export async function syncBookmarks() {
 
         } catch (err) {
             console.error("Sync error:", err);
-            toaster("Sync failed", "error");
+            toaster("Refresh failed", "error");
         }
     });
 }
@@ -623,11 +623,11 @@ export async function syncSingleBookmark(bookmarkName: string, groupKeyId: numbe
             range.insertBookmark(newBookmarkName);
 
             await context.sync();
-            toaster(`${word.Name} synced!`, "success");
+            toaster(`${word.Name} updated!`, "success");
             return true;
         } catch (err) {
             console.error("Error syncing single bookmark:", err);
-            toaster("Failed to sync property.", "error");
+            toaster("Failed to update property.", "error");
             return false;
         }
     });
@@ -666,7 +666,7 @@ export async function loadSyncScreen() {
             <div class="d-flex justify-content-between align-items-center px-2 pt-3">
                 <div class="d-flex align-items-center ms-3 c-pointer" id="back-from-sync">
                     <i class="fa fa-arrow-left text-muted me-2"></i>
-                    <span class="fw-bold">Sync Properties</span>
+                    <span class="fw-bold">Refresh Properties</span>
                 </div>
                 <div class="d-flex justify-content-center align-items-center me-3">
                     <button class="btn btn-sm btn-primary" id="apply-all-sync">Apply All</button>
@@ -674,8 +674,15 @@ export async function loadSyncScreen() {
             </div>
             <hr class="mt-2 mb-1 mx-3">
         </div>
-        <div class="container pt-3 pb-5" id="sync-items-container">
-            <div class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Scanning document...</div>
+        <div class="container pt-3 pb-5">
+            <div class="card ${cardBgClass} mx-2" id="sync-card-container">
+                <div class="card-header fw-semibold">Properties to Update</div>
+                <div class="card-body p-2" id="sync-items-container">
+                    <div class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Scanning document...</div>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2 d-none" id="sync-pagination-footer">
+                </div>
+            </div>
         </div>
     `;
 
@@ -694,19 +701,20 @@ export async function loadSyncScreen() {
     // Fetch desynced items
     const desyncedItems = await getDesyncedBookmarks();
     const container = document.getElementById('sync-items-container');
+    const footer = document.getElementById('sync-pagination-footer');
 
     if (desyncedItems.length === 0) {
         if (container) {
             container.innerHTML = `
-                <div class="text-center mt-5">
+                <div class="text-center mt-5 mb-5">
                     <i class="fa-solid fa-circle-check text-success fa-3x mb-3"></i>
                     <p class="text-muted">No desynchronized properties detected.</p>
                 </div>
             `;
         }
-        // Disable "Apply All" as there is nothing to sync
         const applyAllBtn = document.getElementById('apply-all-sync') as HTMLButtonElement;
         if (applyAllBtn) applyAllBtn.classList.add('d-none');
+        if (footer) footer.classList.add('d-none');
 
         return;
     }
@@ -720,9 +728,35 @@ export async function loadSyncScreen() {
         groupedItems[item.propertyName].items.push(item);
     });
 
-    if (container) {
+    let currentPage = 1;
+    const pageSize = 2;
+
+    function getTotalPages() {
+        return Math.max(1, Math.ceil(Object.keys(groupedItems).length / pageSize));
+    }
+
+    const renderPage = () => {
+        if (!container || !footer) return;
         container.innerHTML = '';
-        Object.keys(groupedItems).forEach(propName => {
+        footer.innerHTML = '';
+        footer.classList.remove('d-none');
+
+        const propNames = Object.keys(groupedItems);
+        if (propNames.length === 0) {
+            store.isSyncEnabled = false;
+            updateSyncButtonState();
+            loadHomepage(store.availableKeys);
+            return;
+        }
+
+        const totalPages = getTotalPages();
+        if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+
+        const start = (currentPage - 1) * pageSize;
+        const end = Math.min(start + pageSize, propNames.length);
+        const currentProps = propNames.slice(start, end);
+
+        currentProps.forEach(propName => {
             const group = groupedItems[propName];
             const card = document.createElement('div');
             card.className = `card mb-3 ${cardBgClass}`;
@@ -760,7 +794,6 @@ export async function loadSyncScreen() {
                     </div>
                 `;
 
-                // Add listeners to new elements
                 card.querySelector('.sync-prev-btn')?.addEventListener('click', (e) => {
                     e.stopPropagation();
                     group.currentIndex = (group.currentIndex - 1 + group.items.length) % group.items.length;
@@ -784,20 +817,11 @@ export async function loadSyncScreen() {
                     const success = await syncSingleBookmark(itemToSync.bookmarkName, itemToSync.tagId);
 
                     if (success) {
-                        // Remove item from group
                         group.items.splice(group.currentIndex, 1);
                         if (group.items.length === 0) {
-                            card.remove();
                             delete groupedItems[propName];
-
-                            // Check if all gone
-                            if (Object.keys(groupedItems).length === 0) {
-                                store.isSyncEnabled = false;
-                                updateSyncButtonState();
-                                loadHomepage(store.availableKeys);
-                            }
+                            renderPage();
                         } else {
-                            // Adjust index and refresh
                             if (group.currentIndex >= group.items.length) {
                                 group.currentIndex = group.items.length - 1;
                             }
@@ -813,7 +837,60 @@ export async function loadSyncScreen() {
             updateCardUI();
             container.appendChild(card);
         });
-    }
+
+        // Aligned Pagination Controls (Summary Tag Style)
+        if (totalPages > 1 || propNames.length > 0) {
+            const startItem = propNames.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+            const endItem = Math.min(currentPage * pageSize, propNames.length);
+
+            footer.innerHTML = `
+                <div class="btn-group btn-group-sm" role="group" aria-label="pagination">
+                    <button class="btn btn-outline-secondary" id="sync-page-first" title="First" ${currentPage === 1 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-backward-fast"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" id="sync-page-prev" title="Previous" ${currentPage === 1 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-backward-step"></i>
+                    </button>
+
+                    <div class="btn-group btn-group-sm" id="sync-page-buttons"></div>
+
+                    <button class="btn btn-outline-secondary" id="sync-page-next" title="Next" ${currentPage === totalPages ? 'disabled' : ''}>
+                        <i class="fa-solid fa-forward-step"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" id="sync-page-last" title="Last" ${currentPage === totalPages ? 'disabled' : ''}>
+                        <i class="fa-solid fa-forward-fast"></i>
+                    </button>
+                </div>
+                <div class="text-muted small">${startItem} - ${endItem} of ${propNames.length} items</div>
+            `;
+
+            const pageButtons = footer.querySelector('#sync-page-buttons') as HTMLElement;
+            const maxButtons = 5;
+            let pStart = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let pEnd = Math.min(totalPages, pStart + maxButtons - 1);
+            pStart = Math.max(1, pEnd - maxButtons + 1);
+
+            for (let p = pStart; p <= pEnd; p++) {
+                const b = document.createElement('button');
+                b.className = `btn ${p === currentPage ? 'btn-primary text-white' : 'btn-outline-secondary'}`;
+                b.textContent = String(p);
+                b.onclick = () => {
+                    currentPage = p;
+                    renderPage();
+                };
+                pageButtons.appendChild(b);
+            }
+
+            footer.querySelector('#sync-page-first')?.addEventListener('click', () => { currentPage = 1; renderPage(); });
+            footer.querySelector('#sync-page-prev')?.addEventListener('click', () => { currentPage = Math.max(1, currentPage - 1); renderPage(); });
+            footer.querySelector('#sync-page-next')?.addEventListener('click', () => { currentPage = Math.min(totalPages, currentPage + 1); renderPage(); });
+            footer.querySelector('#sync-page-last')?.addEventListener('click', () => { currentPage = totalPages; renderPage(); });
+        } else {
+            footer.classList.add('d-none');
+        }
+    };
+
+    renderPage();
 }
 
 export function updateSyncButtonState() {
