@@ -1,4 +1,4 @@
-import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
+import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate, getPropertyStatus, updatePropertyStatus } from "./draft.api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, getReport, mentionDropdownFn, saveAppState } from "../taskpane";
 import { StoreService } from "../services/store.service";
@@ -12,6 +12,18 @@ let preview = '';
 
 export function loadHomepage(availableKeys) {
     const store = StoreService.getInstance();
+    store.view = 'Home';
+    store.save();
+
+    // If restoring a session with an active AI Tag, open it
+    if (store.currentChatTagId && store.currentChatTagId > 0) {
+        const tag = availableKeys.find(t => t.GroupKeyID === store.currentChatTagId || t.ID === store.currentChatTagId);
+        if (tag) {
+            openAITag(tag);
+            return;
+        }
+    }
+
     const searchBoxClass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
 
     document.getElementById('app-body').innerHTML = `
@@ -113,17 +125,7 @@ export function loadHomepage(availableKeys) {
 
                 listItem.onclick = () => {
                     if (isAISection) {
-                        const store = StoreService.getInstance();
-                        store.currentChatTagId = mention.ID || mention.GroupKeyID;
-                        saveAppState();
-
-                        const appBody = document.getElementById('app-body');
-                        appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                        generateCheckboxHistory(mention, "AITag")
-                            .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
-                            .then(html => {
-                                appBody.innerHTML = html;
-                            });
+                        openAITag(mention);
                     } else {
                         // Properties + Images behave same
                         replaceMention(mention, mention.ComponentKeyDataType);
@@ -181,6 +183,12 @@ export function loadHomepage(availableKeys) {
 
     document.getElementById('sync-btn-tag').addEventListener('click', async () => {
         if (!store.isPendingResponse) {
+            if (store.isDraftGenerated) {
+                // Call getPropertyStatus again
+                await getPropertyStatus(store.WorkbenchID, store.jwt);
+                // Refresh document data
+                await getReport();
+            }
             loadSyncScreen();
         }
     });
@@ -655,6 +663,8 @@ export async function selectBookmarkByName(bookmarkName: string) {
 
 export async function loadSyncScreen() {
     const store = StoreService.getInstance();
+    store.view = 'Sync';
+    store.save();
     const appBody = document.getElementById('app-body');
     const isDark = store.theme === 'Dark';
     const bgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
@@ -668,7 +678,8 @@ export async function loadSyncScreen() {
                     <i class="fa fa-arrow-left text-muted me-2"></i>
                     <span class="fw-bold">Refresh Properties</span>
                 </div>
-                <div class="d-flex justify-content-center align-items-center me-3">
+                <div class="d-flex justify-content-center align-items-center me-3 gap-2">
+                    <button class="btn btn-sm btn-outline-primary" id="done-sync">Done</button>
                     <button class="btn btn-sm btn-primary" id="apply-all-sync">Apply All</button>
                 </div>
             </div>
@@ -694,8 +705,31 @@ export async function loadSyncScreen() {
         const btn = document.getElementById('apply-all-sync') as HTMLButtonElement;
         btn.disabled = true;
         btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Applying...';
-        await syncBookmarks();
-        loadHomepage(store.availableKeys);
+        try {
+            await syncBookmarks();
+            await updatePropertyStatus(store.WorkbenchID, store.jwt);
+            loadHomepage(store.availableKeys);
+        } catch (error) {
+            console.error("Apply All error:", error);
+            toaster("Failed to apply updates.", "error");
+            btn.disabled = false;
+            btn.innerHTML = 'Apply All';
+        }
+    });
+
+    document.getElementById('done-sync')?.addEventListener('click', async () => {
+        const btn = document.getElementById('done-sync') as HTMLButtonElement;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ...';
+        try {
+            await updatePropertyStatus(store.WorkbenchID, store.jwt);
+            loadHomepage(store.availableKeys);
+        } catch (error) {
+            console.error("Done button error:", error);
+            toaster("Failed to complete update.", "error");
+            btn.disabled = false;
+            btn.innerHTML = 'Done';
+        }
     });
 
     // Fetch desynced items
@@ -894,21 +928,36 @@ export async function loadSyncScreen() {
 }
 
 export function updateSyncButtonState() {
+    const store = StoreService.getInstance();
     const syncBtn = document.getElementById('sync-btn-tag');
     if (syncBtn) {
-        syncBtn.classList.remove('disabled');
+        if (store.isDraftGenerated) {
+            syncBtn.classList.remove('disabled');
+            syncBtn.style.pointerEvents = 'auto';
+            syncBtn.style.opacity = '1';
+        } else {
+            syncBtn.classList.add('disabled');
+            syncBtn.style.pointerEvents = 'none';
+            syncBtn.style.opacity = '0.5';
+        }
     }
 }
 
 
 
 export async function openAITag(tag) {
-    tag.ReportHeadAIHistoryList.forEach((historyList) => {
-        historyList.Response = removeQuotes(historyList.Response);
-        tag.FilteredReportHeadAIHistoryList.unshift(historyList);
-    });
+    const store = StoreService.getInstance();
+    store.currentChatTagId = tag.GroupKeyID || tag.ID;
+    store.save();
 
 
+    const appBody = document.getElementById('app-body');
+    appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+    generateCheckboxHistory(tag, "AITag")
+        .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+        .then(html => {
+            appBody.innerHTML = html;
+        });
 }
 
 export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {

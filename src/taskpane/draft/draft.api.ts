@@ -274,3 +274,37 @@ export async function getReportHeadImageById(id: string, jwt: string): Promise<a
   const data: any = await response.json();
   return data;
 };
+
+export async function getPropertyStatus(WorkbenchID: string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/addin/workbench/property-status/${WorkbenchID}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${jwt}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+export async function updatePropertyStatus(WorkbenchID: string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/addin/workbench/property-status/update/${WorkbenchID}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    },
+    body: JSON.stringify({})
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data = await response.json();
+  return data;
+}
