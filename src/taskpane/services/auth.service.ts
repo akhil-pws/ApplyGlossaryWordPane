@@ -16,7 +16,7 @@ export class AuthService {
     }
 
     /**
-     * Restores session. Priority: sessionStorage (refresh) > PersistenceService (reopen).
+     * Restores session. Priority: sessionStorage (refresh) > PersistenceService & Office.settings (reopen).
      */
     static async restoreSession(): Promise<any> {
         // Check SessionStorage first (survives refresh)
@@ -32,17 +32,34 @@ export class AuthService {
                 mode: sessionStorage.getItem('mode') || 'Home',
                 currentChatTagId: sessionStorage.getItem(this.TAG_ID_KEY) ? Number(sessionStorage.getItem(this.TAG_ID_KEY)) : null,
                 tagDraft: JSON.parse(sessionStorage.getItem('tagDraft') || 'null'),
-                summaryTagDraft: JSON.parse(sessionStorage.getItem('summaryTagDraft') || 'null')
+                summaryTagDraft: JSON.parse(sessionStorage.getItem('summaryTagDraft') || 'null'),
+                view: sessionStorage.getItem('view') || 'Home',
+                viewParams: JSON.parse(sessionStorage.getItem('viewParams') || '{}')
             };
         }
 
-        // Check PersistenceService (survives closing)
+        // Check PersistenceService & Office.settings (survives closing)
         const state = await PersistenceService.loadState();
         if (state) {
             console.log("AuthService: Restoring session from decrypted localStorage");
+
+            // Load document-specific settings
+            const settingsKeys = [this.STYLE_KEY, this.PALETTE_KEY, this.TAG_ID_KEY, 'theme', 'tagDraft', 'summaryTagDraft', 'mode'];
+            const docSettings = PersistenceService.loadSettings(settingsKeys);
+
+            const mergedState = {
+                ...state,
+                ...docSettings,
+                // Ensure correct types
+                tableStyle: docSettings[this.STYLE_KEY] || state.tableStyle,
+                colorPallete: docSettings[this.PALETTE_KEY] || state.colorPallete,
+                currentChatTagId: docSettings[this.TAG_ID_KEY] !== undefined ? docSettings[this.TAG_ID_KEY] : state.currentChatTagId,
+                mode: docSettings['mode'] || state.mode || 'Home'
+            };
+
             // For legacy components that might still read from sessionStorage
-            this.syncToSessionStorage(state);
-            return state;
+            this.syncToSessionStorage(mergedState);
+            return mergedState;
         }
         return null;
     }
@@ -62,6 +79,10 @@ export class AuthService {
         }
         if (state.tagDraft) sessionStorage.setItem('tagDraft', JSON.stringify(state.tagDraft));
         if (state.summaryTagDraft) sessionStorage.setItem('summaryTagDraft', JSON.stringify(state.summaryTagDraft));
+        if (state.view) sessionStorage.setItem('view', state.view);
+        if (state.viewParams) sessionStorage.setItem('viewParams', JSON.stringify(state.viewParams));
+        if (state.mode) sessionStorage.setItem('mode', state.mode);
+        if (state.theme) sessionStorage.setItem('theme', state.theme);
     }
 
     static async login(organization: string, username: string, password: string): Promise<{ success: boolean, message?: string, data?: any }> {

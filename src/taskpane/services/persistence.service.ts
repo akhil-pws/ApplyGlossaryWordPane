@@ -52,6 +52,46 @@ export class PersistenceService {
     }
 
     /**
+     * Saves document-specific settings using Office.settings.
+     */
+    static saveSettings(settings: Record<string, any>): void {
+        try {
+            if (Office.context && Office.context.document && Office.context.document.settings) {
+                for (const [key, value] of Object.entries(settings)) {
+                    Office.context.document.settings.set(key, value);
+                }
+                Office.context.document.settings.saveAsync((result) => {
+                    if (result.status === Office.AsyncResultStatus.Failed) {
+                        console.error("PersistenceService: Failed to save Office settings", result.error.message);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("PersistenceService: Error saving Office settings", error);
+        }
+    }
+
+    /**
+     * Loads document-specific settings from Office.settings.
+     */
+    static loadSettings(keys: string[]): Record<string, any> {
+        const settings: Record<string, any> = {};
+        try {
+            if (Office.context && Office.context.document && Office.context.document.settings) {
+                for (const key of keys) {
+                    const value = Office.context.document.settings.get(key);
+                    if (value !== undefined && value !== null) {
+                        settings[key] = value;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("PersistenceService: Error loading Office settings", error);
+        }
+        return settings;
+    }
+
+    /**
      * Clears the stored state.
      */
     static clearState(): void {

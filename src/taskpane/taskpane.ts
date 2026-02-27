@@ -11,7 +11,7 @@ import { AIService } from "./services/ai.service";
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI, checkBookmarksForSync, updateSyncButtonState } from "./draft/home";
 import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllSponsors, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllSponsors, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getPropertyStatus, updatePropertyStatus } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
 import { renderSelectedTags } from "./draft/draft-functions";
 import { loadSummarypage } from "./summary/summary";
@@ -67,9 +67,17 @@ Office.onReady((info) => {
           if (session.tagDraft) store.tagDraft = session.tagDraft;
           if (session.summaryTagDraft) store.summaryTagDraft = session.summaryTagDraft;
 
+          // Restore View State
+          if (session.view) store.view = session.view;
+          if (session.viewParams) store.viewParams = session.viewParams;
+
           window.location.hash = '#/dashboard';
           toaster('You are successfully logged in', 'success');
-          displayMenu(); // Trigger legacy menu display
+          // displayMenu(); // Trigger legacy menu display
+
+          await fetchDocument('Init'); // Full init with data
+          startPingTimer();
+          restoreView(); // Then restore specific screen
         } else {
           loadLoginPage();
         }
@@ -123,6 +131,37 @@ async function login() {
   }
 }
 
+let pingInterval: any = null;
+
+function startPingTimer() {
+  const store = StoreService.getInstance();
+  if (pingInterval) clearInterval(pingInterval);
+
+  pingInterval = setInterval(async () => {
+    if (store.jwt && store.WorkbenchID) {
+      try {
+        const result = await getPropertyStatus(store.WorkbenchID, store.jwt);
+        if (result && result.Status !== undefined) {
+          const isDraftGenerated = result.Data === 1;
+          if (store.isDraftGenerated !== isDraftGenerated) {
+            store.isDraftGenerated = isDraftGenerated;
+            updateSyncButtonState();
+          }
+        }
+      } catch (error) {
+        console.error("Ping timer error:", error);
+      }
+    }
+  }, 10000); // 10 seconds
+}
+
+function stopPingTimer() {
+  if (pingInterval) {
+    clearInterval(pingInterval);
+    pingInterval = null;
+  }
+}
+
 function loadLoginPage() {
   const store = StoreService.getInstance();
   UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
@@ -165,6 +204,7 @@ async function handleLogin(event) {
       if (localPallete) store.colorPallete = JSON.parse(localPallete);
 
       toaster('You are successfully logged in', 'success');
+      startPingTimer();
       displayMenu();
       window.location.hash = '#/dashboard';
     } else {
@@ -194,7 +234,41 @@ function displayMenu() {
   }
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument('Init');
+}
 
+/**
+ * Restores the previous screen based on the store's view state.
+ */
+export function restoreView() {
+  const store = StoreService.getInstance();
+  console.log("Restoring View:", store.view, store.viewParams);
+
+  switch (store.view) {
+    case 'AddTag':
+      addGenAITags();
+      break;
+    case 'Sync':
+      const { loadSyncScreen } = require("./draft/home");
+      loadSyncScreen();
+      break;
+    case 'Glossary':
+      fetchGlossary();
+      break;
+    case 'Formatting':
+      formatOptionsDisplay();
+      break;
+    case 'CustomTable':
+      customizeTable('Custom');
+      break;
+    case 'PredefinedTable':
+      customizeTable('Pre');
+      break;
+    case 'Home':
+    default:
+      loadHomepage(store.availableKeys);
+      // Reopen last active AI Tag if applicable (handled in loadHomepage)
+      break;
+  }
 }
 
 export async function saveAppState() {
@@ -358,6 +432,7 @@ async function fetchDocument(action) {
       onLogout: async () => {
         if (!store.isPendingResponse) {
           if (store.isGlossaryActive) await removeMatchingContentControls();
+          stopPingTimer();
           logout();
         }
       }
@@ -404,6 +479,8 @@ export async function getReport() {
 
 export async function formatOptionsDisplay() {
   const store = StoreService.getInstance();
+  store.view = 'Formatting';
+  store.save();
   if (!store.isTagUpdating) { // Check if isTagUpdating is false
     if (store.isGlossaryActive) {
       await removeMatchingContentControls();
@@ -1075,6 +1152,8 @@ export async function removeTrailingEmptyParagraphs(
 async function fetchGlossary() {
   const store = StoreService.getInstance();
   if (!store.isTagUpdating) {
+    store.view = 'Glossary';
+    store.save();
 
     document.getElementById('app-body').innerHTML = `
   <div id="button-container">
@@ -1515,6 +1594,8 @@ export async function removeMatchingContentControls() {
 export async function addGenAITags() {
   const store = StoreService.getInstance();
   if (!store.isTagUpdating) {
+    store.view = 'AddTag';
+    store.save();
 
     if (store.isGlossaryActive) {
       await removeMatchingContentControls();
@@ -1525,11 +1606,11 @@ export async function addGenAITags() {
     // Build Primary Source List
     let sourceTypeList = [
       ...Array.from(new Map(
-        store.dataList.WorkbenchSourceFiles
-          .filter(item => item.VectorID > 0)
+        (store.dataList.WorkbenchSourceFiles || [])
+          .filter(item => item && item.VectorID > 0 && item.SourceType)
           .map(item => [item.SourceTypeID, { Name: item.SourceType, ID: item.SourceTypeID }])
       ).values())
-    ];
+    ].filter((src: any) => src && src.ID && src.Name);
 
 
     let sourceOptions = sourceTypeList.map((src: any) => {
@@ -1542,16 +1623,18 @@ export async function addGenAITags() {
         </li>`;
     }).join("");
 
-    let sponsorOptions = store.clientList.map(client => {
-      const isSelectedClient = selectedClient.some(selected => selected.ID === client.ID);
-      return `
+    let sponsorOptions = (store.clientList || [])
+      .filter(client => client && client.ID && client.Name)
+      .map(client => {
+        const isSelectedClient = selectedClient.some(selected => selected && selected.ID === client.ID);
+        return `
         <li class="sponsor-dropdown-item dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="${client.ID}" id="sponsor${client.ID}" ${isSelectedClient ? 'checked disabled' : ''}>
             <label class="form-check-label text-prewrap" for="sponsor${client.ID}">${client.Name}</label>
           </div>
         </li>`;
-    }).join("");
+      }).join("");
 
     document.getElementById('app-body').innerHTML = navTabs;
 
@@ -1634,16 +1717,20 @@ export async function addGenAITags() {
         } else {
           store.tagDraft = currentDraft;
         }
-        await saveAppState();
+        store.save();
       };
 
       const updateSponsorDropdownLabel = () => {
         if (availableForAllCheckbox.checked) {
-          sponsorDropdownButton.textContent = store.clientList.map(x => x.Name).join(", ");
+          const names = (store.clientList || [])
+            .map(x => x?.Name)
+            .filter(name => name && name !== "undefined");
+          sponsorDropdownButton.textContent = names.length ? names.join(", ") : "All Sponsors";
         } else {
           const selectedNames = Array.from(sponsorDropdownItems)
             .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
-            .map(cb => cb.parentElement!.textContent!.trim());
+            .map(cb => cb.parentElement!.textContent!.trim())
+            .filter(name => name && name !== "undefined");
 
           sponsorDropdownButton.textContent = selectedNames.length
             ? selectedNames.join(", ")
@@ -1654,7 +1741,11 @@ export async function addGenAITags() {
       const updateSourceDropdownLabel = () => {
         const selectedNames = Array.from(sourceDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-          .map(cb => (cb.parentElement!.querySelector('label') as HTMLElement).textContent!.trim());
+          .map(cb => {
+            const label = cb.parentElement!.querySelector('label');
+            return label ? (label.textContent || "").trim() : "";
+          })
+          .filter(name => name && name !== "undefined");
 
         const labelSpan = document.getElementById('sourceDropdownLabel');
         if (labelSpan) {
@@ -1662,7 +1753,7 @@ export async function addGenAITags() {
             ? selectedNames.join(", ")
             : "Select Source Types";
         }
-      }
+      };
 
       // Submit Handler
       form.addEventListener('submit', async (e) => {
@@ -1854,6 +1945,8 @@ export async function addGenAITags() {
 
 export async function customizeTable(type: string) {
   const store = StoreService.getInstance();
+  store.view = type === 'Custom' ? 'CustomTable' : 'PredefinedTable';
+  store.save();
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
@@ -2220,7 +2313,7 @@ export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
           id="sourceDropdown" 
           data-bs-toggle="dropdown" 
           aria-expanded="false">
-          <span id="sourceDropdownLabel" class='sourceDropdownLabel'></span>
+          <span id="chat-source-dropdown-label" class='sourceDropdownLabel'></span>
           <span class="dropdown-toggle-icon dropdown-toggle-icon-s"></span>
         </button>
         <ul class="dropdown-menu ${dropdownMenuClass} w-100 p-2" style="box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10000; max-height: 300px; overflow-y: auto;">
@@ -2236,16 +2329,20 @@ export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
           <!-- Grouped Sources -->
           ${Object.keys(groupedSources)
       .map((group, groupIndex) => {
-        const groupItems = groupedSources[group]
+        const groupItems = (groupedSources[group] || [])
+          .filter(source => source && (type === 'Summary' ? source.FileName : source.SourceName))
           .map(
-            (source, index) => `
+            (source, index) => {
+              const val = type === 'Summary' ? source.FileName : source.SourceName;
+              return `
                   <li class="dropdown-item ps-4 ${itemClass}" style="cursor: pointer;" data-checkbox-id="source-${groupIndex}-${index}">
                     <div class="form-check">
-                      <input class="form-check-input source-checkbox" type="checkbox" value="${type === 'Summary' ? source.FileName : source.SourceName}" id="source-${groupIndex}-${index}">
-                      <label class="form-check-label w-100 text-prewrap" for="source-${groupIndex}-${index}">${type === 'Summary' ? source.FileName : source.SourceName}</label>
+                      <input class="form-check-input source-checkbox" type="checkbox" value="${val}" id="source-${groupIndex}-${index}">
+                      <label class="form-check-label w-100 text-prewrap" for="source-${groupIndex}-${index}">${val}</label>
                     </div>
                   </li>
-                `
+                `;
+            }
           )
           .join('');
 
@@ -2253,8 +2350,8 @@ export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
                 <!-- Group Header -->
                 <li class="dropdown-item p-2 ${itemClass}" data-group-id="group-${groupIndex}">
                   <div class="form-check">
-                    <input class="form-check-input group-checkbox" type="checkbox" value="${group}" id="group-${groupIndex}">
-                    <label class="form-check-label fw-bold" for="group-${groupIndex}">${group}</label>
+                    <input class="form-check-input group-checkbox" type="checkbox" value="${group || "Unknown"}" id="group-${groupIndex}">
+                    <label class="form-check-label fw-bold" for="group-${groupIndex}">${group || "Unknown"}</label>
                   </div>
                 </li>
                 ${groupItems}
@@ -2272,17 +2369,20 @@ export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
   `;
 
   const accordionBody = document.getElementById(`chatFooter`);
-  accordionBody.innerHTML = multiSelectHTML;
+  if (accordionBody) accordionBody.innerHTML = multiSelectHTML;
 
   let selectedSources = [];
 
   const selectAllCheckbox = document.getElementById(`selectAll`) as HTMLInputElement;
   const groupCheckboxes = document.querySelectorAll(`.group-checkbox`);
   const individualCheckboxes = document.querySelectorAll(`.source-checkbox`);
-  const sourceDropdownLabel = document.getElementById(`sourceDropdownLabel`);
+  const chatSourceDropdownLabel = document.getElementById(`chat-source-dropdown-label`);
 
   function updateLabel() {
-    sourceDropdownLabel.innerText = selectedSources.length > 0 ? selectedSources.join(', ') : ' ';
+    if (chatSourceDropdownLabel) {
+      const filtered = selectedSources.filter(s => s && s !== "undefined");
+      chatSourceDropdownLabel.innerText = filtered.length > 0 ? filtered.join(', ') : ' ';
+    }
   }
 
   // Select All logic
