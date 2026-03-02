@@ -8,6 +8,7 @@ import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 
 let preview = '';
+let bookmarkCounter = 0;
 
 
 export function loadHomepage(availableKeys) {
@@ -46,7 +47,7 @@ export function loadHomepage(availableKeys) {
                     </li>
                     <li>
                         <a class="dropdown-item" href="#" id="sync-btn-tag">
-                            <i class="fa fa-refresh me-2" aria-hidden="true"></i> Refresh Properties
+                            <i class="fa fa-refresh me-2" aria-hidden="true"></i> Sync Document
                         </a>
                     </li>
 
@@ -472,7 +473,7 @@ export async function syncBookmarks() {
                 );
 
                 // 🔥 Recreate bookmark using range method
-                const newBookmarkName = `PT${groupKeyId}_Split_${Date.now()}`;
+                const newBookmarkName = `PT${groupKeyId}_Split_${getDateTimeStamp()}`;
                 range.insertBookmark(newBookmarkName);
             }
 
@@ -594,6 +595,15 @@ export async function getDesyncedBookmarks(): Promise<SyncItem[]> {
                 const bookmarkContent = range.text.trim();
                 const tagResponse = (word.Response ?? "").trim();
 
+                // 🕵️ Duplicate Name Detection & Auto-Fix
+                // If the bookmark exists but the JS API thinks there are multiples with the same name,
+                // we rename this one to be unique so we can actually select it.
+                let uniqueBookmarkName = name;
+                if (syncItems.some(item => item.bookmarkName === name)) {
+                    uniqueBookmarkName = `PT${groupKeyId}_Split_${getDateTimeStamp()}`;
+                    range.insertBookmark(uniqueBookmarkName);
+                }
+
                 if (bookmarkContent !== tagResponse) {
                     // Extract a snippet from the paragraph text
                     let pText = paragraph.isNullObject ? "" : paragraph.text;
@@ -604,7 +614,7 @@ export async function getDesyncedBookmarks(): Promise<SyncItem[]> {
                         updatedValue: tagResponse,
                         existingValue: bookmarkContent,
                         location: pText || "Unknown",
-                        bookmarkName: name,
+                        bookmarkName: uniqueBookmarkName,
                         tagId: groupKeyId
                     });
                 }
@@ -627,7 +637,7 @@ export async function syncSingleBookmark(bookmarkName: string, groupKeyId: numbe
             const range = context.document.getBookmarkRange(bookmarkName);
             range.insertText(word.Response ?? "", Word.InsertLocation.replace);
 
-            const newBookmarkName = `PT${groupKeyId}_Split_${Date.now()}`;
+            const newBookmarkName = `PT${groupKeyId}_Split_${getDateTimeStamp()}`;
             range.insertBookmark(newBookmarkName);
 
             await context.sync();
@@ -672,15 +682,17 @@ export async function loadSyncScreen() {
     const btnClass = isDark ? 'btn-outline-light' : 'btn-outline-primary';
 
     appBody.innerHTML = `
-        <div class="chat-header sticky-top ${bgClass} z-3">
+        <div class="chat-header ${bgClass}">
             <div class="d-flex justify-content-between align-items-center px-2 pt-3">
-                <div class="d-flex align-items-center ms-3 c-pointer" id="back-from-sync">
-                    <i class="fa fa-arrow-left text-muted me-2"></i>
-                    <span class="fw-bold">Refresh Properties</span>
+                <div class="d-flex align-items-center ms-3">
+                    <i class="fa fa-refresh text-muted me-2"></i>
+                    <span class="fw-bold">Sync Document</span>
                 </div>
                 <div class="d-flex justify-content-center align-items-center me-3 gap-2">
-                    <button class="btn btn-sm btn-outline-primary" id="done-sync">Done</button>
                     <button class="btn btn-sm btn-primary" id="apply-all-sync">Apply All</button>
+                    <div class="c-pointer" id="done-sync" title="Close">
+                        <i class="fa-solid fa-circle-xmark fs-5 text-muted hover-dark"></i>
+                    </div>
                 </div>
             </div>
             <hr class="mt-2 mb-1 mx-3">
@@ -697,9 +709,7 @@ export async function loadSyncScreen() {
         </div>
     `;
 
-    document.getElementById('back-from-sync')?.addEventListener('click', () => {
-        loadHomepage(store.availableKeys);
-    });
+
 
     document.getElementById('apply-all-sync')?.addEventListener('click', async () => {
         const btn = document.getElementById('apply-all-sync') as HTMLButtonElement;
@@ -718,18 +728,7 @@ export async function loadSyncScreen() {
     });
 
     document.getElementById('done-sync')?.addEventListener('click', async () => {
-        const btn = document.getElementById('done-sync') as HTMLButtonElement;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ...';
-        try {
-            await updatePropertyStatus(store.WorkbenchID, store.jwt);
-            loadHomepage(store.availableKeys);
-        } catch (error) {
-            console.error("Done button error:", error);
-            toaster("Failed to complete update.", "error");
-            btn.disabled = false;
-            btn.innerHTML = 'Done';
-        }
+        loadHomepage(store.availableKeys);
     });
 
     // Fetch desynced items
@@ -749,6 +748,9 @@ export async function loadSyncScreen() {
         const applyAllBtn = document.getElementById('apply-all-sync') as HTMLButtonElement;
         if (applyAllBtn) applyAllBtn.classList.add('d-none');
         if (footer) footer.classList.add('d-none');
+
+        // Automatically call updatePropertyStatus if no desynced items
+        updatePropertyStatus(store.WorkbenchID, store.jwt).catch(err => console.error("Auto-Done API error:", err));
 
         return;
     }
@@ -796,7 +798,7 @@ export async function loadSyncScreen() {
             card.className = `card mb-3 ${cardBgClass}`;
             card.id = `sync-card-${propName.replace(/\s+/g, '-')}`;
 
-            const updateCardUI = () => {
+            const updateCardUI = (shouldSelect: boolean = false) => {
                 const currentItem = group.items[group.currentIndex];
                 card.innerHTML = `
                     <div class="card-body p-2">
@@ -821,25 +823,27 @@ export async function loadSyncScreen() {
                             <div class="text-danger mt-1"><strong>Existing Value:</strong> <span class="text-break">${currentItem.existingValue}</span></div>
                         </div>
                         <div class="d-flex justify-content-end mt-2">
-                            <button class="btn btn-sm ${btnClass} sync-single-btn">
+                             <button class="btn btn-sm ${btnClass} sync-single-btn">
                                 <i class="fa fa-refresh"></i> Update
                             </button>
                         </div>
                     </div>
                 `;
 
+                if (shouldSelect) {
+                    selectBookmarkByName(currentItem.bookmarkName);
+                }
+
                 card.querySelector('.sync-prev-btn')?.addEventListener('click', (e) => {
                     e.stopPropagation();
                     group.currentIndex = (group.currentIndex - 1 + group.items.length) % group.items.length;
-                    updateCardUI();
-                    selectBookmarkByName(group.items[group.currentIndex].bookmarkName);
+                    updateCardUI(true);
                 });
 
                 card.querySelector('.sync-next-btn')?.addEventListener('click', (e) => {
                     e.stopPropagation();
                     group.currentIndex = (group.currentIndex + 1) % group.items.length;
-                    updateCardUI();
-                    selectBookmarkByName(group.items[group.currentIndex].bookmarkName);
+                    updateCardUI(true);
                 });
 
                 card.querySelector('.sync-single-btn')?.addEventListener('click', async (e) => {
@@ -854,7 +858,14 @@ export async function loadSyncScreen() {
                         group.items.splice(group.currentIndex, 1);
                         if (group.items.length === 0) {
                             delete groupedItems[propName];
-                            renderPage();
+
+                            // If no more grouped items, call done API and refresh
+                            if (Object.keys(groupedItems).length === 0) {
+                                updatePropertyStatus(store.WorkbenchID, store.jwt).catch(err => console.error("Auto-Done API error:", err));
+                                loadHomepage(store.availableKeys);
+                            } else {
+                                renderPage();
+                            }
                         } else {
                             if (group.currentIndex >= group.items.length) {
                                 group.currentIndex = group.items.length - 1;
@@ -1408,12 +1419,15 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
 }
 
 export function getDateTimeStamp() {
-    const d = new Date();
+    const now = new Date();
+    const pad = (num: number) => num.toString().padStart(2, '0');
+    const padMs = (num: number) => num.toString().padStart(3, '0');
 
-    const pad = (n) => n.toString().padStart(2, "0");
+    // session counter to ensure absolute uniqueness even in same ms
+    bookmarkCounter++;
+    const counterStr = bookmarkCounter.toString().padStart(4, '0');
 
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_` +
-        `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}${padMs(now.getMilliseconds())}${counterStr}`;
 }
 
 

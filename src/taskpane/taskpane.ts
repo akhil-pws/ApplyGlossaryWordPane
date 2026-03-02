@@ -331,7 +331,7 @@ async function getTableStyle() {
 
 }
 
-async function fetchDocument(action) {
+async function fetchDocument(action, isRefresh: boolean = false) {
   UIService.toggleLoader(true);
   try {
     const store = StoreService.getInstance();
@@ -339,9 +339,19 @@ async function fetchDocument(action) {
     const reportData = await DocumentService.loadReportData(store.WorkbenchID, store.jwt, userId);
     // Assign to store
     store.dataList = reportData.dataList;
-    await getTableStyle();
-    await loadPromptTemplates();
-    store.availableKeys = reportData.availableKeys;
+
+    if (!isRefresh) {
+      await getTableStyle();
+      await loadPromptTemplates();
+    }
+
+    if (isRefresh) {
+      // Preserve images in availableKeys if refreshing
+      const imageKeys = store.availableKeys.filter(k => k.ComponentKeyDataType === 'IMAGE');
+      store.availableKeys = [...reportData.availableKeys, ...imageKeys];
+    } else {
+      store.availableKeys = reportData.availableKeys;
+    }
     store.sourceList = reportData.sourceList;
     store.sponsorID = reportData.sponsorID;
     // Global Assignment
@@ -392,7 +402,9 @@ async function fetchDocument(action) {
     UIService.toggleLoader(false);
 
     // Fetch images in background
-    getImages();
+    if (!isRefresh) {
+      getImages();
+    }
 
     // Event Wiring
     UIService.attachDashboardEvents({
@@ -463,7 +475,7 @@ async function fetchDocument(action) {
 }
 
 export async function getReport() {
-  await fetchDocument('Refresh');
+  await fetchDocument('Refresh', true);
 
   // Check if PT bookmarks exist and have changed content
   const store = StoreService.getInstance();
