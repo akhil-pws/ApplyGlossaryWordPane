@@ -424,7 +424,7 @@ export async function colorTable(table: any, rows: any, context: any, isReversed
             // ✅ center align merged parameter cell
             try {
               topCell.verticalAlignment = Word.VerticalAlignment.center;
-              topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+              topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered;
             } catch (e) {
               // ignore
             }
@@ -484,7 +484,7 @@ export async function colorTable(table: any, rows: any, context: any, isReversed
   };
 
   // Determine base table type
-  const base = store.tableStyle.split(" - ")[0].trim();
+  const base = (store.tableStyle || 'Plain Table 5').split(" - ")[0].trim();
 
   // ------------------------------------------------------------
   // Plain Table 3

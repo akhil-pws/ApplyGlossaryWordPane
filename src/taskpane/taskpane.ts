@@ -450,6 +450,10 @@ async function fetchDocument(action, isRefresh: boolean = false) {
       },
       onNotificationClick: async () => {
         if (!store.isPendingResponse) {
+          if (store.isDraftGenerated) {
+            await getPropertyStatus(store.WorkbenchID, store.jwt);
+            await getReport();
+          }
           const { loadSyncScreen } = await import("./draft/home");
           loadSyncScreen();
         }
@@ -983,7 +987,7 @@ export async function applyPropertyTagsFn(
 
               let grid = parseHtmlTableToGrid(rows);
               const store = StoreService.getInstance();
-              const base = store.tableStyle.split(" - ")[0].trim();
+              const base = (store.tableStyle || 'Plain Table 5').split(" - ")[0].trim();
 
               if (base === 'Table Grid 2') {
                 store.isReversed = true;
