@@ -941,6 +941,10 @@ export async function loadSyncScreen() {
 export function updateSyncButtonState() {
     const store = StoreService.getInstance();
     const syncBtn = document.getElementById('sync-btn-tag');
+    const bellIcon = document.getElementById('notification-bell');
+
+    const showNotification = store.isSyncEnabled || store.isDraftGenerated;
+
     if (syncBtn) {
         if (store.isDraftGenerated) {
             syncBtn.classList.remove('disabled');
@@ -951,6 +955,10 @@ export function updateSyncButtonState() {
             syncBtn.style.pointerEvents = 'none';
             syncBtn.style.opacity = '0.5';
         }
+    }
+
+    if (bellIcon) {
+        bellIcon.style.display = showNotification ? 'inline-block' : 'none';
     }
 }
 

@@ -406,6 +406,18 @@ function logoheader(storedUrl) {
       <!-- Theme Toggle Icon -->
       <span id="theme-toggle"><i class="fa ${themeicon} c-pointer me-3" title="Toggle Theme"></i></span>
 
+      <!-- Notification Bell Dropdown (hidden by default) -->
+      <div class="dropdown d-inline" id="notification-bell" style="display: none;">
+        <i class="fa fa-bell c-pointer me-3" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications"></i>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown">
+          <li>
+            <a class="dropdown-item" href="#" id="document-refresh-notification">
+              <i class="fa fa-refresh me-2"></i> Document updates available
+            </a>
+          </li>
+        </ul>
+      </div>
+
       <i class="fa fa-sign-out c-pointer me-3" id="logout" title="Logout"></i>
     </div>    
   `

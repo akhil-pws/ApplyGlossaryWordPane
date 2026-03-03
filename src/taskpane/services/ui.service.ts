@@ -126,7 +126,8 @@ export class UIService {
             onFormat: () => void,
             onRemoveFormat: () => void,
             onThemeToggle: () => void,
-            onLogout: () => void
+            onLogout: () => void,
+            onNotificationClick: () => void
         }
     ): void {
         document.getElementById('home')?.addEventListener('click', handlers.onHome);
@@ -136,5 +137,6 @@ export class UIService {
         document.getElementById('removeFormatting')?.addEventListener('click', handlers.onRemoveFormat);
         document.getElementById('theme-toggle')?.addEventListener('click', handlers.onThemeToggle);
         document.getElementById('logout')?.addEventListener('click', handlers.onLogout);
+        document.getElementById('document-refresh-notification')?.addEventListener('click', handlers.onNotificationClick);
     }
 }
