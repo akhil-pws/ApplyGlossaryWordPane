@@ -447,6 +447,12 @@ async function fetchDocument(action, isRefresh: boolean = false) {
           stopPingTimer();
           logout();
         }
+      },
+      onNotificationClick: async () => {
+        if (!store.isPendingResponse) {
+          const { loadSyncScreen } = await import("./draft/home");
+          loadSyncScreen();
+        }
       }
     });
 
