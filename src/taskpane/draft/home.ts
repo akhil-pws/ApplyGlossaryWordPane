@@ -941,9 +941,12 @@ export async function loadSyncScreen() {
 export function updateSyncButtonState() {
     const store = StoreService.getInstance();
     const syncBtn = document.getElementById('sync-btn-tag');
-    const bellIcon = document.getElementById('notification-bell');
+    const badge = document.getElementById('notification-badge');
+    const notificationItem = document.getElementById('document-refresh-notification');
+    const noNotificationItem = document.getElementById('no-notifications');
 
-    const showNotification = store.isSyncEnabled || store.isDraftGenerated;
+    const hasUpdates = store.isSyncEnabled || store.isDraftGenerated;
+    const notificationCount = hasUpdates ? 1 : 0;
 
     if (syncBtn) {
         if (store.isDraftGenerated) {
@@ -957,8 +960,17 @@ export function updateSyncButtonState() {
         }
     }
 
-    if (bellIcon) {
-        bellIcon.style.display = showNotification ? 'inline-block' : 'none';
+    if (badge) {
+        badge.innerText = notificationCount.toString();
+        badge.style.display = notificationCount > 0 ? 'block' : 'none';
+    }
+
+    if (notificationItem) {
+        notificationItem.style.display = hasUpdates ? 'block' : 'none';
+    }
+
+    if (noNotificationItem) {
+        noNotificationItem.style.display = hasUpdates ? 'none' : 'block';
     }
 }
 
