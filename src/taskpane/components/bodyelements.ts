@@ -416,7 +416,7 @@ function logoheader(storedUrl) {
           </li>
           <li id="document-refresh-notification" style="display: none;">
             <a class="dropdown-item" href="#">
-              <i class="fa fa-refresh me-2"></i> Document updates available
+              <i class="fa fa-refresh me-2"></i> <span>Properties have been updated in the application.</span>
             </a>
           </li>
         </ul>

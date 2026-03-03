@@ -273,7 +273,7 @@ export async function insertContentAtRange(context: Word.RequestContext, range: 
 
                     let grid = parseHtmlTableToGrid(rows);
                     const store = StoreService.getInstance();
-                    const base = store.tableStyle.split(" - ")[0].trim();
+                    const base = (store.tableStyle || 'Plain Table 5').split(" - ")[0].trim();
 
                     if (base === 'Table Grid 2') {
                         store.isReversed = true;
@@ -718,6 +718,8 @@ export async function loadSyncScreen() {
         try {
             await syncBookmarks();
             await updatePropertyStatus(store.WorkbenchID, store.jwt);
+            store.isDraftGenerated = false;
+            store.isSyncEnabled = false;
             loadHomepage(store.availableKeys);
         } catch (error) {
             console.error("Apply All error:", error);
@@ -750,6 +752,8 @@ export async function loadSyncScreen() {
         if (footer) footer.classList.add('d-none');
 
         // Automatically call updatePropertyStatus if no desynced items
+        store.isDraftGenerated = false;
+        store.isSyncEnabled = false;
         updatePropertyStatus(store.WorkbenchID, store.jwt).catch(err => console.error("Auto-Done API error:", err));
 
         return;
@@ -861,6 +865,8 @@ export async function loadSyncScreen() {
 
                             // If no more grouped items, call done API and refresh
                             if (Object.keys(groupedItems).length === 0) {
+                                store.isDraftGenerated = false;
+                                store.isSyncEnabled = false;
                                 updatePropertyStatus(store.WorkbenchID, store.jwt).catch(err => console.error("Auto-Done API error:", err));
                                 loadHomepage(store.availableKeys);
                             } else {
@@ -1306,7 +1312,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
 
                             let grid = parseHtmlTableToGrid(rows);
                             const store = StoreService.getInstance();
-                            const base = store.tableStyle.split(" - ")[0].trim();
+                            const base = (store.tableStyle || 'Plain Table 5').split(" - ")[0].trim();
 
                             if (base === 'Table Grid 2') {
                                 store.isReversed = true;
