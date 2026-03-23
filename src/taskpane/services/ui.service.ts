@@ -136,5 +136,23 @@ export class UIService {
         document.getElementById('removeFormatting')?.addEventListener('click', handlers.onRemoveFormat);
         document.getElementById('theme-toggle')?.addEventListener('click', handlers.onThemeToggle);
         document.getElementById('logout')?.addEventListener('click', handlers.onLogout);
+
+        // Toggle sticky elements to static when mode dropdown is active
+        const modeDropdownToggle = document.getElementById('modeDropdown');
+        if (modeDropdownToggle) {
+            const dropdownParent = modeDropdownToggle.parentElement;
+            if (dropdownParent) {
+                dropdownParent.addEventListener('show.bs.dropdown', () => {
+                    document.querySelectorAll('.sticky-top, .chat-header, .accordion-header').forEach(el => {
+                        el.classList.add('sticky-static');
+                    });
+                });
+                dropdownParent.addEventListener('hide.bs.dropdown', () => {
+                    document.querySelectorAll('.sticky-top, .chat-header, .accordion-header').forEach(el => {
+                        el.classList.remove('sticky-static');
+                    });
+                });
+            }
+        }
     }
 }
