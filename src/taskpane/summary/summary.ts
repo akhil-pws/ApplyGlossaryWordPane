@@ -186,7 +186,11 @@ export async function loadSummarypage(availableKeys: any[]) {
         `list-group-item list-group-item-action d-flex justify-content-between align-items-center ${themeClasses}`;
 
 
-      const tagStatus = (tag.Status === undefined || tag.Status === null) ? "1" : String(tag.Status);
+      let tagStatus = (tag.Status === undefined || tag.Status === null) ? "1" : String(tag.Status);
+
+      if (store.reprocessingTagIds[String(tag.ID || tag.ReportHeadSummaryTagID)]) {
+        tagStatus = "0";
+      }
 
       let statusIcon = "";
       if (tagStatus === "0") {
@@ -335,8 +339,13 @@ export async function loadSummarypage(availableKeys: any[]) {
       // ✅ 2) check Data.SummaryTagGenerated from GET API response
       currentSummaryStatus = getRes?.Data?.SummaryTagGenerated;
 
-      // ✅ 3) Render tags immediately
+      // ✅ 3) Update status from store if manually reprocessing
       allSummaryTags = getRes?.Data?.SummaryTags || [];
+      allSummaryTags.forEach(tag => {
+        if (store.reprocessingTagIds[String(tag.ID || tag.ReportHeadSummaryTagID)]) {
+          tag.Status = "0";
+        }
+      });
       store.summaryTagList = allSummaryTags;
       store.sourceSummaryList = deduplicateSummarySources(getRes?.Data?.SummarySources || []);
       filtered = allSummaryTags;
@@ -344,8 +353,8 @@ export async function loadSummarypage(availableKeys: any[]) {
 
       const summaryStatus = currentSummaryStatus;
 
-      // Check if any tag is still processing (status 0)
-      const hasProcessingTags = allSummaryTags.some(t => String(t.Status) === "0");
+      // Check if any tag is still processing (status 0) or manually reprocessing
+      const hasProcessingTags = allSummaryTags.some(t => String(t.Status) === "0" || store.reprocessingTagIds[String(t.ID || t.ReportHeadSummaryTagID)]);
 
       if (summaryStatus === 2 && !hasProcessingTags) {
         setReanalyzeButtonState(true);
@@ -430,6 +439,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       };
 
       await addSummaryHistory(payload, jwt);
+      store.reprocessingTagIds[String(tag.ID || tag.ReportHeadSummaryTagID)] = true;
 
       // Start polling if not already running (status 1)
       if (currentSummaryStatus !== 1) {
@@ -465,6 +475,10 @@ export async function loadSummarypage(availableKeys: any[]) {
             if (matchingTag) {
               const oldStatus = String(matchingTag.Status);
               matchingTag.Status = String(ts.Status);
+
+              if (String(ts.Status) !== "2") {
+                delete store.reprocessingTagIds[String(ts.ReportHeadSummaryTagID)];
+              }
 
               // Auto-refresh chat if currently viewing this tag and status changed from 0
               if (store.currentChatTagId === ts.ReportHeadSummaryTagID && oldStatus === "0" && String(ts.Status) !== "0") {
@@ -544,7 +558,10 @@ export async function loadSummarypage(availableKeys: any[]) {
         currentSummaryStatus = 1;
 
         // Start individual tag spinners immediately
-        allSummaryTags.forEach(t => t.Status = "0");
+        allSummaryTags.forEach(t => {
+          t.Status = "0";
+          store.reprocessingTagIds[String(t.ID || t.ReportHeadSummaryTagID)] = true;
+        });
         renderRows();
 
         const base64Data = await getWordAsBase64();
