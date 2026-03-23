@@ -1055,6 +1055,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
             const store = StoreService.getInstance();
             store.currentChatTagId = -1;
+            sessionStorage.setItem("currentChatTagId", "-1");
             if (store.mode === "Home") {
                 loadHomepage(availableKeys)
             } else if (store.mode === "Summary") {

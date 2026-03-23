@@ -812,10 +812,10 @@ export async function applyAITagFn(
                     } else if (lastParamRowIndex !== -1) {
                       const topCell = table.getCell(lastParamRowIndex, 0);
                       const bottomCell = table.getCell(rowIndex, 0);
-                      topCell.merge(bottomCell);
+                      (topCell as any).merge(bottomCell);
                       try {
                         topCell.verticalAlignment = Word.VerticalAlignment.center;
-                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered as any;
                       } catch (e) { }
                     }
                   });
@@ -1025,7 +1025,7 @@ export async function applyglossary() {
 
       // Filter out smaller terms if they are included in a larger term
       const filteredTerms = store.layTerms.filter(term => {
-        for (const biggerTerm of processedTerms) {
+        for (const biggerTerm of Array.from(processedTerms)) {
           if (typeof biggerTerm === 'string' && biggerTerm.includes(term.ClinicalTerm.toLowerCase())) {
             console.log(`Skipping "${term.ClinicalTerm}" because it's part of "${biggerTerm}"`);
             return false; // Exclude this smaller term
@@ -1040,7 +1040,7 @@ export async function applyglossary() {
 
       const foundRanges = new Map(); // Track words already processed
 
-      const searchPromises = store.filteredGlossaryTerm.map(term => {
+      const searchPromises = Array.from(store.filteredGlossaryTerm).map((term: any) => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load("items");
         return searchResults;
@@ -1406,10 +1406,11 @@ export async function addGenAITags() {
 
 
     let sourceOptions = sourceTypeList.map((src: any) => {
+      const isSummary = store.mode === "Summary";
       return `
         <li class="source-dropdown-item dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}">
+            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}" ${isSummary ? 'checked' : ''}>
             <label class="form-check-label text-prewrap" for="source${src.ID}">${src.Name}</label>
           </div>
         </li>`;
@@ -1505,8 +1506,8 @@ export async function addGenAITags() {
         // SOURCE VALIDATION
         let selectedPrimarySources = [];
         selectedPrimarySources = Array.from(sourceDropdownItems)
-          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-          .map(cb => (cb as HTMLInputElement).value);
+          .filter(cb_node => (cb_node as HTMLInputElement).checked && (cb_node as HTMLInputElement).id !== 'sourceSelectAll')
+          .map(cb_node => (cb_node as HTMLInputElement).value);
 
         if (!selectedPrimarySources.length && !isSummaryMode) {
           document.getElementById("primarySourceError").style.display = "block";
@@ -1518,8 +1519,8 @@ export async function addGenAITags() {
         if (!valid) return;
 
         const selectedSponsors = Array.from(sponsorDropdownItems)
-          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
-          .map(cb => (store.clientList.find(c => c.ID == (cb as HTMLInputElement).value) as any));
+          .filter(cb_node => (cb_node as HTMLInputElement).checked && (cb_node as HTMLInputElement).id !== 'sponsorSelectAll')
+          .map(cb_node => (store.clientList.find(c => c.ID == (cb_node as HTMLInputElement).value) as any));
 
         const selectedSources = Array.from(sourceDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
@@ -1565,7 +1566,8 @@ export async function addGenAITags() {
       };
 
       const enableSponsors = () => {
-        sponsorDropdownItems.forEach(cb => {
+        sponsorDropdownItems.forEach(cb_node => {
+          const cb = cb_node as HTMLInputElement;
           const isSelectedClient = selectedClient.some(sel => sel.ID === parseInt(cb.value));
           if (!isSelectedClient) cb.disabled = false;
         });
@@ -1612,15 +1614,16 @@ export async function addGenAITags() {
       document.querySelectorAll('.sponsor-dropdown-item').forEach(item => {
         item.addEventListener('click', function (e) {
           e.stopPropagation();
-          const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input');
-          if (!checkbox) return;
-
-          if (checkbox.id === 'sponsorSelectAll') {
-            const isChecked = (checkbox as HTMLInputElement).checked;
-            sponsorDropdownItems.forEach(cb => {
-              if (!(cb as HTMLInputElement).disabled) (cb as HTMLInputElement).checked = isChecked;
-            });
-          }
+            const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input') as HTMLInputElement;
+            if (!checkbox) return;
+  
+            if (checkbox.id === 'sponsorSelectAll') {
+              const isChecked = checkbox.checked;
+              sponsorDropdownItems.forEach(cb_node => {
+                const cb = cb_node as HTMLInputElement;
+                if (!cb.disabled) cb.checked = isChecked;
+              });
+            }
 
           updateSponsorDropdownLabel();
         });

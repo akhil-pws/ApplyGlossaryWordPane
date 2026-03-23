@@ -1,4 +1,3 @@
-import { generateCheckboxHistory } from "../draft/home";
 import { addGenAITags } from "../taskpane";
 import {
   activateSummaryMode,
@@ -216,6 +215,8 @@ export async function loadSummarypage(availableKeys: any[]) {
           </div>
         `;
           store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
+          sessionStorage.setItem("currentChatTagId", String(store.currentChatTagId));
+          const { generateCheckboxHistory } = await import("../draft/home");
           const html = await generateCheckboxHistory(tag, "Summary");
           appBody.innerHTML = html;
         } catch {
@@ -393,6 +394,7 @@ export async function loadSummarypage(availableKeys: any[]) {
     } finally {
       if (instanceId === currentSummaryInstance) {
         isSummaryLoading = false;
+        setReanalyzeButtonState(true);
         disableActionButtons(false);
         renderAll();
       }
@@ -458,21 +460,22 @@ export async function loadSummarypage(availableKeys: any[]) {
 
         // Update individual tag statuses in our local list if they exist in the response
         if (tagStatuses && tagStatuses.length > 0) {
-          tagStatuses.forEach((ts: any) => {
+          for (const ts of tagStatuses) { // Use for...of for await inside loop
             const matchingTag = allSummaryTags.find(t => (t.ReportHeadSummaryTagID || t.ID) === ts.ReportHeadSummaryTagID);
             if (matchingTag) {
               const oldStatus = String(matchingTag.Status);
-              matchingTag.Status = ts.Status;
+              matchingTag.Status = String(ts.Status);
 
               // Auto-refresh chat if currently viewing this tag and status changed from 0
               if (store.currentChatTagId === ts.ReportHeadSummaryTagID && oldStatus === "0" && String(ts.Status) !== "0") {
+                const { generateCheckboxHistory } = await import("../draft/home");
                 generateCheckboxHistory(matchingTag, "Summary").then(html => {
                   const appBody = document.getElementById('app-body');
                   if (appBody && store.currentChatTagId === ts.ReportHeadSummaryTagID) appBody.innerHTML = html;
                 });
               }
             }
-          });
+          }
           renderAll();
         }
 
@@ -482,6 +485,8 @@ export async function loadSummarypage(availableKeys: any[]) {
 
         if (status === 2 && allTagsProcessed) {
           setReanalyzeButtonState(true);
+          disableActionButtons(false);
+          isSummaryLoading = false;
 
           // after done -> fetch tags again and render
           const getRes2 = await getSummaryTagsByReportHeadId(store.documentID, store.jwt);
@@ -528,6 +533,10 @@ export async function loadSummarypage(availableKeys: any[]) {
 
     const handleAction = async (refresh: boolean) => {
       popupContainer.innerHTML = ""; // Close popup
+      if (refresh === null) {
+        // Just cancel
+        return;
+      }
       try {
         setReanalyzeButtonState(false);
         disableActionButtons(true);
@@ -569,6 +578,7 @@ export async function loadSummarypage(availableKeys: any[]) {
 
       } catch (err) {
         console.error("Refresh failed:", err);
+      } finally {
         if (instanceId === currentSummaryInstance) {
           setReanalyzeButtonState(true);
           disableActionButtons(false);
@@ -583,6 +593,25 @@ export async function loadSummarypage(availableKeys: any[]) {
 
   // ✅ Final: run new logic
   await firstLoadAndRender();
+
+  // Reopen last active Summary Tag if applicable
+  const savedTagId = sessionStorage.getItem("currentChatTagId");
+  if (savedTagId && savedTagId !== "-1") {
+    store.currentChatTagId = Number(savedTagId);
+    const activeTag = allSummaryTags.find(t => (t.ID || t.ReportHeadSummaryTagID) === store.currentChatTagId);
+    if (activeTag) {
+      const appBody = document.getElementById('app-body')!;
+      appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+      const { generateCheckboxHistory } = await import("../draft/home");
+      generateCheckboxHistory(activeTag, "Summary")
+        .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+        .then(html => {
+          if (html) {
+            appBody.innerHTML = html;
+          }
+        });
+    }
+  }
 }
 
 // ------------------ Base64 utils (unchanged) ------------------
