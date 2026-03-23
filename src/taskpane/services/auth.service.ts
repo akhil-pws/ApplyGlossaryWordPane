@@ -1,6 +1,7 @@
 import { CONFIG } from "../utils/config";
 import { UserProfile } from "../models/user.model";
 import { loginUser } from "../draft/draft.api";
+import { StoreService } from "./store.service";
 
 export class AuthService {
     private static readonly TOKEN_KEY = 'user_token';
@@ -9,18 +10,18 @@ export class AuthService {
     private static readonly PALETTE_KEY = 'colorPallete';
 
     static getStoredToken(): string | null {
-        return sessionStorage.getItem('token'); // Legacy code used sessionStorage for token
+        return localStorage.getItem('token'); 
     }
 
     static restoreSession(): any {
-        const sessionToken = sessionStorage.getItem('token');
+        const sessionToken = localStorage.getItem('token');
         if (sessionToken) {
             return {
                 jwt: sessionToken,
-                userRole: JSON.parse(sessionStorage.getItem(this.USER_ROLE_KEY) || '{}'),
-                tableStyle: sessionStorage.getItem(this.STYLE_KEY),
-                colorPallete: JSON.parse(sessionStorage.getItem(this.PALETTE_KEY) || 'null'),
-                userId: sessionStorage.getItem('userId')
+                userRole: JSON.parse(localStorage.getItem(this.USER_ROLE_KEY) || '{}'),
+                tableStyle: localStorage.getItem(this.STYLE_KEY),
+                colorPallete: JSON.parse(localStorage.getItem(this.PALETTE_KEY) || 'null'),
+                userId: localStorage.getItem('userId')
             };
         }
         return null;
@@ -37,18 +38,17 @@ export class AuthService {
                     const userRole = data.Data.UserRole;
                     const userId = data.Data.ID;
 
-                    // Store interactions in Session
-                    sessionStorage.setItem('token', jwt);
-                    sessionStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
-                    sessionStorage.setItem('userId', userId);
+                    // Store interactions in Local Storage for persistence
+                    localStorage.setItem('token', jwt);
+                    localStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
+                    localStorage.setItem('userId', userId);
 
-                    // Note: tableStyle and colorPallete are typically stored sequentially or retrieved from profile
-                    // For now, we just ensure session is clean or updated as per legacy flow which checked sessionStorage items?
-                    // Legacy flow: 
-                    // const style = sessionStorage.getItem('tableStyle');
-                    // const localPallete = sessionStorage.getItem('colorPallete');
-                    // It seems legacy flow READS from session storage if available, it doesn't SET them from login response?
-                    // Actually, it seemed to just re-read them.
+                    // Sync with StoreService and persist
+                    const store = StoreService.getInstance();
+                    store.jwt = jwt;
+                    store.UserRole = userRole;
+                    store.userId = userId;
+                    store.saveToStorage();
 
                     return {
                         success: true,
@@ -72,9 +72,12 @@ export class AuthService {
     }
 
     static logout(): void {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem(this.USER_ROLE_KEY);
-        // Add other keys
+        localStorage.removeItem('token');
+        localStorage.removeItem(this.USER_ROLE_KEY);
+        localStorage.removeItem('userId');
+        
+        const store = StoreService.getInstance();
+        store.clearStorage();
         console.log("Logged out");
     }
 }

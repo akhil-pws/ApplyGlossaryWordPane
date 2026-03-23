@@ -215,7 +215,7 @@ export async function loadSummarypage(availableKeys: any[]) {
           </div>
         `;
           store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
-          sessionStorage.setItem("currentChatTagId", String(store.currentChatTagId));
+          localStorage.setItem("currentChatTagId", String(store.currentChatTagId));
           const { generateCheckboxHistory } = await import("../draft/home");
           const html = await generateCheckboxHistory(tag, "Summary");
           appBody.innerHTML = html;
@@ -595,7 +595,7 @@ export async function loadSummarypage(availableKeys: any[]) {
   await firstLoadAndRender();
 
   // Reopen last active Summary Tag if applicable
-  const savedTagId = sessionStorage.getItem("currentChatTagId");
+  const savedTagId = localStorage.getItem("currentChatTagId");
   if (savedTagId && savedTagId !== "-1") {
     store.currentChatTagId = Number(savedTagId);
     const activeTag = allSummaryTags.find(t => (t.ID || t.ReportHeadSummaryTagID) === store.currentChatTagId);

@@ -60,9 +60,9 @@ Office.onReady((info) => {
       console.error("Failed to initialize", err);
     });
 
-    // Restore theme preference from sessionStorage
+    // Restore theme preference from Local Storage
     const store = StoreService.getInstance();
-    const savedTheme = sessionStorage.getItem('theme');
+    const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
       store.theme = savedTheme;
       UIService.applyTheme(savedTheme as 'Light' | 'Dark');
@@ -80,17 +80,17 @@ function setupEventHandlers() {
 
 async function login() {
   // document.getElementById('header').innerHTML = ``
-  const sessionToken = sessionStorage.getItem('token');
+  const sessionToken = localStorage.getItem('token');
   const store = StoreService.getInstance();
   if (sessionToken) {
-    store.UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
+    store.UserRole = JSON.parse(localStorage.getItem('userRole')) || ''
     store.jwt = sessionToken;
     window.location.hash = '#/dashboard';
-    const style = sessionStorage.getItem('tableStyle');
+    const style = localStorage.getItem('tableStyle');
     if (style) {
       store.tableStyle = style;
     }
-    const localPallete = sessionStorage.getItem('colorPallete');
+    const localPallete = localStorage.getItem('colorPallete');
     if (localPallete) {
       store.colorPallete = JSON.parse(localPallete);
     }
@@ -105,50 +105,55 @@ function loadLoginPage() {
   UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
     store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
     UIService.applyTheme(store.theme as 'Light' | 'Dark');
-    sessionStorage.setItem('theme', store.theme);
+    localStorage.setItem('theme', store.theme);
   });
 }
 
 async function handleLogin(event) {
   event.preventDefault();
+  UIService.toggleLoader(true);
 
-  const organization = (document.getElementById('organization') as HTMLInputElement).value;
-  const username = (document.getElementById('username') as HTMLInputElement).value;
-  const password = (document.getElementById('password') as HTMLInputElement).value;
+  try {
+    const organizationInput = (document.getElementById('organization') as HTMLInputElement).value;
+    const username = (document.getElementById('username') as HTMLInputElement).value;
+    const password = (document.getElementById('password') as HTMLInputElement).value;
 
-  const store = StoreService.getInstance();
+    const store = StoreService.getInstance();
+    const targetOrg = (store.organizationName || '').toLowerCase().trim();
+    const enteredOrg = (organizationInput || '').toLowerCase().trim();
 
-  if (organization.toLowerCase().trim() === store.organizationName.toLocaleLowerCase().trim()) {
-    UIService.toggleLoader(true);
+    if (enteredOrg === targetOrg && targetOrg !== '') {
+      // Use AuthService
+      const result = await AuthService.login(organizationInput, username, password);
 
-    // Use AuthService
-    const result = await AuthService.login(organization, username, password);
+      if (result.success) {
+        const data = result.data;
+        store.jwt = data.token;
+        store.UserRole = data.userRole;
+        store.userId = data.userId;
+        store.saveToStorage();
 
-    // Hide loader is handled by UI replacement or overwrite below? 
-    // Legacy code overwrote app-body with loader, so we need to be careful.
-    // Actually, legacy code replaced innerHTML with loader. calling displayMenu() replaces it again.
+        // Preserve legacy logic for style restoring
+        const style = localStorage.getItem('tableStyle');
+        if (style) store.tableStyle = style;
 
-    if (result.success) {
-      const data = result.data;
-      const store = StoreService.getInstance();
-      store.jwt = data.token;
-      store.UserRole = data.userRole;
+        const localPallete = localStorage.getItem('colorPallete');
+        if (localPallete) store.colorPallete = JSON.parse(localPallete);
 
-      // Preserve legacy logic for style restoring if it was there
-      const style = sessionStorage.getItem('tableStyle');
-      if (style) store.tableStyle = style;
-
-      const localPallete = sessionStorage.getItem('colorPallete');
-      if (localPallete) store.colorPallete = JSON.parse(localPallete);
-
-      toaster('You are successfully logged in', 'success');
-      displayMenu();
-      window.location.hash = '#/dashboard';
+        toaster('You are successfully logged in', 'success');
+        displayMenu();
+        window.location.hash = '#/dashboard';
+      } else {
+        showLoginError(result.message || "Login failed");
+      }
     } else {
-      showLoginError(result.message || "Login failed");
+      showLoginError("The organization specified is not associated with this document");
     }
-  } else {
-    showLoginError("The organization specified is not associated with this document")
+  } catch (error) {
+    console.error("Login process error:", error);
+    showLoginError("An unexpected error occurred. Please try again.");
+  } finally {
+    UIService.toggleLoader(false);
   }
 }
 
@@ -161,7 +166,7 @@ function showLoginError(message) {
 
 function displayMenu() {
   const store = StoreService.getInstance();
-  store.userId = Number(sessionStorage.getItem('userId'))
+  store.userId = Number(localStorage.getItem('userId'))
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument('Init');
 
@@ -173,7 +178,7 @@ async function getTableStyle() {
   store.customTableStyle = tableStyleObj['Data'];
   const selectedTable = store.customTableStyle.find(style => style.ID === store.dataList.TableCustomizationID);
   if (selectedTable) {
-    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+    localStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
     store.colorPallete = {
       "Header": selectedTable.Setting.HeaderColor,
       "Primary": selectedTable.Setting.PrimaryColor,
@@ -191,7 +196,7 @@ async function fetchDocument(action) {
   UIService.toggleLoader(true);
   try {
     const store = StoreService.getInstance();
-    const userId = sessionStorage.getItem('userId') || '0';
+    const userId = localStorage.getItem('userId') || '0';
     const reportData = await DocumentService.loadReportData(store.documentID, store.jwt, userId);
 
     // Assign to store
@@ -255,7 +260,7 @@ async function fetchDocument(action) {
       onThemeToggle: () => {
         store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
         UIService.applyTheme(store.theme as 'Light' | 'Dark');
-        sessionStorage.setItem('theme', store.theme);
+        localStorage.setItem('theme', store.theme);
       },
       onLogout: async () => {
         if (!store.isPendingResponse) {
@@ -616,7 +621,7 @@ async function logout() {
   if (store.isGlossaryActive) {
     await removeMatchingContentControls();
   }
-  sessionStorage.clear();
+  AuthService.logout();
   window.location.hash = '#/new';
   store.initialised = true;
   document.getElementById('logo-header').innerHTML = ``;
@@ -1679,8 +1684,8 @@ export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  const customStyleName = sessionStorage.getItem("CustomStyle") || "";
-  const defaultStyle = sessionStorage.getItem("DefaultStyle") || store.tableStyle;
+  const customStyleName = localStorage.getItem("CustomStyle") || "";
+  const defaultStyle = localStorage.getItem("DefaultStyle") || store.tableStyle;
   let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
   container.innerHTML = customizeTablePopup(styleObj, type);
 
@@ -1778,17 +1783,17 @@ export async function customizeTable(type: string) {
         store.colorPallete.Customize = true;
         store.colorPallete.IsSideHeaderBold = styleObj.Setting.IsSideHeaderBold;
         store.colorPallete.IsHeaderBold = styleObj.Setting.IsHeaderBold;
-        sessionStorage.setItem("CustomStyle", styleObj.Name);
+        localStorage.setItem("CustomStyle", styleObj.Name);
         store.tableStyle = styleObj.Setting.BaseStyle; // stores full object as 
       } else {
         store.colorPallete.Customize = false;
         store.tableStyle = dropdown.value; // normal style string
-        sessionStorage.setItem("DefaultStyle", store.tableStyle);
+        localStorage.setItem("DefaultStyle", store.tableStyle);
 
       }
 
-      sessionStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
-      sessionStorage.setItem("tableStyle", store.tableStyle);
+      localStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
+      localStorage.setItem("tableStyle", store.tableStyle);
 
       container.innerHTML = "";
     });
@@ -2332,7 +2337,7 @@ function pickRelevantBookmarks(bookmarks: string[]) {
 async function getImages() {
   try {
     const store = StoreService.getInstance();
-    const userId = sessionStorage.getItem('userId') || '0';
+    const userId = localStorage.getItem('userId') || '0';
 
     // Fetch Images and Clients in parallel
     const generalImagesPromise = getGeneralImages(store.jwt);
