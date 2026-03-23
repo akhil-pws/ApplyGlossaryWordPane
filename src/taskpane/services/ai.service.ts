@@ -22,13 +22,11 @@ export class AIService {
                     tag.SourceValueID.includes(String(list.VectorID))
                 );
 
-                tag.SourceName = selectedSources.map((item: any) => {
-                    return item.SourceName;
-                });
-                tag.Sources = tag.SourceName.join(',');
-                tag.TempSourceValue = selectedSources.map((item: any) => {
-                    return item.VectorID ? String(item.VectorID) : item.SourceValue;
-                });
+                tag.SourceName = selectedSources.map((item: any) => item.SourceName);
+                tag.Sources = [...tag.SourceName];
+                tag.TempSourceValue = selectedSources.map((item: any) =>
+                    item.VectorID ? String(item.VectorID) : item.SourceValue
+                );
 
                 tag.ReportHeadAIHistoryList.forEach((historyList: any) => {
                     historyList.Response = removeQuotes(historyList.Response);

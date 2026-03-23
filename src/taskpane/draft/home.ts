@@ -475,7 +475,7 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
     templateSelect.addEventListener('change', async () => {
         const templateId = templateSelect.value;
-        const jwt = sessionStorage.getItem('token') || '';
+        const jwt = localStorage.getItem('token') || '';
 
         const data = await getPromptTemplateById(templateId, jwt);
         if (data.Status && data.Data) {
@@ -1055,6 +1055,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
             const store = StoreService.getInstance();
             store.currentChatTagId = -1;
+            localStorage.setItem("currentChatTagId", "-1");
             if (store.mode === "Home") {
                 loadHomepage(availableKeys)
             } else if (store.mode === "Summary") {

@@ -60,9 +60,9 @@ Office.onReady((info) => {
       console.error("Failed to initialize", err);
     });
 
-    // Restore theme preference from sessionStorage
+    // Restore theme preference from Local Storage
     const store = StoreService.getInstance();
-    const savedTheme = sessionStorage.getItem('theme');
+    const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
       store.theme = savedTheme;
       UIService.applyTheme(savedTheme as 'Light' | 'Dark');
@@ -80,17 +80,17 @@ function setupEventHandlers() {
 
 async function login() {
   // document.getElementById('header').innerHTML = ``
-  const sessionToken = sessionStorage.getItem('token');
+  const sessionToken = localStorage.getItem('token');
   const store = StoreService.getInstance();
   if (sessionToken) {
-    store.UserRole = JSON.parse(sessionStorage.getItem('userRole')) || ''
+    store.UserRole = JSON.parse(localStorage.getItem('userRole')) || ''
     store.jwt = sessionToken;
     window.location.hash = '#/dashboard';
-    const style = sessionStorage.getItem('tableStyle');
+    const style = localStorage.getItem('tableStyle');
     if (style) {
       store.tableStyle = style;
     }
-    const localPallete = sessionStorage.getItem('colorPallete');
+    const localPallete = localStorage.getItem('colorPallete');
     if (localPallete) {
       store.colorPallete = JSON.parse(localPallete);
     }
@@ -105,50 +105,55 @@ function loadLoginPage() {
   UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
     store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
     UIService.applyTheme(store.theme as 'Light' | 'Dark');
-    sessionStorage.setItem('theme', store.theme);
+    localStorage.setItem('theme', store.theme);
   });
 }
 
 async function handleLogin(event) {
   event.preventDefault();
+  UIService.toggleLoader(true);
 
-  const organization = (document.getElementById('organization') as HTMLInputElement).value;
-  const username = (document.getElementById('username') as HTMLInputElement).value;
-  const password = (document.getElementById('password') as HTMLInputElement).value;
+  try {
+    const organizationInput = (document.getElementById('organization') as HTMLInputElement).value;
+    const username = (document.getElementById('username') as HTMLInputElement).value;
+    const password = (document.getElementById('password') as HTMLInputElement).value;
 
-  const store = StoreService.getInstance();
+    const store = StoreService.getInstance();
+    const targetOrg = (store.organizationName || '').toLowerCase().trim();
+    const enteredOrg = (organizationInput || '').toLowerCase().trim();
 
-  if (organization.toLowerCase().trim() === store.organizationName.toLocaleLowerCase().trim()) {
-    UIService.toggleLoader(true);
+    if (enteredOrg === targetOrg && targetOrg !== '') {
+      // Use AuthService
+      const result = await AuthService.login(organizationInput, username, password);
 
-    // Use AuthService
-    const result = await AuthService.login(organization, username, password);
+      if (result.success) {
+        const data = result.data;
+        store.jwt = data.token;
+        store.UserRole = data.userRole;
+        store.userId = data.userId;
+        store.saveToStorage();
 
-    // Hide loader is handled by UI replacement or overwrite below? 
-    // Legacy code overwrote app-body with loader, so we need to be careful.
-    // Actually, legacy code replaced innerHTML with loader. calling displayMenu() replaces it again.
+        // Preserve legacy logic for style restoring
+        const style = localStorage.getItem('tableStyle');
+        if (style) store.tableStyle = style;
 
-    if (result.success) {
-      const data = result.data;
-      const store = StoreService.getInstance();
-      store.jwt = data.token;
-      store.UserRole = data.userRole;
+        const localPallete = localStorage.getItem('colorPallete');
+        if (localPallete) store.colorPallete = JSON.parse(localPallete);
 
-      // Preserve legacy logic for style restoring if it was there
-      const style = sessionStorage.getItem('tableStyle');
-      if (style) store.tableStyle = style;
-
-      const localPallete = sessionStorage.getItem('colorPallete');
-      if (localPallete) store.colorPallete = JSON.parse(localPallete);
-
-      toaster('You are successfully logged in', 'success');
-      displayMenu();
-      window.location.hash = '#/dashboard';
+        toaster('You are successfully logged in', 'success');
+        displayMenu();
+        window.location.hash = '#/dashboard';
+      } else {
+        showLoginError(result.message || "Login failed");
+      }
     } else {
-      showLoginError(result.message || "Login failed");
+      showLoginError("The organization specified is not associated with this document");
     }
-  } else {
-    showLoginError("The organization specified is not associated with this document")
+  } catch (error) {
+    console.error("Login process error:", error);
+    showLoginError("An unexpected error occurred. Please try again.");
+  } finally {
+    UIService.toggleLoader(false);
   }
 }
 
@@ -161,7 +166,7 @@ function showLoginError(message) {
 
 function displayMenu() {
   const store = StoreService.getInstance();
-  store.userId = Number(sessionStorage.getItem('userId'))
+  store.userId = Number(localStorage.getItem('userId'))
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument('Init');
 
@@ -173,7 +178,7 @@ async function getTableStyle() {
   store.customTableStyle = tableStyleObj['Data'];
   const selectedTable = store.customTableStyle.find(style => style.ID === store.dataList.TableCustomizationID);
   if (selectedTable) {
-    sessionStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+    localStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
     store.colorPallete = {
       "Header": selectedTable.Setting.HeaderColor,
       "Primary": selectedTable.Setting.PrimaryColor,
@@ -191,7 +196,7 @@ async function fetchDocument(action) {
   UIService.toggleLoader(true);
   try {
     const store = StoreService.getInstance();
-    const userId = sessionStorage.getItem('userId') || '0';
+    const userId = localStorage.getItem('userId') || '0';
     const reportData = await DocumentService.loadReportData(store.documentID, store.jwt, userId);
 
     // Assign to store
@@ -255,7 +260,7 @@ async function fetchDocument(action) {
       onThemeToggle: () => {
         store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
         UIService.applyTheme(store.theme as 'Light' | 'Dark');
-        sessionStorage.setItem('theme', store.theme);
+        localStorage.setItem('theme', store.theme);
       },
       onLogout: async () => {
         if (!store.isPendingResponse) {
@@ -616,7 +621,7 @@ async function logout() {
   if (store.isGlossaryActive) {
     await removeMatchingContentControls();
   }
-  sessionStorage.clear();
+  AuthService.logout();
   window.location.hash = '#/new';
   store.initialised = true;
   document.getElementById('logo-header').innerHTML = ``;
@@ -812,10 +817,10 @@ export async function applyAITagFn(
                     } else if (lastParamRowIndex !== -1) {
                       const topCell = table.getCell(lastParamRowIndex, 0);
                       const bottomCell = table.getCell(rowIndex, 0);
-                      topCell.merge(bottomCell);
+                      (topCell as any).merge(bottomCell);
                       try {
                         topCell.verticalAlignment = Word.VerticalAlignment.center;
-                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.center;
+                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered as any;
                       } catch (e) { }
                     }
                   });
@@ -1025,7 +1030,7 @@ export async function applyglossary() {
 
       // Filter out smaller terms if they are included in a larger term
       const filteredTerms = store.layTerms.filter(term => {
-        for (const biggerTerm of processedTerms) {
+        for (const biggerTerm of Array.from(processedTerms)) {
           if (typeof biggerTerm === 'string' && biggerTerm.includes(term.ClinicalTerm.toLowerCase())) {
             console.log(`Skipping "${term.ClinicalTerm}" because it's part of "${biggerTerm}"`);
             return false; // Exclude this smaller term
@@ -1040,7 +1045,7 @@ export async function applyglossary() {
 
       const foundRanges = new Map(); // Track words already processed
 
-      const searchPromises = store.filteredGlossaryTerm.map(term => {
+      const searchPromises = Array.from(store.filteredGlossaryTerm).map((term: any) => {
         const searchResults = body.search(term.ClinicalTerm, { matchCase: false, matchWholeWord: false });
         searchResults.load("items");
         return searchResults;
@@ -1406,10 +1411,11 @@ export async function addGenAITags() {
 
 
     let sourceOptions = sourceTypeList.map((src: any) => {
+      const isSummary = store.mode === "Summary";
       return `
         <li class="source-dropdown-item dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}">
+            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}" ${isSummary ? 'checked' : ''}>
             <label class="form-check-label text-prewrap" for="source${src.ID}">${src.Name}</label>
           </div>
         </li>`;
@@ -1505,8 +1511,8 @@ export async function addGenAITags() {
         // SOURCE VALIDATION
         let selectedPrimarySources = [];
         selectedPrimarySources = Array.from(sourceDropdownItems)
-          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
-          .map(cb => (cb as HTMLInputElement).value);
+          .filter(cb_node => (cb_node as HTMLInputElement).checked && (cb_node as HTMLInputElement).id !== 'sourceSelectAll')
+          .map(cb_node => (cb_node as HTMLInputElement).value);
 
         if (!selectedPrimarySources.length && !isSummaryMode) {
           document.getElementById("primarySourceError").style.display = "block";
@@ -1518,8 +1524,8 @@ export async function addGenAITags() {
         if (!valid) return;
 
         const selectedSponsors = Array.from(sponsorDropdownItems)
-          .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sponsorSelectAll')
-          .map(cb => (store.clientList.find(c => c.ID == (cb as HTMLInputElement).value) as any));
+          .filter(cb_node => (cb_node as HTMLInputElement).checked && (cb_node as HTMLInputElement).id !== 'sponsorSelectAll')
+          .map(cb_node => (store.clientList.find(c => c.ID == (cb_node as HTMLInputElement).value) as any));
 
         const selectedSources = Array.from(sourceDropdownItems)
           .filter(cb => (cb as HTMLInputElement).checked && cb.id !== 'sourceSelectAll')
@@ -1565,7 +1571,8 @@ export async function addGenAITags() {
       };
 
       const enableSponsors = () => {
-        sponsorDropdownItems.forEach(cb => {
+        sponsorDropdownItems.forEach(cb_node => {
+          const cb = cb_node as HTMLInputElement;
           const isSelectedClient = selectedClient.some(sel => sel.ID === parseInt(cb.value));
           if (!isSelectedClient) cb.disabled = false;
         });
@@ -1612,15 +1619,16 @@ export async function addGenAITags() {
       document.querySelectorAll('.sponsor-dropdown-item').forEach(item => {
         item.addEventListener('click', function (e) {
           e.stopPropagation();
-          const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input');
-          if (!checkbox) return;
-
-          if (checkbox.id === 'sponsorSelectAll') {
-            const isChecked = (checkbox as HTMLInputElement).checked;
-            sponsorDropdownItems.forEach(cb => {
-              if (!(cb as HTMLInputElement).disabled) (cb as HTMLInputElement).checked = isChecked;
-            });
-          }
+            const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input') as HTMLInputElement;
+            if (!checkbox) return;
+  
+            if (checkbox.id === 'sponsorSelectAll') {
+              const isChecked = checkbox.checked;
+              sponsorDropdownItems.forEach(cb_node => {
+                const cb = cb_node as HTMLInputElement;
+                if (!cb.disabled) cb.checked = isChecked;
+              });
+            }
 
           updateSponsorDropdownLabel();
         });
@@ -1676,8 +1684,8 @@ export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  const customStyleName = sessionStorage.getItem("CustomStyle") || "";
-  const defaultStyle = sessionStorage.getItem("DefaultStyle") || store.tableStyle;
+  const customStyleName = localStorage.getItem("CustomStyle") || "";
+  const defaultStyle = localStorage.getItem("DefaultStyle") || store.tableStyle;
   let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
   container.innerHTML = customizeTablePopup(styleObj, type);
 
@@ -1775,17 +1783,17 @@ export async function customizeTable(type: string) {
         store.colorPallete.Customize = true;
         store.colorPallete.IsSideHeaderBold = styleObj.Setting.IsSideHeaderBold;
         store.colorPallete.IsHeaderBold = styleObj.Setting.IsHeaderBold;
-        sessionStorage.setItem("CustomStyle", styleObj.Name);
+        localStorage.setItem("CustomStyle", styleObj.Name);
         store.tableStyle = styleObj.Setting.BaseStyle; // stores full object as 
       } else {
         store.colorPallete.Customize = false;
         store.tableStyle = dropdown.value; // normal style string
-        sessionStorage.setItem("DefaultStyle", store.tableStyle);
+        localStorage.setItem("DefaultStyle", store.tableStyle);
 
       }
 
-      sessionStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
-      sessionStorage.setItem("tableStyle", store.tableStyle);
+      localStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
+      localStorage.setItem("tableStyle", store.tableStyle);
 
       container.innerHTML = "";
     });
@@ -2329,7 +2337,7 @@ function pickRelevantBookmarks(bookmarks: string[]) {
 async function getImages() {
   try {
     const store = StoreService.getInstance();
-    const userId = sessionStorage.getItem('userId') || '0';
+    const userId = localStorage.getItem('userId') || '0';
 
     // Fetch Images and Clients in parallel
     const generalImagesPromise = getGeneralImages(store.jwt);

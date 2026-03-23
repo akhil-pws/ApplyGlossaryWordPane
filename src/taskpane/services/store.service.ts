@@ -2,6 +2,8 @@
 export class StoreService {
     private static instance: StoreService;
 
+    private static readonly STORAGE_KEY = 'link_ai_store_v1';
+
     // State Variables
     public jwt: string = '';
     public UserRole: any = {};
@@ -46,12 +48,68 @@ export class StoreService {
     public currentChatTagId: number = -1;
     public isReversed: boolean = false;
 
-    private constructor() { }
+    private constructor() {
+        this.loadFromStorage();
+    }
 
     public static getInstance(): StoreService {
         if (!StoreService.instance) {
             StoreService.instance = new StoreService();
         }
         return StoreService.instance;
+    }
+
+    /**
+     * Persist current critical state to localStorage.
+     */
+    public saveToStorage(): void {
+        const dataToSave = {
+            jwt: this.jwt,
+            UserRole: this.UserRole,
+            documentID: this.documentID,
+            organizationName: this.organizationName,
+            theme: this.theme,
+            mode: this.mode,
+            userId: this.userId,
+            tableStyle: this.tableStyle,
+            colorPallete: this.colorPallete,
+            clientId: this.clientId
+        };
+        localStorage.setItem(StoreService.STORAGE_KEY, JSON.stringify(dataToSave));
+    }
+
+    /**
+     * Rehydrate state from localStorage.
+     */
+    private loadFromStorage(): void {
+        try {
+            const stored = localStorage.getItem(StoreService.STORAGE_KEY);
+            if (stored) {
+                const data = JSON.parse(stored);
+                if (data.jwt) this.jwt = data.jwt;
+                if (data.UserRole) this.UserRole = data.UserRole;
+                if (data.documentID) this.documentID = data.documentID;
+                if (data.organizationName) this.organizationName = data.organizationName;
+                if (data.theme) this.theme = data.theme;
+                if (data.mode) this.mode = data.mode;
+                if (data.userId) this.userId = data.userId;
+                if (data.tableStyle) this.tableStyle = data.tableStyle;
+                if (data.colorPallete) this.colorPallete = data.colorPallete;
+                if (data.clientId) this.clientId = data.clientId;
+            }
+        } catch (error) {
+            console.error("Failed to load state from storage", error);
+        }
+    }
+
+    /**
+     * Clear stored state.
+     */
+    public clearStorage(): void {
+        localStorage.removeItem(StoreService.STORAGE_KEY);
+        // Reset local variables
+        this.jwt = '';
+        this.UserRole = {};
+        this.userId = 0;
     }
 }

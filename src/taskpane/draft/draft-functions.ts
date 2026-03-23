@@ -353,7 +353,7 @@ export function switchModeIcon() {
   icon.classList.remove(...Object.values(modeIconMap));
   icon.classList.add(modeIconMap[store.mode]);
 
-  sessionStorage.setItem("mode", store.mode);
+  localStorage.setItem("mode", store.mode);
 }
 
 
