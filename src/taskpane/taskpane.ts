@@ -5,6 +5,7 @@ import { DocumentService } from "./services/document.service";
 import { UIService } from "./services/ui.service";
 import { StoreService } from "./services/store.service";
 import { AIService } from "./services/ai.service";
+import { DocStorage } from "./utils/doc-storage";
 // Note: GlossaryService import removed if unused or moved
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
@@ -28,6 +29,7 @@ Office.onReady((info) => {
     DocumentService.retrieveDocumentProperties().then((props) => {
       if (props) {
         if (CONFIG.environment !== props.environment || props.environment === 'unknown') {
+          debugger
           document.getElementById('app-body').innerHTML = `
         <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
           console.log(`Custom property "documentID" not found.`);
@@ -36,7 +38,7 @@ Office.onReady((info) => {
           // documentID = props.documentID; // Moved to Store
           // organizationName = props.organizationName; // Moved to Store
           const store = StoreService.getInstance();
-          store.documentID = props.documentID;
+          store.initForDocument(props.documentID);
           store.organizationName = props.organizationName;
           store.environment = props.environment;
 
@@ -67,13 +69,7 @@ Office.onReady((info) => {
       console.error("Failed to initialize", err);
     });
 
-    // Restore theme preference from Local Storage
-    const store = StoreService.getInstance();
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      store.theme = savedTheme;
-      UIService.applyTheme(savedTheme as 'Light' | 'Dark');
-    }
+    // Theme is restored inside initForDocument → loadFromStorage, nothing extra needed here.
 
     // Setup UI
     setupEventHandlers();
@@ -86,18 +82,17 @@ function setupEventHandlers() {
 }
 
 async function login() {
-  // document.getElementById('header').innerHTML = ``
-  const sessionToken = localStorage.getItem('token');
+  const sessionToken = DocStorage.getItem('token');
   const store = StoreService.getInstance();
   if (sessionToken) {
-    store.UserRole = JSON.parse(localStorage.getItem('userRole')) || ''
+    store.UserRole = JSON.parse(DocStorage.getItem('userRole')) || ''
     store.jwt = sessionToken;
     window.location.hash = '#/dashboard';
-    const style = localStorage.getItem('tableStyle');
+    const style = DocStorage.getItem('tableStyle');
     if (style) {
       store.tableStyle = style;
     }
-    const localPallete = localStorage.getItem('colorPallete');
+    const localPallete = DocStorage.getItem('colorPallete');
     if (localPallete) {
       store.colorPallete = JSON.parse(localPallete);
     }
@@ -112,7 +107,7 @@ function loadLoginPage() {
   UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
     store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
     UIService.applyTheme(store.theme as 'Light' | 'Dark');
-    localStorage.setItem('theme', store.theme);
+    DocStorage.setItem('theme', store.theme);
   });
 }
 
@@ -141,10 +136,10 @@ async function handleLogin(event) {
         store.saveToStorage();
 
         // Preserve legacy logic for style restoring
-        const style = localStorage.getItem('tableStyle');
+        const style = DocStorage.getItem('tableStyle');
         if (style) store.tableStyle = style;
 
-        const localPallete = localStorage.getItem('colorPallete');
+        const localPallete = DocStorage.getItem('colorPallete');
         if (localPallete) store.colorPallete = JSON.parse(localPallete);
 
         toaster('You are successfully logged in', 'success');
@@ -173,7 +168,7 @@ function showLoginError(message) {
 
 function displayMenu() {
   const store = StoreService.getInstance();
-  store.userId = Number(localStorage.getItem('userId'))
+  store.userId = Number(DocStorage.getItem('userId'))
   // document.getElementById('aitag').addEventListener('click', redirectAI);
   fetchDocument('Init');
 
@@ -185,7 +180,7 @@ async function getTableStyle() {
   store.customTableStyle = tableStyleObj['Data'];
   const selectedTable = store.customTableStyle.find(style => style.ID === store.dataList.TableCustomizationID);
   if (selectedTable) {
-    localStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
+    DocStorage.setItem("CustomStyle", selectedTable ? selectedTable.Name : '');
     store.colorPallete = {
       "Header": selectedTable.Setting.HeaderColor,
       "Primary": selectedTable.Setting.PrimaryColor,
@@ -203,7 +198,7 @@ async function fetchDocument(action) {
   UIService.toggleLoader(true);
   try {
     const store = StoreService.getInstance();
-    const userId = localStorage.getItem('userId') || '0';
+    const userId = DocStorage.getItem('userId') || '0';
     const reportData = await DocumentService.loadReportData(store.documentID, store.jwt, userId);
 
     // Assign to store
@@ -267,7 +262,7 @@ async function fetchDocument(action) {
       onThemeToggle: () => {
         store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
         UIService.applyTheme(store.theme as 'Light' | 'Dark');
-        localStorage.setItem('theme', store.theme);
+        DocStorage.setItem('theme', store.theme);
       },
       onLogout: async () => {
         if (!store.isPendingResponse) {
@@ -629,6 +624,8 @@ async function logout() {
     await removeMatchingContentControls();
   }
   AuthService.logout();
+  DocStorage.clearAll();
+  sessionStorage.clear();
   window.location.hash = '#/new';
   store.initialised = true;
   document.getElementById('logo-header').innerHTML = ``;
@@ -1691,8 +1688,8 @@ export async function customizeTable(type: string) {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  const customStyleName = localStorage.getItem("CustomStyle") || "";
-  const defaultStyle = localStorage.getItem("DefaultStyle") || store.tableStyle;
+  const customStyleName = DocStorage.getItem("CustomStyle") || "";
+  const defaultStyle = DocStorage.getItem("DefaultStyle") || store.tableStyle;
   let styleObj: any = type === "Custom" ? customStyleName : defaultStyle;
   container.innerHTML = customizeTablePopup(styleObj, type);
 
@@ -1790,17 +1787,17 @@ export async function customizeTable(type: string) {
         store.colorPallete.Customize = true;
         store.colorPallete.IsSideHeaderBold = styleObj.Setting.IsSideHeaderBold;
         store.colorPallete.IsHeaderBold = styleObj.Setting.IsHeaderBold;
-        localStorage.setItem("CustomStyle", styleObj.Name);
+        DocStorage.setItem("CustomStyle", styleObj.Name);
         store.tableStyle = styleObj.Setting.BaseStyle; // stores full object as 
       } else {
         store.colorPallete.Customize = false;
         store.tableStyle = dropdown.value; // normal style string
-        localStorage.setItem("DefaultStyle", store.tableStyle);
+        DocStorage.setItem("DefaultStyle", store.tableStyle);
 
       }
 
-      localStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
-      localStorage.setItem("tableStyle", store.tableStyle);
+      DocStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
+      DocStorage.setItem("tableStyle", store.tableStyle);
 
       container.innerHTML = "";
     });
@@ -2344,7 +2341,7 @@ function pickRelevantBookmarks(bookmarks: string[]) {
 async function getImages() {
   try {
     const store = StoreService.getInstance();
-    const userId = localStorage.getItem('userId') || '0';
+    const userId = DocStorage.getItem('userId') || '0';
 
     // Fetch Images and Clients in parallel
     const generalImagesPromise = getGeneralImages(store.jwt);

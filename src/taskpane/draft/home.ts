@@ -7,6 +7,7 @@ import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyel
 import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
+import { DocStorage } from "../utils/doc-storage";
 
 let preview = '';
 
@@ -475,7 +476,7 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
     templateSelect.addEventListener('change', async () => {
         const templateId = templateSelect.value;
-        const jwt = localStorage.getItem('token') || '';
+        const jwt = DocStorage.getItem('token') || '';
 
         const data = await getPromptTemplateById(templateId, jwt);
         if (data.Status && data.Data) {
@@ -1055,7 +1056,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
             const store = StoreService.getInstance();
             store.currentChatTagId = -1;
-            localStorage.setItem("currentChatTagId", "-1");
+            DocStorage.setItem("currentChatTagId", "-1");
             if (store.mode === "Home") {
                 loadHomepage(availableKeys)
             } else if (store.mode === "Summary") {
