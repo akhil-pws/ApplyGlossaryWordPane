@@ -44,6 +44,8 @@ export class StoreService {
         "IsHeaderBold": true,
         "IsSideHeaderBold": false
     };
+    public environment: string = '';
+
     public customTableStyle: any[] = [];
     public currentChatTagId: number = -1;
     public isReversed: boolean = false;

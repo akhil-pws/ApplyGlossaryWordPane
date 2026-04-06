@@ -27,30 +27,37 @@ Office.onReady((info) => {
     // Retrieve Properties via Service
     DocumentService.retrieveDocumentProperties().then((props) => {
       if (props) {
-        // Update local state for legacy compatibility
-        // documentID = props.documentID; // Moved to Store
-        // organizationName = props.organizationName; // Moved to Store
-        const store = StoreService.getInstance();
-        store.documentID = props.documentID;
-        store.organizationName = props.organizationName;
-
-
-        // Check Session
-        const session = AuthService.restoreSession();
-        if (session) {
-          // Restore session state
-          store.jwt = session.jwt;
-          store.UserRole = session.userRole;
-          if (session.tableStyle) store.tableStyle = session.tableStyle;
-          if (session.colorPallete) store.colorPallete = session.colorPallete;
-
-          window.location.hash = '#/dashboard';
-          toaster('You are successfully logged in', 'success');
-          displayMenu(); // Trigger legacy menu display
+        if (CONFIG.environment !== props.environment || props.environment === 'unknown') {
+          document.getElementById('app-body').innerHTML = `
+        <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
+          console.log(`Custom property "documentID" not found.`);
         } else {
-          loadLoginPage();
-        }
+          // Update local state for legacy compatibility
+          // documentID = props.documentID; // Moved to Store
+          // organizationName = props.organizationName; // Moved to Store
+          const store = StoreService.getInstance();
+          store.documentID = props.documentID;
+          store.organizationName = props.organizationName;
+          store.environment = props.environment;
 
+
+
+          // Check Session
+          const session = AuthService.restoreSession();
+          if (session) {
+            // Restore session state
+            store.jwt = session.jwt;
+            store.UserRole = session.userRole;
+            if (session.tableStyle) store.tableStyle = session.tableStyle;
+            if (session.colorPallete) store.colorPallete = session.colorPallete;
+
+            window.location.hash = '#/dashboard';
+            toaster('You are successfully logged in', 'success');
+            displayMenu(); // Trigger legacy menu display
+          } else {
+            loadLoginPage();
+          }
+        }
       } else {
         document.getElementById('app-body').innerHTML = `
         <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
@@ -1619,16 +1626,16 @@ export async function addGenAITags() {
       document.querySelectorAll('.sponsor-dropdown-item').forEach(item => {
         item.addEventListener('click', function (e) {
           e.stopPropagation();
-            const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input') as HTMLInputElement;
-            if (!checkbox) return;
-  
-            if (checkbox.id === 'sponsorSelectAll') {
-              const isChecked = checkbox.checked;
-              sponsorDropdownItems.forEach(cb_node => {
-                const cb = cb_node as HTMLInputElement;
-                if (!cb.disabled) cb.checked = isChecked;
-              });
-            }
+          const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input') as HTMLInputElement;
+          if (!checkbox) return;
+
+          if (checkbox.id === 'sponsorSelectAll') {
+            const isChecked = checkbox.checked;
+            sponsorDropdownItems.forEach(cb_node => {
+              const cb = cb_node as HTMLInputElement;
+              if (!cb.disabled) cb.checked = isChecked;
+            });
+          }
 
           updateSponsorDropdownLabel();
         });
