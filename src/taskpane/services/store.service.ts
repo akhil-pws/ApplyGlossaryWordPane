@@ -1,4 +1,6 @@
 
+import { DocStorage, setDocStorageId } from '../utils/doc-storage';
+
 export class StoreService {
     private static instance: StoreService;
 
@@ -44,13 +46,16 @@ export class StoreService {
         "IsHeaderBold": true,
         "IsSideHeaderBold": false
     };
+    public environment: string = '';
+
     public customTableStyle: any[] = [];
     public currentChatTagId: number = -1;
     public isReversed: boolean = false;
     public reprocessingTagIds: { [key: string]: boolean } = {};
 
     private constructor() {
-        this.loadFromStorage();
+        // Do NOT load from storage here — documentID is not yet known.
+        // Call initForDocument(docId) after retrieving the document properties.
     }
 
     public static getInstance(): StoreService {
@@ -61,7 +66,17 @@ export class StoreService {
     }
 
     /**
-     * Persist current critical state to localStorage.
+     * Must be called once, after documentID is known (from document properties).
+     * Scopes all localStorage I/O to this document and rehydrates saved state.
+     */
+    public initForDocument(docId: string): void {
+        this.documentID = docId;
+        setDocStorageId(docId);
+        this.loadFromStorage();
+    }
+
+    /**
+     * Persist current critical state to localStorage (scoped to this document).
      */
     public saveToStorage(): void {
         const dataToSave = {
@@ -76,20 +91,19 @@ export class StoreService {
             colorPallete: this.colorPallete,
             clientId: this.clientId
         };
-        localStorage.setItem(StoreService.STORAGE_KEY, JSON.stringify(dataToSave));
+        DocStorage.setItem(StoreService.STORAGE_KEY, JSON.stringify(dataToSave));
     }
 
     /**
-     * Rehydrate state from localStorage.
+     * Rehydrate state from localStorage (scoped to this document).
      */
     private loadFromStorage(): void {
         try {
-            const stored = localStorage.getItem(StoreService.STORAGE_KEY);
+            const stored = DocStorage.getItem(StoreService.STORAGE_KEY);
             if (stored) {
                 const data = JSON.parse(stored);
                 if (data.jwt) this.jwt = data.jwt;
                 if (data.UserRole) this.UserRole = data.UserRole;
-                if (data.documentID) this.documentID = data.documentID;
                 if (data.organizationName) this.organizationName = data.organizationName;
                 if (data.theme) this.theme = data.theme;
                 if (data.mode) this.mode = data.mode;
@@ -104,10 +118,10 @@ export class StoreService {
     }
 
     /**
-     * Clear stored state.
+     * Clear stored state for this document.
      */
     public clearStorage(): void {
-        localStorage.removeItem(StoreService.STORAGE_KEY);
+        DocStorage.removeItem(StoreService.STORAGE_KEY);
         // Reset local variables
         this.jwt = '';
         this.UserRole = {};

@@ -2,6 +2,7 @@ import { toaster } from "../components/bodyelements";
 import { generateCheckboxHistory } from "./home";
 import { wordTableStyleLocales } from "../components/tablestyles";
 import { StoreService } from "../services/store.service";
+import { DocStorage } from "../utils/doc-storage";
 
 export function insertLineWithHeadingStyle(
   paragraph: Word.Paragraph,
@@ -353,7 +354,7 @@ export function switchModeIcon() {
   icon.classList.remove(...Object.values(modeIconMap));
   icon.classList.add(modeIconMap[store.mode]);
 
-  localStorage.setItem("mode", store.mode);
+  DocStorage.setItem("mode", store.mode);
 }
 
 

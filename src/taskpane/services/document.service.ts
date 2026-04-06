@@ -82,7 +82,7 @@ export class DocumentService {
         }
     }
 
-    static async retrieveDocumentProperties(): Promise<{ documentID: string, organizationName: string } | null> {
+    static async retrieveDocumentProperties(): Promise<{ documentID: string, organizationName: string, environment: string } | null> {
         try {
             return await Word.run(async (context) => {
                 const properties = context.document.properties.customProperties;
@@ -92,11 +92,13 @@ export class DocumentService {
 
                 const property = properties.items.find(prop => prop.key === 'DocumentID');
                 const orgName = properties.items.find(prop => prop.key === 'Organization');
+                const environment = properties.items.find(prop => prop.key === 'Environment');
 
                 if (property && orgName) {
                     return {
                         documentID: property.value,
-                        organizationName: orgName.value
+                        organizationName: orgName.value,
+                        environment: environment ? environment.value : 'unknown' // Default to 'Production' if not set
                     };
                 } else {
                     return null;
