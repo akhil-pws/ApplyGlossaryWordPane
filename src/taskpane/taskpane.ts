@@ -28,8 +28,7 @@ Office.onReady((info) => {
     // Retrieve Properties via Service
     DocumentService.retrieveDocumentProperties().then((props) => {
       if (props) {
-        if (CONFIG.environment !== props.environment || props.environment === 'unknown') {
-          debugger
+        if (CONFIG.environment !== props.environment && props.environment !== 'unknown') {
           document.getElementById('app-body').innerHTML = `
         <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
           console.log(`Custom property "documentID" not found.`);
