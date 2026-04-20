@@ -172,14 +172,14 @@ function jsonToHtmlTable(jsonData) {
   }
 
   let normalizedData = Array.isArray(jsonData) ? jsonData : [jsonData];
-
-  // Detect if this is a list of single-property objects (disjoint labels)
-  // If so, coalesce them into a single dense row to prevent diagonal tables.
   if (normalizedData.length > 1 && normalizedData.every(item =>
     typeof item === 'object' && item !== null && Object.keys(item).length === 1
   )) {
     const keys = normalizedData.map(item => Object.keys(item)[0]);
-    if (new Set(keys).size === normalizedData.length) {
+    const nonEmptyKeys = keys.filter(k => k.trim() !== "");
+    // Detect if this is a list of single-property objects (disjoint labels)
+    // If so, coalesce them into a single dense row if non-empty keys are unique.
+    if (new Set(nonEmptyKeys).size === nonEmptyKeys.length) {
       normalizedData = [Object.assign({}, ...normalizedData)];
     }
   }
@@ -199,6 +199,7 @@ function jsonToHtmlTable(jsonData) {
   table += '</table>';
   return table;
 }
+
 
 
 
