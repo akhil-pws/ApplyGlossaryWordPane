@@ -173,16 +173,31 @@ function jsonToHtmlTable(jsonData) {
   }
 
   let normalizedData = Array.isArray(jsonData) ? jsonData : [jsonData];
+
+  // Narrative summary tables come back as [{ Label: Value }, ...].
+  // Render them as key/value rows instead of one very wide row.
   if (normalizedData.length > 1 && normalizedData.every(item =>
     typeof item === 'object' && item !== null && Object.keys(item).length === 1
   )) {
-    const keys = normalizedData.map(item => Object.keys(item)[0]);
-    const nonEmptyKeys = keys.filter(k => k.trim() !== "");
-    // Detect if this is a list of single-property objects (disjoint labels)
-    // If so, coalesce them into a single dense row if non-empty keys are unique.
-    if (new Set(nonEmptyKeys).size === nonEmptyKeys.length) {
-      normalizedData = [Object.assign({}, ...normalizedData)];
-    }
+    const keyValueRows = normalizedData
+      .map(item => {
+        const [key, value] = Object.entries(flattenObject(item))[0] || ["", ""];
+        return { key, value };
+      })
+      .filter(({ key, value }) => {
+        const cellValue = value === undefined || value === null ? "" : String(value);
+        return key.trim() !== "" || cellValue.trim() !== "";
+      });
+
+    if (keyValueRows.length === 0) return '<p>No data available</p>';
+
+    let table = '<table border="1" cellspacing="0" cellpadding="5">';
+    keyValueRows.forEach(({ key, value }) => {
+      const cellValue = value === undefined || value === null ? "" : value;
+      table += `<tr><th>${key}</th><td>${cellValue}</td></tr>`;
+    });
+    table += '</table>';
+    return table;
   }
 
   normalizedData.forEach(item => {
