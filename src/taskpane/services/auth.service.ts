@@ -46,6 +46,7 @@ export class AuthService {
 
                     // Sync with StoreService and persist
                     const store = StoreService.getInstance();
+                    store.clearStorage();
                     store.jwt = jwt;
                     store.UserRole = userRole;
                     store.userId = userId;
