@@ -126,5 +126,25 @@ export class StoreService {
         this.jwt = '';
         this.UserRole = {};
         this.userId = 0;
+        this.isReversed = false;
+        this.aiTagList = [];
+        this.summaryTagList = [];
+        this.imageList = [];
+        this.dataList = [];
+        this.selectedNames = [];
+        this.currentChatTagId = -1;
+        this.reprocessingTagIds = {};
+        this.isPendingResponse = false;
+        this.isTagUpdating = false;
+        this.tableStyle = 'Plain Table 5';
+        this.colorPallete = {
+            "Header": '#FFFFFF',
+            "Primary": '#FFFFFF',
+            "Secondary": '#FFFFFF',
+            "Customize": true,
+            "IsHeaderBold": true,
+            "IsSideHeaderBold": false
+        };
+        this.mode = 'Home';
     }
 }
