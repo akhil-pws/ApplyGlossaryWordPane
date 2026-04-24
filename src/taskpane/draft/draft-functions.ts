@@ -148,7 +148,6 @@ function jsonToHtmlTable(jsonData) {
   if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
     return '<p>No data available</p>';
   }
-
   let headers = new Set();
   let rows = [];
 
@@ -215,6 +214,7 @@ function jsonToHtmlTable(jsonData) {
   table += '</table>';
   return table;
 }
+
 
 
 export function generateChatHistoryHtml(chatList: any[]): string {
@@ -908,4 +908,34 @@ export function transposeGrid(grid: string[][]): string[][] {
   }
 
   return transposed;
+}
+
+
+type TableCase = "CASE_1" | "CASE_2" | "CASE_3" | "UNKNOWN";
+
+export function detectTableCase(data: any[][]): TableCase {
+  if (!Array.isArray(data) || data.length === 0) return "UNKNOWN";
+
+  // CASE 1 → every row has exactly 2 elements (key-value)
+  if (data.every(row => Array.isArray(row) && row.length === 2)) {
+    return "CASE_1";
+  }
+
+  // Must have at least header
+  if (!Array.isArray(data[0])) return "UNKNOWN";
+
+  const headerLength = data[0].length;
+
+  // all rows same length as header
+  const validTable = data.every(row => Array.isArray(row) && row.length === headerLength);
+
+  if (!validTable) return "UNKNOWN";
+
+  // CASE 2 → header + single row
+  if (data.length === 2) return "CASE_2";
+
+  // CASE 3 → header + multiple rows
+  if (data.length > 2) return "CASE_3";
+
+  return "UNKNOWN";
 }
