@@ -30,7 +30,7 @@ Office.onReady((info) => {
       if (props) {
         if (CONFIG.environment !== props.environment && props.environment !== 'unknown') {
           document.getElementById('app-body').innerHTML = `
-        <p class="px-3 text-center">Export a document from the LINK AI application to use this functionality.</p>`
+        <p class="px-3 text-center">The document is not exported from this environment.</p>`
           console.log(`Custom property "documentID" not found.`);
         } else {
           // Update local state for legacy compatibility
