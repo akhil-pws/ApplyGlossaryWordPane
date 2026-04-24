@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid } from "./draft-functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -216,6 +216,8 @@ export async function replaceMention(word: any, type: any) {
                             }
 
                             let grid = parseHtmlTableToGrid(rows);
+                            const tableCase = detectTableCase(grid);
+
                             const store = StoreService.getInstance();
                             const base = store.tableStyle.split(" - ")[0].trim();
 
@@ -225,7 +227,7 @@ export async function replaceMention(word: any, type: any) {
                                 store.isReversed = false;
                             }
 
-                            if (store.isReversed) {
+                            if (store.isReversed && tableCase !== "CASE_1") {
                                 grid = transposeGrid(grid);
                             }
 
@@ -666,6 +668,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                             if (!rows.length) continue;
 
                             let grid = parseHtmlTableToGrid(rows);
+                            const tableCase = detectTableCase(grid);
                             const store = StoreService.getInstance();
                             const base = store.tableStyle.split(" - ")[0].trim();
 
@@ -675,7 +678,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                                 store.isReversed = false;
                             }
 
-                            if (store.isReversed) {
+                            if (store.isReversed && tableCase !== 'CASE_1') {
                                 grid = transposeGrid(grid);
                             }
 

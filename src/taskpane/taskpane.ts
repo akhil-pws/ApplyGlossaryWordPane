@@ -10,7 +10,7 @@ import { DocStorage } from "./utils/doc-storage";
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -774,6 +774,8 @@ export async function applyAITagFn(
               if (!rows.length) continue;
 
               let grid = parseHtmlTableToGrid(rows);
+              const tableCase = detectTableCase(grid);
+
               const store = StoreService.getInstance();
               const base = store.tableStyle.split(" - ")[0].trim();
 
@@ -782,7 +784,7 @@ export async function applyAITagFn(
               } else {
                 store.isReversed = false;
               }
-              if (store.isReversed) {
+              if (store.isReversed && tableCase !== "CASE_1") {
                 grid = transposeGrid(grid);
               }
 
