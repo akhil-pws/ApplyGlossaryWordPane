@@ -2250,122 +2250,134 @@ async function loadPromptTemplates() {
 
 async function logBookmarksInSelection() {
   return Word.run(async (context) => {
-
     const selection = context.document.getSelection();
 
     const rawBookmarks = await getBookmarksFromSelection(context); // internally calls context.sync()
     const bookmarks = pickRelevantBookmarks(rawBookmarks);
 
-    if (bookmarks.length === 0) {
-      // Fallback: read the clicked paragraph and find which #Tag# the cursor is inside.
-      // We cannot rely on selection.text alone because Word only gives a collapsed cursor
-      // (no text) or a single word on click — multi-word tags like #Clinical Summary# break.
-      try {
-        const store = StoreService.getInstance();
-        if (store.mode === 'Home' || store.mode === 'Summary') {
-          // Get the paragraph the cursor is sitting in
-          const para = selection.paragraphs.getFirst();
-          // Get a range from the paragraph start up to the cursor position
-          const paraStartRange = para.getRange('Start');
-          const cursorStartRange = selection.getRange('Start');
-          const beforeCursorRange = paraStartRange.expandTo(cursorStartRange);
+    try {
+      const store = StoreService.getInstance();
+      if (store.mode === 'Home' || store.mode === 'Summary') {
+        selection.load('text');
 
-          para.load('text');
-          beforeCursorRange.load('text');
-          await context.sync();
+        const para = selection.paragraphs.getFirst();
+        const paraStartRange = para.getRange('Start');
+        const cursorStartRange = selection.getRange('Start');
+        const beforeCursorRange = paraStartRange.expandTo(cursorStartRange);
 
-          const paraText = para.text || '';
-          // Length of text from para start to cursor = cursor offset within para
-          const cursorOffset = (beforeCursorRange.text || '').length;
+        para.load('text');
+        beforeCursorRange.load('text');
+        await context.sync();
 
-          // Find every #tag# pattern in the paragraph text with its char positions
-          const tagRegex = /#([^#\r\n]+)#/g;
-          let match: RegExpExecArray | null;
+        const selectedText = selection.text || '';
+        const paraText = para.text || '';
+        const cursorOffset = (beforeCursorRange.text || '').length;
 
-          while ((match = tagRegex.exec(paraText)) !== null) {
-            const tagStart = match.index;
-            const tagEnd = match.index + match[0].length;
+        const tagRegex = /#([^#\r\n]+)#/g;
+        let match: RegExpExecArray | null;
 
-            // Only act if the cursor is within this tag's character span
-            if (cursorOffset >= tagStart && cursorOffset <= tagEnd) {
-              const tagName = match[1].trim();
+        const matchedNames = [...bookmarks];
 
-              if (store.mode === 'Home') {
-                const aiTag = store.availableKeys.find(k =>
-                  k.AIFlag === 1 &&
-                  k.DisplayName.toLowerCase() === tagName.toLowerCase()
-                );
-                if (aiTag) {
-                  const appBody = document.getElementById('app-body');
-                  appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                  appBody.innerHTML = await generateCheckboxHistory(aiTag, "AITag");
-                  return;
-                }
-              } else if (store.mode === 'Summary') {
-                const summaryTag = store.summaryTagList?.find(k =>
-                  k.Name?.toLowerCase() === tagName.toLowerCase()
-                );
-                if (summaryTag) {
-                  const appBody = document.getElementById('app-body');
-                  appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                  appBody.innerHTML = await generateCheckboxHistory(summaryTag, "Summary");
-                  return;
+        // Helper to find matching tag in current mode
+        const findTag = (tagName: string) => {
+          if (store.mode === 'Home') {
+            return store.availableKeys.find(k =>
+              k.AIFlag === 1 &&
+              (k.DisplayName.toLowerCase() === tagName.toLowerCase() ||
+                `id${k.ID}`.toLowerCase() === tagName.toLowerCase())
+            );
+          } else if (store.mode === 'Summary') {
+            return store.summaryTagList?.find(k =>
+              k.Name?.toLowerCase() === tagName.toLowerCase() ||
+              `sm${k.ID || k.ReportHeadSummaryTagID}`.toLowerCase() === tagName.toLowerCase()
+            );
+          }
+          return null;
+        };
+
+        // Case 1: Selection is not empty, check if it contains matching keys
+        if (selectedText.trim().length > 0) {
+          while ((match = tagRegex.exec(selectedText)) !== null) {
+            const tagName = match[1].trim();
+            const tag = findTag(tagName);
+            if (tag) {
+              const nameToPush = store.mode === 'Home' ? tag.DisplayName : tag.Name;
+              if (nameToPush) {
+                const isAlreadyAdded = matchedNames.some(existingName => {
+                  if (store.mode === 'Home') {
+                    return existingName.toLowerCase() === nameToPush.toLowerCase() ||
+                           existingName.toLowerCase() === `id${tag.ID}`.toLowerCase();
+                  } else {
+                    return existingName.toLowerCase() === nameToPush.toLowerCase() ||
+                           existingName.toLowerCase() === `sm${tag.ID || tag.ReportHeadSummaryTagID}`.toLowerCase();
+                  }
+                });
+
+                if (!isAlreadyAdded) {
+                  matchedNames.push(nameToPush);
                 }
               }
             }
           }
         }
-      } catch (e) {
-        console.error('Tag placeholder detection error:', e);
-      }
 
-      document.getElementById('tags-in-selected-text')
-        ?.classList.replace('d-block', 'd-none');
-      return;
+        // Case 2: Selection was empty or no tags were found inside selection,
+        // look at the tag where the cursor is currently placed in the paragraph
+        if (matchedNames.length === 0) {
+          tagRegex.lastIndex = 0;
+          while ((match = tagRegex.exec(paraText)) !== null) {
+            const tagStart = match.index;
+            const tagEnd = match.index + match[0].length;
+
+            if (cursorOffset >= tagStart && cursorOffset <= tagEnd) {
+              const tagName = match[1].trim();
+              const tag = findTag(tagName);
+              if (tag) {
+                const nameToPush = store.mode === 'Home' ? tag.DisplayName : tag.Name;
+                if (nameToPush) {
+                  matchedNames.push(nameToPush);
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        if (matchedNames.length > 1) {
+          document.getElementById('tags-in-selected-text')
+            ?.classList.replace('d-none', 'd-block');
+          store.selectedNames = matchedNames;
+          renderSelectedTags(store.selectedNames, store.availableKeys);
+          return;
+        } else if (matchedNames.length === 1) {
+          const singleName = matchedNames[0];
+          const tag = findTag(singleName);
+          if (tag) {
+            const appBody = document.getElementById('app-body');
+            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+
+            await selectMatchingBookmarkFromSelection(singleName);
+
+            if (store.mode === 'Home') {
+              appBody.innerHTML = await generateCheckboxHistory(tag, "AITag");
+            } else if (store.mode === 'Summary') {
+              appBody.innerHTML = await generateCheckboxHistory(tag, "Summary");
+            }
+
+            document.getElementById('tags-in-selected-text')
+              ?.classList.replace('d-none', 'd-block');
+            store.selectedNames = [singleName];
+            renderSelectedTags(store.selectedNames, store.availableKeys);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Tag placeholder detection error:', e);
     }
 
     document.getElementById('tags-in-selected-text')
-      ?.classList.replace('d-none', 'd-block');
-
-    if (bookmarks.length > 1) {
-      const store = StoreService.getInstance();
-      store.selectedNames = bookmarks;
-      renderSelectedTags(store.selectedNames, store.availableKeys);
-      return;
-    }
-
-    // Single bookmark
-    const seachBox = document.getElementById('search-box') as HTMLInputElement;
-    if (seachBox) {
-      const processedName = bookmarks[0];
-      const store = StoreService.getInstance();
-      store.selectedNames = [processedName];
-      selectMatchingBookmarkFromSelection(processedName);
-
-      const aiTag = (store.mode === 'Home') ? store.availableKeys.find(k =>
-        k.AIFlag === 1 &&
-        (k.DisplayName.toLowerCase() === processedName.toLowerCase() ||
-          `id${k.ID}`.toLowerCase() === processedName.toLowerCase())
-      ) : null;
-
-      const summaryTag = (store.mode === 'Summary') ? store.summaryTagList.find(k =>
-      (k.Name?.toLowerCase() === processedName.toLowerCase() ||
-        `sm${k.ID || k.ReportHeadSummaryTagID}`.toLowerCase() === processedName.toLowerCase())
-      ) : null;
-
-      if (!aiTag && !summaryTag) return;
-
-      const appBody = document.getElementById('app-body');
-      appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-
-      if (aiTag) {
-        appBody.innerHTML = await generateCheckboxHistory(aiTag, "AITag");
-      } else if (summaryTag) {
-        appBody.innerHTML = await generateCheckboxHistory(summaryTag, "Summary");
-      }
-    }
-
-
+      ?.classList.replace('d-block', 'd-none');
   });
 }
 
