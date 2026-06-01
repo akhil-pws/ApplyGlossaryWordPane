@@ -28,9 +28,9 @@ Office.onReady((info) => {
     // Retrieve Properties via Service
     DocumentService.retrieveDocumentProperties().then((props) => {
       if (props) {
-        if (CONFIG.environment !== props.environment && props.environment !== 'unknown') {
+        if (!CONFIG.environment.includes(props.environment) && props.environment !== 'unknown') {
           document.getElementById('app-body').innerHTML = `
-        <p class="px-3 text-center">The document is not exported from this environment.</p>`
+        <p class="px-3 text-center">The document is not exported from this environment</p>`
           console.log(`Custom property "documentID" not found.`);
         } else {
           // Update local state for legacy compatibility
@@ -40,8 +40,9 @@ Office.onReady((info) => {
           store.initForDocument(props.documentID);
           store.organizationName = props.organizationName;
           store.environment = props.environment;
-
-
+          if (props.URL) {
+            CONFIG.dataUrl = props.URL
+          }
 
           // Check Session
           const session = AuthService.restoreSession();

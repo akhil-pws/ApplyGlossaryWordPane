@@ -1,7 +1,9 @@
 import { CONFIG } from "../utils/config";
 
 // api.ts
-const baseUrl = CONFIG.dataUrl // Set your actual base URL
+const baseUrl = {
+  toString: () => CONFIG.dataUrl
+} as any;
 
 export async function getSummaryTagsByReportHeadId(reportHeadId: number | string, jwt: string): Promise<any> {
   const response = await fetch(`${baseUrl}/api/summarytag/reportHead/${reportHeadId}`, {
