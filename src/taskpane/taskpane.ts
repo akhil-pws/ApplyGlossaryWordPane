@@ -2251,10 +2251,74 @@ async function loadPromptTemplates() {
 async function logBookmarksInSelection() {
   return Word.run(async (context) => {
 
-    const rawBookmarks = await getBookmarksFromSelection(context);
+    const selection = context.document.getSelection();
+
+    const rawBookmarks = await getBookmarksFromSelection(context); // internally calls context.sync()
     const bookmarks = pickRelevantBookmarks(rawBookmarks);
 
     if (bookmarks.length === 0) {
+      // Fallback: read the clicked paragraph and find which #Tag# the cursor is inside.
+      // We cannot rely on selection.text alone because Word only gives a collapsed cursor
+      // (no text) or a single word on click — multi-word tags like #Clinical Summary# break.
+      try {
+        const store = StoreService.getInstance();
+        if (store.mode === 'Home' || store.mode === 'Summary') {
+          // Get the paragraph the cursor is sitting in
+          const para = selection.paragraphs.getFirst();
+          // Get a range from the paragraph start up to the cursor position
+          const paraStartRange = para.getRange('Start');
+          const cursorStartRange = selection.getRange('Start');
+          const beforeCursorRange = paraStartRange.expandTo(cursorStartRange);
+
+          para.load('text');
+          beforeCursorRange.load('text');
+          await context.sync();
+
+          const paraText = para.text || '';
+          // Length of text from para start to cursor = cursor offset within para
+          const cursorOffset = (beforeCursorRange.text || '').length;
+
+          // Find every #tag# pattern in the paragraph text with its char positions
+          const tagRegex = /#([^#\r\n]+)#/g;
+          let match: RegExpExecArray | null;
+
+          while ((match = tagRegex.exec(paraText)) !== null) {
+            const tagStart = match.index;
+            const tagEnd = match.index + match[0].length;
+
+            // Only act if the cursor is within this tag's character span
+            if (cursorOffset >= tagStart && cursorOffset <= tagEnd) {
+              const tagName = match[1].trim();
+
+              if (store.mode === 'Home') {
+                const aiTag = store.availableKeys.find(k =>
+                  k.AIFlag === 1 &&
+                  k.DisplayName.toLowerCase() === tagName.toLowerCase()
+                );
+                if (aiTag) {
+                  const appBody = document.getElementById('app-body');
+                  appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+                  appBody.innerHTML = await generateCheckboxHistory(aiTag, "AITag");
+                  return;
+                }
+              } else if (store.mode === 'Summary') {
+                const summaryTag = store.summaryTagList?.find(k =>
+                  k.Name?.toLowerCase() === tagName.toLowerCase()
+                );
+                if (summaryTag) {
+                  const appBody = document.getElementById('app-body');
+                  appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+                  appBody.innerHTML = await generateCheckboxHistory(summaryTag, "Summary");
+                  return;
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Tag placeholder detection error:', e);
+      }
+
       document.getElementById('tags-in-selected-text')
         ?.classList.replace('d-block', 'd-none');
       return;
