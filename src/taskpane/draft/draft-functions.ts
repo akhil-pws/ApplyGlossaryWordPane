@@ -312,42 +312,75 @@ export function renderSelectedTags(selectedNames, availableKeys) {
       selectedNames.find(name => name.toLowerCase() === lowerName)
     );
 
+    const store = StoreService.getInstance();
 
     uniqueNames.forEach(name => {
-      let aiTag;
+      if (store.mode === 'Summary') {
+        let summaryTag;
+        if (/^SM\d+$/i.test(name)) {
+          summaryTag = store.summaryTagList?.find(
+            k => `sm${k.ID || k.ReportHeadSummaryTagID}`.toLowerCase() === name.toLowerCase()
+          );
+        } else {
+          summaryTag = store.summaryTagList?.find(
+            k => k.Name?.toLowerCase() === name.toLowerCase()
+          );
+        }
 
-      if (/^ID\d+$/i.test(name)) {
-        aiTag = availableKeys.find(
-          mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
-        );
+        if (summaryTag?.Name) {
+          const badge = document.createElement('span');
+          badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
+          badge.style.cursor = 'pointer';
+          badge.innerHTML = `${summaryTag.Name} <i class="fa-solid fa-wand-magic-sparkles ms-2 text-muted" aria-label="Summary Tag"></i>`;
+          badge.addEventListener('click', async () => {
+            await selectMatchingBookmarkFromSelection(name);
+
+            if (summaryTag) {
+              const appBody = document.getElementById('app-body');
+              appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+
+              generateCheckboxHistory(summaryTag, "Summary").then(html => {
+                appBody.innerHTML = html;
+              });
+            }
+          });
+          badgeWrapper.appendChild(badge);
+        }
       } else {
-        aiTag = availableKeys.find(
-          mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
-        );
-      }
-      if (aiTag?.DisplayName) {
+        let aiTag;
 
-        const badge = document.createElement('span');
-        badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
-        badge.style.cursor = 'pointer';
-        badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
-        badge.addEventListener('click', async () => {
-          await selectMatchingBookmarkFromSelection(name);
+        if (/^ID\d+$/i.test(name)) {
+          aiTag = availableKeys.find(
+            mention => mention.AIFlag === 1 && `id${mention.ID}`.toLowerCase() === name.toLowerCase()
+          );
+        } else {
+          aiTag = availableKeys.find(
+            mention => mention.AIFlag === 1 && mention.DisplayName.toLowerCase() === name.toLowerCase()
+          );
+        }
+        if (aiTag?.DisplayName) {
 
-          if (aiTag) {
-            const appBody = document.getElementById('app-body');
-            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+          const badge = document.createElement('span');
+          badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
+          badge.style.cursor = 'pointer';
+          badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+          badge.addEventListener('click', async () => {
+            await selectMatchingBookmarkFromSelection(name);
 
-            generateCheckboxHistory(aiTag, "AITag").then(html => {
-              appBody.innerHTML = html;
-            });
-          }
-        });
-        badgeWrapper.appendChild(badge);
+            if (aiTag) {
+              const appBody = document.getElementById('app-body');
+              appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+
+              generateCheckboxHistory(aiTag, "AITag").then(html => {
+                appBody.innerHTML = html;
+              });
+            }
+          });
+          badgeWrapper.appendChild(badge);
+        }
       }
     });
   }
-
 }
 
 
