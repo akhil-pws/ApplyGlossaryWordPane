@@ -10,7 +10,7 @@ import { DocStorage } from "./utils/doc-storage";
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -234,41 +234,53 @@ async function fetchDocument(action) {
 
     // Event Wiring
     UIService.attachDashboardEvents({
-      onHome: async () => {
-        if (!store.isPendingResponse) {
-          if (store.isGlossaryActive) await removeMatchingContentControls();
-          loadHomepage(store.availableKeys);
-        }
-        store.mode = 'Home';
-        switchModeIcon();
+      onHome: () => {
+        confirmSwitchChatHistory(async () => {
+          if (!store.isPendingResponse) {
+            if (store.isGlossaryActive) await removeMatchingContentControls();
+            loadHomepage(store.availableKeys);
+          }
+          store.mode = 'Home';
+          switchModeIcon();
+        });
       },
-      onSummary: async () => {
-        if (!store.isPendingResponse) {
-          if (store.isGlossaryActive) await removeMatchingContentControls();
-          loadSummarypage(store.availableKeys);
-        }
-        store.mode = 'Summary';
-        switchModeIcon();
+      onSummary: () => {
+        confirmSwitchChatHistory(async () => {
+          if (!store.isPendingResponse) {
+            if (store.isGlossaryActive) await removeMatchingContentControls();
+            loadSummarypage(store.availableKeys);
+          }
+          store.mode = 'Summary';
+          switchModeIcon();
+        });
       },
       onGlossary: () => {
-        if (store.emptyFormat) fetchGlossary();
+        confirmSwitchChatHistory(() => {
+          if (store.emptyFormat) fetchGlossary();
+        });
       },
       onFormat: () => {
-        if (!store.isPendingResponse) formatOptionsDisplay();
+        confirmSwitchChatHistory(() => {
+          if (!store.isPendingResponse) formatOptionsDisplay();
+        });
       },
       onRemoveFormat: () => {
-        if (Object.keys(store.capturedFormatting).length > 0) removeOptionsConfirmation();
+        confirmSwitchChatHistory(() => {
+          if (Object.keys(store.capturedFormatting).length > 0) removeOptionsConfirmation();
+        });
       },
       onThemeToggle: () => {
         store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
         UIService.applyTheme(store.theme as 'Light' | 'Dark');
         DocStorage.setItem('theme', store.theme);
       },
-      onLogout: async () => {
-        if (!store.isPendingResponse) {
-          if (store.isGlossaryActive) await removeMatchingContentControls();
-          logout();
-        }
+      onLogout: () => {
+        confirmSwitchChatHistory(async () => {
+          if (!store.isPendingResponse) {
+            if (store.isGlossaryActive) await removeMatchingContentControls();
+            logout();
+          }
+        });
       }
     });
 
@@ -2353,21 +2365,23 @@ async function logBookmarksInSelection() {
           const singleName = matchedNames[0];
           const tag = findTag(singleName);
           if (tag) {
-            const appBody = document.getElementById('app-body');
-            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+            confirmSwitchChatHistory(async () => {
+              const appBody = document.getElementById('app-body');
+              appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-            await selectMatchingBookmarkFromSelection(singleName);
+              await selectMatchingBookmarkFromSelection(singleName);
 
-            if (store.mode === 'Home') {
-              appBody.innerHTML = await generateCheckboxHistory(tag, "AITag");
-            } else if (store.mode === 'Summary') {
-              appBody.innerHTML = await generateCheckboxHistory(tag, "Summary");
-            }
+              if (store.mode === 'Home') {
+                appBody.innerHTML = await generateCheckboxHistory(tag, "AITag");
+              } else if (store.mode === 'Summary') {
+                appBody.innerHTML = await generateCheckboxHistory(tag, "Summary");
+              }
 
-            document.getElementById('tags-in-selected-text')
-              ?.classList.replace('d-none', 'd-block');
-            store.selectedNames = [singleName];
-            renderSelectedTags(store.selectedNames, store.availableKeys);
+              document.getElementById('tags-in-selected-text')
+                ?.classList.replace('d-none', 'd-block');
+              store.selectedNames = [singleName];
+              renderSelectedTags(store.selectedNames, store.availableKeys);
+            });
             return;
           }
         }

@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase } from "./draft-functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -110,11 +110,13 @@ export function loadHomepage(availableKeys) {
 
                 listItem.onclick = () => {
                     if (isAISection) {
-                        const appBody = document.getElementById('app-body');
-                        appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-                        generateCheckboxHistory(mention, "AITag")
-                            .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
-                            .then(html => { appBody.innerHTML = html; });
+                        confirmSwitchChatHistory(() => {
+                            const appBody = document.getElementById('app-body');
+                            appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+                            generateCheckboxHistory(mention, "AITag")
+                                .catch(() => appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>')
+                                .then(html => { appBody.innerHTML = html; });
+                        });
                     } else {
                         // Properties + Images behave same
                         replaceMention(mention, mention.ComponentKeyDataType);
@@ -1057,14 +1059,16 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
         // Close button
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
-            const store = StoreService.getInstance();
-            store.currentChatTagId = -1;
-            DocStorage.setItem("currentChatTagId", "-1");
-            if (store.mode === "Home") {
-                loadHomepage(availableKeys)
-            } else if (store.mode === "Summary") {
-                loadSummarypage(availableKeys);
-            }
+            confirmSwitchChatHistory(() => {
+                const store = StoreService.getInstance();
+                store.currentChatTagId = -1;
+                DocStorage.setItem("currentChatTagId", "-1");
+                if (store.mode === "Home") {
+                    loadHomepage(availableKeys)
+                } else if (store.mode === "Summary") {
+                    loadSummarypage(availableKeys);
+                }
+            });
         });
 
         // Button: Insert Tag
