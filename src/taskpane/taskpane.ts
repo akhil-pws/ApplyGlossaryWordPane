@@ -11,7 +11,7 @@ import { DocStorage } from "./utils/doc-storage";
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
 import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft/draft-functions";
-import { addtagbody, customizeTablePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
+import { addtagbody, customizeTablePopup, customizeTextStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
 import { renderSelectedTags } from "./draft/draft-functions";
@@ -52,6 +52,7 @@ Office.onReady((info) => {
             store.UserRole = session.userRole;
             if (session.tableStyle) store.tableStyle = session.tableStyle;
             if (session.colorPallete) store.colorPallete = session.colorPallete;
+            if (session.defaultTextStyle) store.defaultTextStyle = session.defaultTextStyle;
 
             window.location.hash = '#/dashboard';
             toaster('You are successfully logged in', 'success');
@@ -91,6 +92,10 @@ async function login() {
     const style = DocStorage.getItem('tableStyle');
     if (style) {
       store.tableStyle = style;
+    }
+    const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+    if (defaultTextStyle) {
+      store.defaultTextStyle = defaultTextStyle;
     }
     const localPallete = DocStorage.getItem('colorPallete');
     if (localPallete) {
@@ -138,6 +143,9 @@ async function handleLogin(event) {
         // Preserve legacy logic for style restoring
         const style = DocStorage.getItem('tableStyle');
         if (style) store.tableStyle = style;
+
+        const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+        if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
 
         const localPallete = DocStorage.getItem('colorPallete');
         if (localPallete) store.colorPallete = JSON.parse(localPallete);
@@ -1813,6 +1821,76 @@ export async function customizeTable(type: string) {
       DocStorage.setItem("colorPallete", JSON.stringify(store.colorPallete));
       DocStorage.setItem("tableStyle", store.tableStyle);
 
+      container.innerHTML = "";
+    });
+  }
+}
+
+export async function getDocumentParagraphStyles(): Promise<string[]> {
+  return Word.run(async (context) => {
+    try {
+      const styles = context.document.getStyles();
+      styles.load("items/nameLocal,items/type");
+      await context.sync();
+      
+      const paragraphStyles = styles.items
+        .filter(style => style.type === "Paragraph" || (Word.StyleType && style.type === Word.StyleType.paragraph))
+        .map(style => style.nameLocal)
+        .sort((a, b) => a.localeCompare(b));
+        
+      return paragraphStyles.length > 0 ? paragraphStyles : ["Normal", "Body Text", "No Spacing"];
+    } catch (error) {
+      console.error("Failed to load document styles:", error);
+      return ["Normal", "Body Text", "No Spacing"];
+    }
+  });
+}
+
+export async function customizeTextStyle() {
+  const store = StoreService.getInstance();
+  const container = document.getElementById("confirmation-popup");
+  if (!container) return;
+
+  const popupClass = store.theme === 'Dark' ? 'bg-dark text-light' : 'bg-light text-dark';
+
+  // Show a loading dialog first
+  container.innerHTML = `
+    <div class="modal show d-block" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content ${popupClass}">
+          <div class="modal-body text-center p-4">
+            <i class="fa fa-spinner fa-spin fa-2x mb-2 text-primary"></i>
+            <div>Fetching styles from active document...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const availableStyles = await getDocumentParagraphStyles();
+  const currentStyle = store.defaultTextStyle || "Normal";
+
+  container.innerHTML = customizeTextStylePopup(currentStyle, availableStyles);
+
+  const cancelBtn = document.getElementById("text-style-popup-cancel");
+  const okBtn = document.getElementById("text-style-popup-confirm");
+  const dropdown = document.getElementById("text-style-dropdown") as HTMLSelectElement;
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      container.innerHTML = "";
+    });
+  }
+
+  if (okBtn && dropdown) {
+    okBtn.addEventListener("click", () => {
+      const finalStyle = dropdown.value;
+
+      store.defaultTextStyle = finalStyle;
+      DocStorage.setItem("defaultTextStyle", store.defaultTextStyle);
+      store.saveToStorage();
+
+      toaster("Default text style saved successfully", "success");
       container.innerHTML = "";
     });
   }

@@ -373,4 +373,54 @@ const navTabs = `<ul class="nav nav-tabs" id="tabList" role="tablist">
 const promptbuilderbody = `<div>hi</div>`
 
 
-export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup };
+function customizeTextStylePopup(selectedValue: string, availableStyles: string[]) {
+  const store = StoreService.getInstance();
+  const isDark = store.theme === "Dark";
+  const popupClass = isDark ? "bg-dark text-light" : "bg-light text-dark";
+  const selectClass = isDark ? "bg-dark text-light border-light" : "bg-white text-dark border-dark";
+  
+  if (selectedValue && !availableStyles.includes(selectedValue)) {
+    availableStyles.push(selectedValue);
+    availableStyles.sort((a, b) => a.localeCompare(b));
+  }
+
+  const dropdown = `
+    <div class="mb-3">
+      <label for="text-style-dropdown" class="form-label fw-bold">Select Default Paragraph Style</label>
+      <select class="form-select ${selectClass}" id="text-style-dropdown" style="max-height: 200px;">
+        ${availableStyles
+          .map(style => {
+            const isSelected = style === selectedValue;
+            return `<option value="${style}" ${isSelected ? "selected" : ""}>${style}</option>`;
+          })
+          .join("")}
+      </select>
+    </div>
+  `;
+
+  return `
+<div class="modal show d-block" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold">Default Text Style</h5>
+      </div>
+
+      <div class="modal-body">
+        ${dropdown}
+        <div class="alert alert-info py-2 small" role="alert">
+          This lists all paragraph styles available in the current Word document. The selected style will be applied by default to all inserted AI text content.
+        </div>
+      </div>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-link ${isDark ? "text-info" : "text-primary"}" id="text-style-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-white" id="text-style-popup-confirm">Ok</button>
+      </div>
+    </div>
+  </div>
+</div>
+  `;
+}
+
+export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup };

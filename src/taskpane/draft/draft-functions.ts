@@ -31,8 +31,21 @@ export function insertLineWithHeadingStyle(
     text = line.substring(2).trim();
   }
 
-  // ✅ THIS is the important line
-  paragraph.styleBuiltIn = builtInStyle;
+  // Apply configured default text style if it's the normal style
+  try {
+    if (builtInStyle === Word.BuiltInStyleName.normal) {
+      const store = StoreService.getInstance();
+      const styleName = store.defaultTextStyle || "Normal";
+      paragraph.style = styleName;
+    } else {
+      paragraph.styleBuiltIn = builtInStyle;
+    }
+  } catch (e) {
+    console.error("Error setting paragraph style, falling back to normal:", e);
+    try {
+      paragraph.styleBuiltIn = Word.BuiltInStyleName.normal;
+    } catch (err) {}
+  }
 
   const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(_(.+?)_)/g;
   let lastIndex = 0;
