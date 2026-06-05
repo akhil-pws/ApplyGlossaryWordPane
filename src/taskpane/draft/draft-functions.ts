@@ -1,4 +1,4 @@
-import { toaster } from "../components/bodyelements";
+import { toaster, Confirmationpopup } from "../components/bodyelements";
 import { generateCheckboxHistory } from "./home";
 import { wordTableStyleLocales } from "../components/tablestyles";
 import { StoreService } from "../services/store.service";
@@ -103,6 +103,40 @@ export function copyText(text: string) {
   toaster('Copied to clipboard successfully!', 'success')
 
 }
+
+export function confirmSwitchChatHistory(onConfirm: () => void, onCancel?: () => void) {
+  const chatInput = document.getElementById("chatInput") as HTMLTextAreaElement;
+  if (chatInput && chatInput.value.trim().length > 0) {
+    const container = document.getElementById('confirmation-popup');
+    if (container) {
+      container.innerHTML = Confirmationpopup('Are you sure you want to discard changes and proceed?');
+
+      setTimeout(() => {
+        const cancelBtn = document.getElementById('confirmation-popup-cancel');
+        const confirmBtn = document.getElementById('confirmation-popup-confirm');
+
+        cancelBtn?.addEventListener('click', () => {
+          container.innerHTML = '';
+          if (onCancel) onCancel();
+        });
+
+        confirmBtn?.addEventListener('click', () => {
+          container.innerHTML = '';
+          onConfirm();
+        });
+      }, 0);
+    } else {
+      if (confirm('You have unsaved changes in your chat input. Do you want to switch?')) {
+        onConfirm();
+      } else {
+        if (onCancel) onCancel();
+      }
+    }
+  } else {
+    onConfirm();
+  }
+}
+
 
 
 export function switchToPromptBuilder() {
@@ -333,16 +367,18 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.style.cursor = 'pointer';
           badge.innerHTML = `${summaryTag.Name} <i class="fa-solid fa-wand-magic-sparkles ms-2 text-muted" aria-label="Summary Tag"></i>`;
           badge.addEventListener('click', async () => {
-            await selectMatchingBookmarkFromSelection(name);
+            confirmSwitchChatHistory(async () => {
+              await selectMatchingBookmarkFromSelection(name);
 
-            if (summaryTag) {
-              const appBody = document.getElementById('app-body');
-              appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+              if (summaryTag) {
+                const appBody = document.getElementById('app-body');
+                appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-              generateCheckboxHistory(summaryTag, "Summary").then(html => {
-                appBody.innerHTML = html;
-              });
-            }
+                generateCheckboxHistory(summaryTag, "Summary").then(html => {
+                  appBody.innerHTML = html;
+                });
+              }
+            });
           });
           badgeWrapper.appendChild(badge);
         }
@@ -365,16 +401,18 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.style.cursor = 'pointer';
           badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
           badge.addEventListener('click', async () => {
-            await selectMatchingBookmarkFromSelection(name);
+            confirmSwitchChatHistory(async () => {
+              await selectMatchingBookmarkFromSelection(name);
 
-            if (aiTag) {
-              const appBody = document.getElementById('app-body');
-              appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
+              if (aiTag) {
+                const appBody = document.getElementById('app-body');
+                appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-              generateCheckboxHistory(aiTag, "AITag").then(html => {
-                appBody.innerHTML = html;
-              });
-            }
+                generateCheckboxHistory(aiTag, "AITag").then(html => {
+                  appBody.innerHTML = html;
+                });
+              }
+            });
           });
           badgeWrapper.appendChild(badge);
         }

@@ -12,6 +12,7 @@ import { UIService } from "../services/ui.service";
 import { StoreService } from "../services/store.service";
 import { DocStorage } from "../utils/doc-storage";
 import { Confirmationpopup, toaster } from "../components/bodyelements";
+import { confirmSwitchChatHistory } from "../draft/draft-functions";
 
 export var summarySelectedNames: string[] = [];
 
@@ -212,22 +213,24 @@ export async function loadSummarypage(availableKeys: any[]) {
       `;
 
       row.onclick = async () => {
-        try {
-          const appBody = document.getElementById('app-body');
-          appBody.innerHTML = `
-          <div id="button-container">
-            <div class="loader" id="loader"></div>
-          </div>
-        `;
-          store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
-          DocStorage.setItem("currentChatTagId", String(store.currentChatTagId));
-          const { generateCheckboxHistory } = await import("../draft/home");
-          const html = await generateCheckboxHistory(tag, "Summary");
-          appBody.innerHTML = html;
-        } catch {
-          document.getElementById('app-body').innerHTML =
-            '<div class="text-danger p-2">Error loading data</div>';
-        }
+        confirmSwitchChatHistory(async () => {
+          try {
+            const appBody = document.getElementById('app-body');
+            appBody.innerHTML = `
+            <div id="button-container">
+              <div class="loader" id="loader"></div>
+            </div>
+          `;
+            store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
+            DocStorage.setItem("currentChatTagId", String(store.currentChatTagId));
+            const { generateCheckboxHistory } = await import("../draft/home");
+            const html = await generateCheckboxHistory(tag, "Summary");
+            appBody.innerHTML = html;
+          } catch {
+            document.getElementById('app-body').innerHTML =
+              '<div class="text-danger p-2">Error loading data</div>';
+          }
+        });
       };
 
       list.appendChild(row);
