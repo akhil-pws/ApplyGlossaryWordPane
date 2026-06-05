@@ -9,6 +9,7 @@ export class AuthService {
     private static readonly USER_ROLE_KEY = 'userRole';
     private static readonly STYLE_KEY = 'tableStyle';
     private static readonly PALETTE_KEY = 'colorPallete';
+    private static readonly TEXT_STYLE_KEY = 'defaultTextStyle';
 
     static getStoredToken(): string | null {
         return DocStorage.getItem('token'); 
@@ -22,7 +23,8 @@ export class AuthService {
                 userRole: JSON.parse(DocStorage.getItem(this.USER_ROLE_KEY) || '{}'),
                 tableStyle: DocStorage.getItem(this.STYLE_KEY),
                 colorPallete: JSON.parse(DocStorage.getItem(this.PALETTE_KEY) || 'null'),
-                userId: DocStorage.getItem('userId')
+                userId: DocStorage.getItem('userId'),
+                defaultTextStyle: DocStorage.getItem(this.TEXT_STYLE_KEY)
             };
         }
         return null;

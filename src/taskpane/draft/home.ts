@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft-functions";
-import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, mentionDropdownFn } from "../taskpane";
+import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, customizeTextStyle, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
 import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
@@ -43,6 +43,11 @@ export function loadHomepage(availableKeys) {
                     <li>
                         <a class="dropdown-item" href="#" id="customized-table">
                             <i class="fa fa-brush me-2" aria-hidden="true"></i> Customized Tables
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#" id="default-text-style">
+                            <i class="fa fa-font me-2" aria-hidden="true"></i> Default Text Style
                         </a>
                     </li>
                 </ul>
@@ -163,6 +168,12 @@ export function loadHomepage(availableKeys) {
     document.getElementById('predefined-table').addEventListener('click', () => {
         if (!store.isPendingResponse) {
             customizeTable('Pre');
+        }
+    })
+
+    document.getElementById('default-text-style').addEventListener('click', () => {
+        if (!store.isPendingResponse) {
+            customizeTextStyle();
         }
     })
 
