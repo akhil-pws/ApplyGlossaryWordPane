@@ -33,12 +33,37 @@ export function insertLineWithHeadingStyle(
 
   // Apply configured default text style if it's the normal style
   try {
+    const store = StoreService.getInstance();
     if (builtInStyle === Word.BuiltInStyleName.normal) {
-      const store = StoreService.getInstance();
       const styleName = store.defaultTextStyle || "Normal";
       paragraph.style = styleName;
     } else {
       paragraph.styleBuiltIn = builtInStyle;
+    }
+
+    // Apply customized style properties if configured for normal text
+    if (builtInStyle === Word.BuiltInStyleName.normal && store.customizedTextStyle && store.customizedTextStyle.properties) {
+      const props = store.customizedTextStyle.properties;
+      paragraph.font.bold = props.bold;
+      paragraph.font.italic = props.italic;
+      paragraph.font.underline = props.underline ? Word.UnderlineType.single : Word.UnderlineType.none;
+      if (props.fontFamily) {
+        paragraph.font.name = props.fontFamily;
+      }
+      if (props.size) {
+        const numericSize = parseFloat(props.size);
+        if (!isNaN(numericSize)) {
+          paragraph.font.size = numericSize;
+        }
+      }
+      if (props.fontColor) {
+        paragraph.font.color = props.fontColor;
+      }
+      if (props.backgroundColor && props.backgroundColor !== "transparent") {
+        try {
+          paragraph.shadingColor = props.backgroundColor;
+        } catch (e) {}
+      }
     }
   } catch (e) {
     console.error("Error setting paragraph style, falling back to normal:", e);

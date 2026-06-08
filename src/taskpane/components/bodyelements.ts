@@ -1,5 +1,6 @@
 import { StoreService } from "../services/store.service";
 import { wordTableStyles } from "./tablestyles";
+import { customizedStyles } from "./customstyles";
 
 function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
   const body = `<div class="modal-dialog">
@@ -398,6 +399,15 @@ function customizeTextStylePopup(selectedValue: string, availableStyles: string[
     </div>
   `;
 
+  const previewContainer = `
+    <div class="mb-3">
+      <label class="form-label fw-bold">Style Preview</label>
+      <div id="text-style-preview" class="p-3 border rounded text-center" style="min-height: 80px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+        Preview Text
+      </div>
+    </div>
+  `;
+
   return `
 <div class="modal show d-block" tabindex="-1">
   <div class="modal-dialog">
@@ -408,6 +418,7 @@ function customizeTextStylePopup(selectedValue: string, availableStyles: string[
 
       <div class="modal-body">
         ${dropdown}
+        ${previewContainer}
         <div class="alert alert-info py-2 small" role="alert">
           This lists all paragraph styles available in the current Word document. The selected style will be applied by default to all inserted AI text content.
         </div>
@@ -423,4 +434,59 @@ function customizeTextStylePopup(selectedValue: string, availableStyles: string[
   `;
 }
 
-export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup };
+function customizedStylePopup(selectedValue: string, availableStyles: any[]) {
+  const store = StoreService.getInstance();
+  const isDark = store.theme === "Dark";
+  const popupClass = isDark ? "bg-dark text-light" : "bg-light text-dark";
+  const selectClass = isDark ? "bg-dark text-light border-light" : "bg-white text-dark border-dark";
+
+  const dropdown = `
+    <div class="mb-3">
+      <label for="customized-style-dropdown" class="form-label fw-bold">Select Customized Style</label>
+      <select class="form-select ${selectClass} mb-3" id="customized-style-dropdown">
+        ${availableStyles
+          .map(style => {
+            const isSelected = style.id === selectedValue;
+            return `<option value="${style.id}" ${isSelected ? "selected" : ""}>${style.name}</option>`;
+          })
+          .join("")}
+      </select>
+    </div>
+  `;
+
+  const previewContainer = `
+    <div class="mb-3">
+      <label class="form-label fw-bold">Style Preview</label>
+      <div id="customized-style-preview" class="p-3 border rounded text-center" style="min-height: 80px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+        Preview Text
+      </div>
+    </div>
+  `;
+
+  return `
+<div class="modal show d-block" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold">Customized Styles</h5>
+      </div>
+
+      <div class="modal-body">
+        ${dropdown}
+        ${previewContainer}
+        <div class="alert alert-info py-2 small" role="alert">
+          Select a style configuration to apply when inserting generated AI text.
+        </div>
+      </div>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-link ${isDark ? "text-info" : "text-primary"}" id="customized-style-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-white" id="customized-style-popup-confirm">Ok</button>
+      </div>
+    </div>
+  </div>
+</div>
+  `;
+}
+
+export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup, customizedStylePopup };
