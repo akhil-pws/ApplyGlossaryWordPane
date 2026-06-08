@@ -39,6 +39,7 @@ export class StoreService {
     public mode: string = 'Home';
     public tableStyle: string = 'Plain Table 5';
     public defaultTextStyle: string = 'Normal';
+    public customizedTextStyle: any = null;
     public colorPallete: any = {
         "Header": '#FFFFFF',
         "Primary": '#FFFFFF',
@@ -91,7 +92,8 @@ export class StoreService {
             tableStyle: this.tableStyle,
             colorPallete: this.colorPallete,
             clientId: this.clientId,
-            defaultTextStyle: this.defaultTextStyle
+            defaultTextStyle: this.defaultTextStyle,
+            customizedTextStyle: this.customizedTextStyle
         };
         DocStorage.setItem(StoreService.STORAGE_KEY, JSON.stringify(dataToSave));
     }
@@ -114,6 +116,7 @@ export class StoreService {
                 if (data.colorPallete) this.colorPallete = data.colorPallete;
                 if (data.clientId) this.clientId = data.clientId;
                 if (data.defaultTextStyle) this.defaultTextStyle = data.defaultTextStyle;
+                if (data.customizedTextStyle) this.customizedTextStyle = data.customizedTextStyle;
             }
         } catch (error) {
             console.error("Failed to load state from storage", error);
@@ -141,6 +144,7 @@ export class StoreService {
         this.isTagUpdating = false;
         this.tableStyle = 'Plain Table 5';
         this.defaultTextStyle = 'Normal';
+        this.customizedTextStyle = null;
         this.colorPallete = {
             "Header": '#FFFFFF',
             "Primary": '#FFFFFF',

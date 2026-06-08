@@ -11,9 +11,10 @@ import { DocStorage } from "./utils/doc-storage";
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
 import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft/draft-functions";
-import { addtagbody, customizeTablePopup, customizeTextStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
+import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
+import { customizedStyles } from "./components/customstyles";
 import { renderSelectedTags } from "./draft/draft-functions";
 import { loadSummarypage } from "./summary/summary";
 
@@ -1846,6 +1847,41 @@ export async function getDocumentParagraphStyles(): Promise<string[]> {
   });
 }
 
+export async function getDocumentStyleDetails(styleName: string) {
+  return Word.run(async (context) => {
+    try {
+      const styles = context.document.getStyles();
+      const style = styles.getByName(styleName);
+      style.load("font/bold,font/italic,font/underline,font/name,font/size,font/color");
+      await context.sync();
+
+      const fontUnderline = style.font.underline;
+      const hasUnderline = fontUnderline && fontUnderline.toLowerCase() !== "none";
+
+      return {
+        bold: style.font.bold || false,
+        italic: style.font.italic || false,
+        underline: hasUnderline,
+        fontFamily: style.font.name || "Calibri",
+        size: style.font.size ? `${style.font.size}pt` : "11pt",
+        fontColor: style.font.color || "#000000",
+        backgroundColor: "transparent"
+      };
+    } catch (error) {
+      console.error(`Failed to load style details for ${styleName}:`, error);
+      return {
+        bold: false,
+        italic: false,
+        underline: false,
+        fontFamily: "Calibri",
+        size: "11pt",
+        fontColor: "#000000",
+        backgroundColor: "transparent"
+      };
+    }
+  });
+}
+
 export async function customizeTextStyle() {
   const store = StoreService.getInstance();
   const container = document.getElementById("confirmation-popup");
@@ -1875,6 +1911,27 @@ export async function customizeTextStyle() {
   const cancelBtn = document.getElementById("text-style-popup-cancel");
   const okBtn = document.getElementById("text-style-popup-confirm");
   const dropdown = document.getElementById("text-style-dropdown") as HTMLSelectElement;
+  const preview = document.getElementById("text-style-preview") as HTMLDivElement;
+
+  const updatePreview = async () => {
+    if (!dropdown || !preview) return;
+    const styleName = dropdown.value;
+    preview.textContent = "Loading style details...";
+    const details = await getDocumentStyleDetails(styleName);
+    
+    preview.style.fontWeight = details.bold ? "bold" : "normal";
+    preview.style.fontStyle = details.italic ? "italic" : "normal";
+    preview.style.textDecoration = details.underline ? "underline" : "none";
+    preview.style.fontFamily = details.fontFamily;
+    preview.style.fontSize = details.size;
+    preview.style.color = details.fontColor;
+    preview.style.backgroundColor = details.backgroundColor;
+    preview.textContent = `${styleName} Preview`;
+  };
+
+  // Initial preview load
+  await updatePreview();
+  dropdown?.addEventListener("change", updatePreview);
 
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
@@ -1891,6 +1948,60 @@ export async function customizeTextStyle() {
       store.saveToStorage();
 
       toaster("Default text style saved successfully", "success");
+      container.innerHTML = "";
+    });
+  }
+}
+
+export async function customizeCustomStyle() {
+  const store = StoreService.getInstance();
+  const container = document.getElementById("confirmation-popup");
+  if (!container) return;
+
+  const currentStyleId = (store.customizedTextStyle && store.customizedTextStyle.id) || DocStorage.getItem("customTextStyleId") || customizedStyles[0].id;
+  container.innerHTML = customizedStylePopup(currentStyleId, customizedStyles);
+
+  const cancelBtn = document.getElementById("customized-style-popup-cancel");
+  const okBtn = document.getElementById("customized-style-popup-confirm");
+  const dropdown = document.getElementById("customized-style-dropdown") as HTMLSelectElement;
+  const preview = document.getElementById("customized-style-preview") as HTMLDivElement;
+
+  const applyStylePreview = () => {
+    if (!dropdown || !preview) return;
+    const selectedStyle = customizedStyles.find(s => s.id === dropdown.value);
+    if (selectedStyle) {
+      const props = selectedStyle.properties;
+      preview.style.fontWeight = props.bold ? "bold" : "normal";
+      preview.style.fontStyle = props.italic ? "italic" : "normal";
+      preview.style.textDecoration = props.underline ? "underline" : "none";
+      preview.style.fontFamily = props.fontFamily;
+      preview.style.fontSize = props.size;
+      preview.style.color = props.fontColor;
+      preview.style.backgroundColor = props.backgroundColor;
+      preview.textContent = `${selectedStyle.name} Preview`;
+    }
+  };
+
+  // Initial preview
+  applyStylePreview();
+  dropdown?.addEventListener("change", applyStylePreview);
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      container.innerHTML = "";
+    });
+  }
+
+  if (okBtn && dropdown) {
+    okBtn.addEventListener("click", () => {
+      const selectedStyle = customizedStyles.find(s => s.id === dropdown.value);
+      if (selectedStyle) {
+        store.customizedTextStyle = selectedStyle;
+        DocStorage.setItem("customTextStyleId", selectedStyle.id);
+        DocStorage.setItem("customTextStyle", JSON.stringify(selectedStyle));
+        store.saveToStorage();
+        toaster("Customized style applied successfully", "success");
+      }
       container.innerHTML = "";
     });
   }
