@@ -38,7 +38,7 @@ Office.onReady((info) => {
           // documentID = props.documentID; // Moved to Store
           // organizationName = props.organizationName; // Moved to Store
           const store = StoreService.getInstance();
-          store.initForDocument(props.documentID);
+          store.initForDocument(props.documentID, props.environment);
           store.organizationName = props.organizationName;
           store.environment = props.environment;
           if (props.URL) {
@@ -775,8 +775,14 @@ export async function applyAITagFn(
             if (!txt) continue;
 
             txt = txt.replace(/\n- /g, "\n• ");
-            for (const line of txt.split("\n")) {
-              if (!line.trim()) continue;
+            for (const line of txt.split(/\r?\n/)) {
+              if (!line.trim()) {
+                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                insertLineWithHeadingStyle(p, "");
+                include(p.getRange());
+                cursor = p.getRange();
+                continue;
+              }
 
               const p = cursor.insertParagraph("", Word.InsertLocation.after);
               insertLineWithHeadingStyle(p, line);
@@ -876,9 +882,14 @@ export async function applyAITagFn(
               if (!txt) continue;
 
               txt = txt.replace(/\n- /g, "\n• ");
-              for (const line of txt.split("\n")) {
-                if (!line.trim()) continue;
-
+              for (const line of txt.split(/\r?\n/)) {
+                if (!line.trim()) {
+                  const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                  insertLineWithHeadingStyle(p, "");
+                  include(p.getRange());
+                  cursor = p.getRange();
+                  continue;
+                }
                 const p = cursor.insertParagraph("", Word.InsertLocation.after);
                 insertLineWithHeadingStyle(p, line);
 
@@ -915,8 +926,14 @@ export async function applyAITagFn(
           .replace(/\n- /g, "\n• ")
           .trim();
 
-        for (const line of txt.split("\n")) {
-          if (!line.trim()) continue;
+        for (const line of txt.split(/\r?\n/)) {
+          if (!line.trim()) {
+            const p = cursor.insertParagraph("", Word.InsertLocation.after);
+            insertLineWithHeadingStyle(p, "");
+            include(p.getRange());
+            cursor = p.getRange();
+            continue;
+          }
 
           const p = cursor.insertParagraph("", Word.InsertLocation.after);
           insertLineWithHeadingStyle(p, line);
@@ -1438,11 +1455,10 @@ export async function addGenAITags() {
 
 
     let sourceOptions = sourceTypeList.map((src: any) => {
-      const isSummary = store.mode === "Summary";
       return `
         <li class="source-dropdown-item dropdown-item p-2" style="cursor: pointer;">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}" ${isSummary ? 'checked' : ''}>
+            <input class="form-check-input" type="checkbox" value="${src.ID}" id="source${src.ID}">
             <label class="form-check-label text-prewrap" for="source${src.ID}">${src.Name}</label>
           </div>
         </li>`;
@@ -1496,7 +1512,29 @@ export async function addGenAITags() {
 
 
     if (form && nameField && promptField && sponsorDropdownItems.length > 0 && (isSummaryMode || sourceDropdownItems.length > 0)) {
+      const updateSponsorSelectAllState = () => {
+        const selectAllCb = document.getElementById('sponsorSelectAll') as HTMLInputElement;
+        if (!selectAllCb) return;
+        const individualSponsors = Array.from(sponsorDropdownItems).filter(cb => cb.id !== 'sponsorSelectAll') as HTMLInputElement[];
+        if (individualSponsors.length === 0) {
+          selectAllCb.checked = false;
+          return;
+        }
+        const allChecked = individualSponsors.every(cb => cb.checked);
+        selectAllCb.checked = allChecked;
+      };
 
+      const updateSourceSelectAllState = () => {
+        const selectAllCb = document.getElementById('sourceSelectAll') as HTMLInputElement;
+        if (!selectAllCb) return;
+        const individualSources = Array.from(sourceDropdownItems).filter(cb => cb.id !== 'sourceSelectAll') as HTMLInputElement[];
+        if (individualSources.length === 0) {
+          selectAllCb.checked = false;
+          return;
+        }
+        const allChecked = individualSources.every(cb => cb.checked);
+        selectAllCb.checked = allChecked;
+      };
       const updateSponsorDropdownLabel = () => {
         if ((availableForAllCheckbox as HTMLInputElement).checked) {
           sponsorDropdownButton.textContent = store.clientList.map(x => x.Name).join(", ");
@@ -1509,6 +1547,7 @@ export async function addGenAITags() {
             ? selectedNames.join(", ")
             : "Select Sponsors";
         }
+        updateSponsorSelectAllState();
       };
 
       const updateSourceDropdownLabel = () => {
@@ -1522,6 +1561,7 @@ export async function addGenAITags() {
             ? selectedNames.join(", ")
             : "Select Source Types";
         }
+        updateSourceSelectAllState();
       }
 
       // Submit Handler
@@ -1646,9 +1686,15 @@ export async function addGenAITags() {
       document.querySelectorAll('.sponsor-dropdown-item').forEach(item => {
         item.addEventListener('click', function (e) {
           e.stopPropagation();
-          const checkbox = this.querySelector('.sponsor-dropdown-item .form-check-input') as HTMLInputElement;
+          const checkbox = this.querySelector('.form-check-input') as HTMLInputElement;
           if (!checkbox) return;
 
+          const target = e.target as HTMLElement;
+          if (target !== checkbox && target.tagName !== 'LABEL') {
+            if (!checkbox.disabled) {
+              checkbox.checked = !checkbox.checked;
+            }
+          }
           if (checkbox.id === 'sponsorSelectAll') {
             const isChecked = checkbox.checked;
             sponsorDropdownItems.forEach(cb_node => {
@@ -1664,13 +1710,22 @@ export async function addGenAITags() {
       document.querySelectorAll('.source-dropdown-item').forEach(item => {
         item.addEventListener('click', function (e) {
           e.stopPropagation();
-          const checkbox = this.querySelector('.source-dropdown-item .form-check-input');
+          const checkbox = this.querySelector('.form-check-input') as HTMLInputElement;
           if (!checkbox) return;
+          const target = e.target as HTMLElement;
+          if (target !== checkbox && target.tagName !== 'LABEL') {
+            if (!checkbox.disabled) {
+              checkbox.checked = !checkbox.checked;
+            }
+          }
 
           if (checkbox.id === 'sourceSelectAll') {
-            const isChecked = (checkbox as HTMLInputElement).checked;
+            const isChecked = checkbox.checked;
             sourceDropdownItems.forEach(cb => {
-              (cb as HTMLInputElement).checked = isChecked;
+              const cbInput = cb as HTMLInputElement;
+              if (!cbInput.disabled) {
+                cbInput.checked = isChecked;
+              }
             });
           }
 
@@ -1678,7 +1733,7 @@ export async function addGenAITags() {
           const selectedCount = Array.from(sourceDropdownItems)
             .filter(cb => (cb as HTMLInputElement).checked).length;
 
-          if (selectedCount === 0) {
+          if (selectedCount === 0 && !isSummaryMode) {
             document.getElementById("primarySourceError").style.display = "block";
           } else {
             document.getElementById("primarySourceError").style.display = "none";
@@ -1833,12 +1888,12 @@ export async function getDocumentParagraphStyles(): Promise<string[]> {
       const styles = context.document.getStyles();
       styles.load("items/nameLocal,items/type");
       await context.sync();
-      
+
       const paragraphStyles = styles.items
         .filter(style => style.type === "Paragraph" || (Word.StyleType && style.type === Word.StyleType.paragraph))
         .map(style => style.nameLocal)
         .sort((a, b) => a.localeCompare(b));
-        
+
       return paragraphStyles.length > 0 ? paragraphStyles : ["Normal", "Body Text", "No Spacing"];
     } catch (error) {
       console.error("Failed to load document styles:", error);
@@ -1918,7 +1973,7 @@ export async function customizeTextStyle() {
     const styleName = dropdown.value;
     preview.textContent = "Loading style details...";
     const details = await getDocumentStyleDetails(styleName);
-    
+
     preview.style.fontWeight = details.bold ? "bold" : "normal";
     preview.style.fontStyle = details.italic ? "italic" : "normal";
     preview.style.textDecoration = details.underline ? "underline" : "none";
@@ -2507,10 +2562,10 @@ async function logBookmarksInSelection() {
                 const isAlreadyAdded = matchedNames.some(existingName => {
                   if (store.mode === 'Home') {
                     return existingName.toLowerCase() === nameToPush.toLowerCase() ||
-                           existingName.toLowerCase() === `id${tag.ID}`.toLowerCase();
+                      existingName.toLowerCase() === `id${tag.ID}`.toLowerCase();
                   } else {
                     return existingName.toLowerCase() === nameToPush.toLowerCase() ||
-                           existingName.toLowerCase() === `sm${tag.ID || tag.ReportHeadSummaryTagID}`.toLowerCase();
+                      existingName.toLowerCase() === `sm${tag.ID || tag.ReportHeadSummaryTagID}`.toLowerCase();
                   }
                 });
 

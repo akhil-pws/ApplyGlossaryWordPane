@@ -71,9 +71,11 @@ export class StoreService {
      * Must be called once, after documentID is known (from document properties).
      * Scopes all localStorage I/O to this document and rehydrates saved state.
      */
-    public initForDocument(docId: string): void {
+    public initForDocument(docId: string, environment?: string): void {
         this.documentID = docId;
-        setDocStorageId(docId);
+        this.environment = environment || '';
+        const storageId = environment ? `${docId}_${environment}` : docId;
+        setDocStorageId(storageId);
         this.loadFromStorage();
     }
 
