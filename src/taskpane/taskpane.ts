@@ -12,9 +12,9 @@ import { DocStorage } from "./utils/doc-storage";
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
 import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
-import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey } from "./draft/draft.api";
+import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
-import { customizedStyles } from "./components/customstyles";
+import { mapApiStyleToCustomStyle } from "./components/customstyles";
 import { renderSelectedTags } from "./draft/draft-functions";
 import { loadSummarypage } from "./summary/summary";
 
@@ -201,6 +201,24 @@ async function getTableStyle() {
     store.tableStyle = selectedTable.Setting.BaseStyle;
   }
 
+}
+
+async function getCustomTextStyles() {
+  const store = StoreService.getInstance();
+  try {
+    const textStyleObj = await getAllCustomTexts(store.jwt);
+    if (textStyleObj && textStyleObj.Status && Array.isArray(textStyleObj.Data)) {
+      store.customizedStyles = textStyleObj.Data.map(mapApiStyleToCustomStyle);
+    } else {
+      console.warn("No custom text styles found in API.");
+      store.customizedStyles = [];
+    }
+  } catch (error) {
+    console.error("Failed to load custom text styles:", error);
+    store.customizedStyles = [];
+  } finally {
+    store.customTextStylesLoaded = true;
+  }
 }
 
 async function fetchDocument(action) {
@@ -2013,8 +2031,27 @@ export async function customizeCustomStyle() {
   const container = document.getElementById("confirmation-popup");
   if (!container) return;
 
-  const currentStyleId = (store.customizedTextStyle && store.customizedTextStyle.id) || DocStorage.getItem("customTextStyleId") || customizedStyles[0].id;
-  container.innerHTML = customizedStylePopup(currentStyleId, customizedStyles);
+  if (!store.customTextStylesLoaded) {
+    const popupClass = store.theme === 'Dark' ? 'bg-dark text-light' : 'bg-light text-dark';
+    container.innerHTML = `
+      <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content ${popupClass}">
+            <div class="modal-body text-center p-4">
+              <i class="fa fa-spinner fa-spin fa-2x mb-2 text-primary"></i>
+              <div>Fetching customized styles...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await getCustomTextStyles();
+  }
+
+  const stylesList = store.customizedStyles || [];
+  const currentStyleId = (store.customizedTextStyle && store.customizedTextStyle.id) || DocStorage.getItem("customTextStyleId") || (stylesList[0] ? stylesList[0].id : "");
+  container.innerHTML = customizedStylePopup(currentStyleId, stylesList);
 
   const cancelBtn = document.getElementById("customized-style-popup-cancel");
   const okBtn = document.getElementById("customized-style-popup-confirm");
@@ -2023,7 +2060,7 @@ export async function customizeCustomStyle() {
 
   const applyStylePreview = () => {
     if (!dropdown || !preview) return;
-    const selectedStyle = customizedStyles.find(s => s.id === dropdown.value);
+    const selectedStyle = stylesList.find(s => s.id === dropdown.value);
     if (selectedStyle) {
       const props = selectedStyle.properties;
       preview.style.fontWeight = props.bold ? "bold" : "normal";
@@ -2049,7 +2086,7 @@ export async function customizeCustomStyle() {
 
   if (okBtn && dropdown) {
     okBtn.addEventListener("click", () => {
-      const selectedStyle = customizedStyles.find(s => s.id === dropdown.value);
+      const selectedStyle = stylesList.find(s => s.id === dropdown.value);
       if (selectedStyle) {
         store.customizedTextStyle = selectedStyle;
         DocStorage.setItem("customTextStyleId", selectedStyle.id);
