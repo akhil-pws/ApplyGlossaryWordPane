@@ -672,8 +672,14 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                         if (!txt) continue;
 
                         txt = txt.replace(/\n- /g, "\n• ");
-                        for (const line of txt.split("\n")) {
-                            if (!line.trim()) continue;
+                        for (const line of txt.split(/\r?\n/)) {
+                            if (!line.trim()) {
+                                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                                insertLineWithHeadingStyle(p, "");
+                                include(p.getRange());
+                                cursor = p.getRange();
+                                continue;
+                            }
 
                             const p = cursor.insertParagraph("", Word.InsertLocation.after);
                             insertLineWithHeadingStyle(p, line);
@@ -769,8 +775,14 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                             if (!txt) continue;
 
                             txt = txt.replace(/\n- /g, "\n• ");
-                            for (const line of txt.split("\n")) {
-                                if (!line.trim()) continue;
+                            for (const line of txt.split(/\r?\n/)) {
+                                if (!line.trim()) {
+                                    const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                                    insertLineWithHeadingStyle(p, "");
+                                    include(p.getRange());
+                                    cursor = p.getRange();
+                                    continue;
+                                }
 
                                 const p = cursor.insertParagraph("", Word.InsertLocation.after);
                                 insertLineWithHeadingStyle(p, line);
@@ -786,8 +798,14 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             else {
                 const txt = tag.EditorValue.replace(/\n- /g, "\n• ").trim();
 
-                for (const line of txt.split("\n")) {
-                    if (!line.trim()) continue;
+                for (const line of txt.split(/\r?\n/)) {
+                    if (!line.trim()) {
+                        const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                        insertLineWithHeadingStyle(p, "");
+                        include(p.getRange());
+                        cursor = p.getRange();
+                        continue;
+                    }
 
                     const p = cursor.insertParagraph("", Word.InsertLocation.after);
                     insertLineWithHeadingStyle(p, line);
