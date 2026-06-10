@@ -1,6 +1,5 @@
 import { StoreService } from "../services/store.service";
 import { wordTableStyles } from "./tablestyles";
-import { customizedStyles } from "./customstyles";
 
 function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
   const body = `<div class="modal-dialog">

@@ -51,6 +51,8 @@ export class StoreService {
     public environment: string = '';
 
     public customTableStyle: any[] = [];
+    public customizedStyles: any[] = [];
+    public customTextStylesLoaded: boolean = false;
     public currentChatTagId: number = -1;
     public isReversed: boolean = false;
     public reprocessingTagIds: { [key: string]: boolean } = {};
@@ -156,5 +158,7 @@ export class StoreService {
             "IsSideHeaderBold": false
         };
         this.mode = 'Home';
+        this.customizedStyles = [];
+        this.customTextStylesLoaded = false;
     }
 }
