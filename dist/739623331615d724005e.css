@@ -482,3 +482,9 @@ ul {
 .sticky-static {
   position: static !important;
 }
+
+.style-preview-box::before,
+.style-preview-box::after {
+  content: '';
+  margin: auto;
+}
