@@ -25,8 +25,8 @@ export function mapApiStyleToCustomStyle(apiStyle: any): CustomTextStyle {
       underline: props.Underline ?? false,
       fontFamily: props.FontFamily ?? "Calibri",
       size: props.Size ?? "11pt",
-      fontColor: props.fontColor ?? "#000000",
-      backgroundColor: props.backgroundColor ?? "transparent"
+      fontColor: props.FontColor ?? props.fontColor ?? "#000000",
+      backgroundColor: props.BackgroundColor ?? props.backgroundColor ?? "transparent"
     }
   };
 }
