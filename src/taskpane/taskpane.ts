@@ -209,6 +209,15 @@ async function getCustomTextStyles() {
     const textStyleObj = await getAllCustomTexts(store.jwt);
     if (textStyleObj && textStyleObj.Status && Array.isArray(textStyleObj.Data)) {
       store.customizedStyles = textStyleObj.Data.map(mapApiStyleToCustomStyle);
+      const selectedTextStyle = store.customizedStyles.find(
+        style => style.ID === store.dataList.TextCustomizationID || style.id === store.dataList.TextCustomizationID
+      );
+      if (selectedTextStyle) {
+        store.customizedTextStyle = selectedTextStyle;
+        DocStorage.setItem("customTextStyleId", selectedTextStyle.id);
+        DocStorage.setItem("customTextStyle", JSON.stringify(selectedTextStyle));
+        store.saveToStorage();
+      }
     } else {
       console.warn("No custom text styles found in API.");
       store.customizedStyles = [];
@@ -231,6 +240,7 @@ async function fetchDocument(action) {
     // Assign to store
     store.dataList = reportData.dataList;
     await getTableStyle();
+    await getCustomTextStyles();
     await loadPromptTemplates();
     store.availableKeys = reportData.availableKeys;
     store.sourceList = reportData.sourceList;

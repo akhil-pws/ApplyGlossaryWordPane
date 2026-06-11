@@ -12,6 +12,7 @@ export interface CustomTextStyle {
   id: string;
   name: string;
   properties: CustomStyleProperties;
+  ID?: number;
 }
 
 export function mapApiStyleToCustomStyle(apiStyle: any): CustomTextStyle {
@@ -19,6 +20,7 @@ export function mapApiStyleToCustomStyle(apiStyle: any): CustomTextStyle {
   return {
     id: apiStyle.Name,
     name: apiStyle.DisplayName,
+    ID: apiStyle.ID,
     properties: {
       bold: props.Bold ?? false,
       italic: props.Italic ?? false,
