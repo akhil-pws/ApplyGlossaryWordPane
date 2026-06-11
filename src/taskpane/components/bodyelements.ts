@@ -401,7 +401,7 @@ function customizeTextStylePopup(selectedValue: string, availableStyles: string[
   const previewContainer = `
     <div class="mb-3">
       <label class="form-label fw-bold">Style Preview</label>
-      <div id="text-style-preview" class="p-3 border rounded text-center" style="min-height: 80px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+      <div id="text-style-preview" class="p-3 border rounded text-center style-preview-box" style="max-height: 150px; max-width: 100%; overflow: auto; min-height: 80px; display: flex; flex-direction: column; transition: all 0.3s ease; box-sizing: border-box;">
         Preview Text
       </div>
     </div>
@@ -456,7 +456,7 @@ function customizedStylePopup(selectedValue: string, availableStyles: any[]) {
   const previewContainer = `
     <div class="mb-3">
       <label class="form-label fw-bold">Style Preview</label>
-      <div id="customized-style-preview" class="p-3 border rounded text-center" style="min-height: 80px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+      <div id="customized-style-preview" class="p-3 border rounded text-center style-preview-box" style="max-height: 150px; max-width: 100%; overflow: auto; min-height: 80px; display: flex; flex-direction: column; transition: all 0.3s ease; box-sizing: border-box;">
         Preview Text
       </div>
     </div>
