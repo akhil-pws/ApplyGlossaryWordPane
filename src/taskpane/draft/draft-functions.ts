@@ -61,7 +61,7 @@ export function insertLineWithHeadingStyle(
       }
       if (props.backgroundColor && props.backgroundColor !== "transparent") {
         try {
-          paragraph.shadingColor = props.backgroundColor;
+          paragraph.font.highlightColor = props.backgroundColor;
         } catch (e) {}
       }
     }
