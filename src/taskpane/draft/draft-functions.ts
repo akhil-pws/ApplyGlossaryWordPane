@@ -504,7 +504,42 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
   });
 }
 
+export function applyCustomTextStyleToCell(cell: any, store: any) {
+  try {
+    const styleName = store.defaultTextStyle || "Normal";
+    cell.body.style = styleName;
+  } catch (e) {
+    console.error("Error setting cell body style:", e);
+  }
+
+  if (store.customizedTextStyle && store.customizedTextStyle.properties) {
+    const props = store.customizedTextStyle.properties;
+    const font = cell.body.font;
+    font.bold = props.bold;
+    font.italic = props.italic;
+    font.underline = props.underline ? Word.UnderlineType.single : Word.UnderlineType.none;
+    if (props.fontFamily) {
+      font.name = props.fontFamily;
+    }
+    if (props.size) {
+      const numericSize = parseFloat(props.size);
+      if (!isNaN(numericSize)) {
+        font.size = numericSize;
+      }
+    }
+    if (props.fontColor) {
+      font.color = props.fontColor;
+    }
+    if (props.backgroundColor && props.backgroundColor !== "transparent") {
+      try {
+        font.highlightColor = props.backgroundColor;
+      } catch (e) {}
+    }
+  }
+}
+
 export async function colorTable(table: any, rows: any, context: any, isReversed: boolean = false) {
+  const store = StoreService.getInstance();
 
   // ------------------------------------------------------------
   // 1) Copy cell values DOM -> Word + MERGE FIRST COLUMN GROUPS
@@ -528,7 +563,9 @@ export async function colorTable(table: any, rows: any, context: any, isReversed
           firstColText = text;
         }
 
-        table.getCell(rowIndex, cellIndex).value = text;
+        const tableCell = table.getCell(rowIndex, cellIndex);
+        tableCell.value = text;
+        applyCustomTextStyleToCell(tableCell, store);
         cellIndex++;
       });
 
@@ -566,6 +603,15 @@ export async function colorTable(table: any, rows: any, context: any, isReversed
   table.rows.load("items");
   await context.sync();
 
+  table.rows.items.forEach(row => row.cells.load("items"));
+  await context.sync();
+
+  table.rows.items.forEach((row) => {
+    row.cells.items.forEach((cell) => {
+      applyCustomTextStyleToCell(cell, store);
+    });
+  });
+
   // Helper to check if color is dark
   const isColorDark = (hexColor: string): boolean => {
     const hex = hexColor.replace("#", "");
@@ -576,7 +622,6 @@ export async function colorTable(table: any, rows: any, context: any, isReversed
     return luminance < 0.5;
   };
 
-  const store = StoreService.getInstance();
 
   const applyBoldIfNeeded = (cell: any, rowIndex: number, cellIndex: number) => {
     let weight = "Normal";

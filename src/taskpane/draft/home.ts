@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft-functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, customizeTextStyle, customizeCustomStyle, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -274,7 +274,9 @@ export async function replaceMention(word: any, type: any) {
                                 if (!store.colorPallete.Customize) {
                                     grid.forEach((row, rowIndex) => {
                                         row.forEach((cellValue, cellIndex) => {
-                                            table.getCell(rowIndex, cellIndex).value = cellValue;
+                                            const tableCell = table.getCell(rowIndex, cellIndex);
+                                            tableCell.value = cellValue;
+                                            applyCustomTextStyleToCell(tableCell, store);
                                         });
                                     });
 
@@ -300,7 +302,9 @@ export async function replaceMention(word: any, type: any) {
                                 // Manual population for transposed table
                                 grid.forEach((row, rowIndex) => {
                                     row.forEach((cellValue, cellIndex) => {
-                                        table.getCell(rowIndex, cellIndex).value = cellValue;
+                                        const tableCell = table.getCell(rowIndex, cellIndex);
+                                        tableCell.value = cellValue;
+                                        applyCustomTextStyleToCell(tableCell, store);
                                     });
                                 });
                             }
@@ -728,7 +732,9 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                                 if (!store.colorPallete.Customize) {
                                     grid.forEach((rowGrid, rowIndex) => {
                                         rowGrid.forEach((cellValue, cellIndex) => {
-                                            table.getCell(rowIndex, cellIndex).value = cellValue;
+                                            const tableCell = table.getCell(rowIndex, cellIndex);
+                                            tableCell.value = cellValue;
+                                            applyCustomTextStyleToCell(tableCell, store);
                                         });
                                     });
 
@@ -754,7 +760,9 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                                 // Manual population for transposed table
                                 grid.forEach((rowGrid, rowIndex) => {
                                     rowGrid.forEach((cellValue, cellIndex) => {
-                                        table.getCell(rowIndex, cellIndex).value = cellValue;
+                                        const tableCell = table.getCell(rowIndex, cellIndex);
+                                        tableCell.value = cellValue;
+                                        applyCustomTextStyleToCell(tableCell, store);
                                     });
                                 });
                             }
