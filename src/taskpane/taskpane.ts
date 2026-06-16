@@ -10,7 +10,7 @@ import { DocStorage } from "./utils/doc-storage";
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -864,7 +864,9 @@ export async function applyAITagFn(
                 if (!store.colorPallete.Customize) {
                   grid.forEach((rowGrid, rowIndex) => {
                     rowGrid.forEach((cellValue, cellIndex) => {
-                      table.getCell(rowIndex, cellIndex).value = cellValue;
+                      const tableCell = table.getCell(rowIndex, cellIndex);
+                      tableCell.value = cellValue;
+                      applyCustomTextStyleToCell(tableCell, store);
                     });
                   });
 
@@ -890,7 +892,9 @@ export async function applyAITagFn(
                 // Manual population for transposed table
                 grid.forEach((rowGrid, rowIndex) => {
                   rowGrid.forEach((cellValue, cellIndex) => {
-                    table.getCell(rowIndex, cellIndex).value = cellValue;
+                    const tableCell = table.getCell(rowIndex, cellIndex);
+                    tableCell.value = cellValue;
+                    applyCustomTextStyleToCell(tableCell, store);
                   });
                 });
               }
