@@ -2032,6 +2032,12 @@ export async function customizeTextStyle() {
 
       store.defaultTextStyle = finalStyle;
       DocStorage.setItem("defaultTextStyle", store.defaultTextStyle);
+
+      // Clear customized style when default text style is selected
+      store.customizedTextStyle = null;
+      DocStorage.removeItem("customTextStyleId");
+      DocStorage.removeItem("customTextStyle");
+
       store.saveToStorage();
 
       toaster("Default text style saved successfully", "success");
