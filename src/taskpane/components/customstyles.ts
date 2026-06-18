@@ -11,17 +11,18 @@ export interface CustomStyleProperties {
 export interface CustomTextStyle {
   id: string;
   name: string;
-  properties: CustomStyleProperties;
+  properties: CustomStyleProperties | null;
   ID?: number;
 }
 
 export function mapApiStyleToCustomStyle(apiStyle: any): CustomTextStyle {
-  const props = apiStyle.Properties || {};
+  const props = apiStyle.Properties;
+  const hasProperties = props && typeof props === "object" && Object.keys(props).length > 0;
   return {
     id: apiStyle.Name,
-    name: apiStyle.DisplayName,
+    name: apiStyle.Name,
     ID: apiStyle.ID,
-    properties: {
+    properties: hasProperties ? {
       bold: props.Bold ?? false,
       italic: props.Italic ?? false,
       underline: props.Underline ?? false,
@@ -29,6 +30,6 @@ export function mapApiStyleToCustomStyle(apiStyle: any): CustomTextStyle {
       size: props.Size ?? "11pt",
       fontColor: props.FontColor ?? props.fontColor ?? "#000000",
       backgroundColor: props.BackgroundColor ?? props.backgroundColor ?? "transparent"
-    }
+    } : null
   };
 }
