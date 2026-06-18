@@ -383,6 +383,10 @@ export async function openAITag(tag) {
 }
 
 export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
+    const store = StoreService.getInstance();
+    store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
+    DocStorage.setItem("currentChatTagId", String(store.currentChatTagId));
+
     var skipFetch = false;
     if ((!tag.FilteredReportHeadAIHistoryList || tag.FilteredReportHeadAIHistoryList.length === 0) && !skipFetch) {
         if (type !== 'Summary') {
@@ -409,7 +413,6 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     }
 
     // Check current theme
-    const store = StoreService.getInstance();
     const isDark = store.theme === 'Dark';
     const closeBtnClass = isDark
         ? 'fa-solid fa-circle-xmark bg-dark text-light'

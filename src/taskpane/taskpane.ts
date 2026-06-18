@@ -55,6 +55,20 @@ Office.onReady((info) => {
             if (session.colorPallete) store.colorPallete = session.colorPallete;
             if (session.defaultTextStyle) store.defaultTextStyle = session.defaultTextStyle;
 
+            // Handle custom text style null properties fallback check
+            if (store.customizedTextStyle && store.customizedTextStyle.properties === null) {
+              getDocumentParagraphStyles().then((availableStyles) => {
+                const styleNameInWord = availableStyles.find(
+                  s => s.toLowerCase() === store.customizedTextStyle.name.toLowerCase() || s.toLowerCase() === store.customizedTextStyle.id.toLowerCase()
+                );
+                if (styleNameInWord) {
+                  store.defaultTextStyle = styleNameInWord;
+                  DocStorage.setItem("defaultTextStyle", styleNameInWord);
+                  store.saveToStorage();
+                }
+              }).catch(e => console.error("Error restoring custom style fallback on load:", e));
+            }
+
             window.location.hash = '#/dashboard';
             toaster('You are successfully logged in', 'success');
             displayMenu(); // Trigger legacy menu display
@@ -101,6 +115,20 @@ async function login() {
     const localPallete = DocStorage.getItem('colorPallete');
     if (localPallete) {
       store.colorPallete = JSON.parse(localPallete);
+    }
+
+    // Handle custom text style null properties fallback check
+    if (store.customizedTextStyle && store.customizedTextStyle.properties === null) {
+      getDocumentParagraphStyles().then((availableStyles) => {
+        const styleNameInWord = availableStyles.find(
+          s => s.toLowerCase() === store.customizedTextStyle.name.toLowerCase() || s.toLowerCase() === store.customizedTextStyle.id.toLowerCase()
+        );
+        if (styleNameInWord) {
+          store.defaultTextStyle = styleNameInWord;
+          DocStorage.setItem("defaultTextStyle", styleNameInWord);
+          store.saveToStorage();
+        }
+      }).catch(e => console.error("Error restoring custom style fallback in login:", e));
     }
 
   } else {
@@ -213,11 +241,25 @@ async function getCustomTextStyles() {
         style => style.ID === store.dataList.TextCustomizationID || style.id === store.dataList.TextCustomizationID
       );
       if (selectedTextStyle) {
+        if (selectedTextStyle.properties === null) {
+          try {
+            const availableStyles = await getDocumentParagraphStyles();
+            const styleNameInWord = availableStyles.find(
+              s => s.toLowerCase() === selectedTextStyle.name.toLowerCase() || s.toLowerCase() === selectedTextStyle.id.toLowerCase()
+            );
+            if (styleNameInWord) {
+              store.defaultTextStyle = styleNameInWord;
+              DocStorage.setItem("defaultTextStyle", styleNameInWord);
+            }
+          } catch (e) {
+            console.error("Error checking matching Word style:", e);
+          }
+        }
         store.customizedTextStyle = selectedTextStyle;
         DocStorage.setItem("customTextStyleId", selectedTextStyle.id);
         DocStorage.setItem("customTextStyle", JSON.stringify(selectedTextStyle));
-        store.saveToStorage();
       }
+      store.saveToStorage();
     } else {
       console.warn("No custom text styles found in API.");
       store.customizedStyles = [];
@@ -2078,19 +2120,52 @@ export async function customizeCustomStyle() {
   const dropdown = document.getElementById("customized-style-dropdown") as HTMLSelectElement;
   const preview = document.getElementById("customized-style-preview") as HTMLDivElement;
 
-  const applyStylePreview = () => {
+  const applyStylePreview = async () => {
     if (!dropdown || !preview) return;
     const selectedStyle = stylesList.find(s => s.id === dropdown.value);
     if (selectedStyle) {
       const props = selectedStyle.properties;
-      preview.style.fontWeight = props.bold ? "bold" : "normal";
-      preview.style.fontStyle = props.italic ? "italic" : "normal";
-      preview.style.textDecoration = props.underline ? "underline" : "none";
-      preview.style.fontFamily = props.fontFamily;
-      preview.style.fontSize = props.size;
-      preview.style.color = props.fontColor;
-      preview.style.backgroundColor = props.backgroundColor;
-      preview.textContent = `${selectedStyle.name} Preview`;
+      if (props) {
+        preview.style.fontWeight = props.bold ? "bold" : "normal";
+        preview.style.fontStyle = props.italic ? "italic" : "normal";
+        preview.style.textDecoration = props.underline ? "underline" : "none";
+        preview.style.fontFamily = props.fontFamily;
+        preview.style.fontSize = props.size;
+        preview.style.color = props.fontColor;
+        preview.style.backgroundColor = props.backgroundColor;
+        preview.textContent = `${selectedStyle.name} Preview`;
+      } else {
+        preview.textContent = "Loading style details...";
+        try {
+          const availableStyles = await getDocumentParagraphStyles();
+          const styleNameInWord = availableStyles.find(
+            s => s.toLowerCase() === selectedStyle.name.toLowerCase() || s.toLowerCase() === selectedStyle.id.toLowerCase()
+          );
+          if (styleNameInWord) {
+            const details = await getDocumentStyleDetails(styleNameInWord);
+            preview.style.fontWeight = details.bold ? "bold" : "normal";
+            preview.style.fontStyle = details.italic ? "italic" : "normal";
+            preview.style.textDecoration = details.underline ? "underline" : "none";
+            preview.style.fontFamily = details.fontFamily;
+            preview.style.fontSize = details.size;
+            preview.style.color = details.fontColor;
+            preview.style.backgroundColor = details.backgroundColor;
+            preview.textContent = `${selectedStyle.name} Preview (Word Style)`;
+          } else {
+            preview.style.fontWeight = "normal";
+            preview.style.fontStyle = "normal";
+            preview.style.textDecoration = "none";
+            preview.style.fontFamily = "Calibri";
+            preview.style.fontSize = "11pt";
+            preview.style.color = "#000000";
+            preview.style.backgroundColor = "transparent";
+            preview.textContent = `${selectedStyle.name} Preview (Not found in Word)`;
+          }
+        } catch (e) {
+          console.error("Error updating preview for Word style:", e);
+          preview.textContent = `${selectedStyle.name} Preview (Error loading)`;
+        }
+      }
     }
   };
 
@@ -2105,9 +2180,23 @@ export async function customizeCustomStyle() {
   }
 
   if (okBtn && dropdown) {
-    okBtn.addEventListener("click", () => {
+    okBtn.addEventListener("click", async () => {
       const selectedStyle = stylesList.find(s => s.id === dropdown.value);
       if (selectedStyle) {
+        if (selectedStyle.properties === null) {
+          try {
+            const availableStyles = await getDocumentParagraphStyles();
+            const styleNameInWord = availableStyles.find(
+              s => s.toLowerCase() === selectedStyle.name.toLowerCase() || s.toLowerCase() === selectedStyle.id.toLowerCase()
+            );
+            if (styleNameInWord) {
+              store.defaultTextStyle = styleNameInWord;
+              DocStorage.setItem("defaultTextStyle", styleNameInWord);
+            }
+          } catch (e) {
+            console.error("Error setting default style from Word style:", e);
+          }
+        }
         store.customizedTextStyle = selectedStyle;
         DocStorage.setItem("customTextStyleId", selectedStyle.id);
         DocStorage.setItem("customTextStyle", JSON.stringify(selectedStyle));
@@ -2562,6 +2651,10 @@ async function loadPromptTemplates() {
 }
 
 async function logBookmarksInSelection() {
+  const store = StoreService.getInstance();
+  if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null) {
+    return;
+  }
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
 
