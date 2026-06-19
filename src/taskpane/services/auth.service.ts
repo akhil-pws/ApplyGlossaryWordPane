@@ -18,6 +18,25 @@ export class AuthService {
     static restoreSession(): any {
         const sessionToken = DocStorage.getItem('token');
         if (sessionToken) {
+            // Check expiry (24 hours)
+            const tokenLastUpdated = DocStorage.getItem('tokenLastUpdated');
+            const now = new Date();
+            if (tokenLastUpdated) {
+                const lastUpdatedTime = new Date(tokenLastUpdated).getTime();
+                const differenceInHours = (now.getTime() - lastUpdatedTime) / (1000 * 60 * 60);
+                if (differenceInHours >= 24) {
+                    console.log("JWT token expired (passed 24 hours). Logging out.");
+                    this.logout();
+                    return null;
+                } else {
+                    // Update timestamp to now, resetting the 24-hour expiration window
+                    DocStorage.setItem('tokenLastUpdated', now.toISOString());
+                }
+            } else {
+                // Initialize timestamp for legacy sessions
+                DocStorage.setItem('tokenLastUpdated', now.toISOString());
+            }
+
             return {
                 jwt: sessionToken,
                 userRole: JSON.parse(DocStorage.getItem(this.USER_ROLE_KEY) || '{}'),
@@ -45,6 +64,7 @@ export class AuthService {
                     DocStorage.setItem('token', jwt);
                     DocStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
                     DocStorage.setItem('userId', userId);
+                    DocStorage.setItem('tokenLastUpdated', new Date().toISOString());
 
                     // Sync with StoreService and persist
                     const store = StoreService.getInstance();
@@ -79,6 +99,7 @@ export class AuthService {
         DocStorage.removeItem('token');
         DocStorage.removeItem(this.USER_ROLE_KEY);
         DocStorage.removeItem('userId');
+        DocStorage.removeItem('tokenLastUpdated');
         
         const store = StoreService.getInstance();
         store.clearStorage();

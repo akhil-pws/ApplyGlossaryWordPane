@@ -360,6 +360,26 @@ async function fetchDocument(action) {
             logout();
           }
         });
+      },
+      onPredefinedTable: () => {
+        if (!store.isPendingResponse) {
+          customizeTable('Pre');
+        }
+      },
+      onCustomizedTable: () => {
+        if (!store.isPendingResponse) {
+          customizeTable('Custom');
+        }
+      },
+      onDefaultTextStyle: () => {
+        if (!store.isPendingResponse) {
+          customizeTextStyle();
+        }
+      },
+      onCustomizedStyle: () => {
+        if (!store.isPendingResponse) {
+          customizeCustomStyle();
+        }
       }
     });
 

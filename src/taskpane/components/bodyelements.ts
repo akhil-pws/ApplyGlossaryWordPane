@@ -339,6 +339,27 @@ function logoheader(storedUrl) {
               <i class="fa fa-eraser me-2" aria-hidden="true"></i> Remove Formatting
             </a>
           </li>
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item" href="#" id="predefined-table">
+              <i class="fa fa-table me-2" aria-hidden="true"></i> Default Tables
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="#" id="customized-table">
+              <i class="fa fa-brush me-2" aria-hidden="true"></i> Customized Tables
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="#" id="default-text-style">
+              <i class="fa fa-font me-2" aria-hidden="true"></i> Default Text Style
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="#" id="customized-style">
+              <i class="fa fa-palette me-2" aria-hidden="true"></i> Customized Styles
+            </a>
+          </li>
         </ul>
       </div>
 

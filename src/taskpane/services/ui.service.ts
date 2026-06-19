@@ -126,7 +126,11 @@ export class UIService {
             onFormat: () => void,
             onRemoveFormat: () => void,
             onThemeToggle: () => void,
-            onLogout: () => void
+            onLogout: () => void,
+            onPredefinedTable: () => void,
+            onCustomizedTable: () => void,
+            onDefaultTextStyle: () => void,
+            onCustomizedStyle: () => void
         }
     ): void {
         document.getElementById('home')?.addEventListener('click', handlers.onHome);
@@ -136,6 +140,10 @@ export class UIService {
         document.getElementById('removeFormatting')?.addEventListener('click', handlers.onRemoveFormat);
         document.getElementById('theme-toggle')?.addEventListener('click', handlers.onThemeToggle);
         document.getElementById('logout')?.addEventListener('click', handlers.onLogout);
+        document.getElementById('predefined-table')?.addEventListener('click', handlers.onPredefinedTable);
+        document.getElementById('customized-table')?.addEventListener('click', handlers.onCustomizedTable);
+        document.getElementById('default-text-style')?.addEventListener('click', handlers.onDefaultTextStyle);
+        document.getElementById('customized-style')?.addEventListener('click', handlers.onCustomizedStyle);
 
         // Toggle sticky elements to static when mode dropdown is active
         const modeDropdownToggle = document.getElementById('modeDropdown');
