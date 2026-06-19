@@ -1,6 +1,6 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
 import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft-functions";
-import { addGenAITags, applyTagFn, createMultiSelectDropdown, customizeTable, customizeTextStyle, customizeCustomStyle, mentionDropdownFn } from "../taskpane";
+import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
 import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
@@ -35,26 +35,6 @@ export function loadHomepage(availableKeys) {
                         </a>
                     </li>
 
-                     <li>
-                        <a class="dropdown-item" href="#" id="predefined-table">
-                            <i class="fa fa-table me-2" aria-hidden="true"></i> Default Tables
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="#" id="customized-table">
-                            <i class="fa fa-brush me-2" aria-hidden="true"></i> Customized Tables
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="#" id="default-text-style">
-                            <i class="fa fa-font me-2" aria-hidden="true"></i> Default Text Style
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" href="#" id="customized-style">
-                            <i class="fa fa-palette me-2" aria-hidden="true"></i> Customized Styles
-                        </a>
-                    </li>
                 </ul>
             </div>
         </div>
@@ -164,29 +144,7 @@ export function loadHomepage(availableKeys) {
         }
     });
 
-    document.getElementById('customized-table').addEventListener('click', () => {
-        if (!store.isPendingResponse) {
-            customizeTable('Custom');
-        }
-    })
 
-    document.getElementById('predefined-table').addEventListener('click', () => {
-        if (!store.isPendingResponse) {
-            customizeTable('Pre');
-        }
-    })
-
-    document.getElementById('default-text-style').addEventListener('click', () => {
-        if (!store.isPendingResponse) {
-            customizeTextStyle();
-        }
-    })
-
-    document.getElementById('customized-style').addEventListener('click', () => {
-        if (!store.isPendingResponse) {
-            customizeCustomStyle();
-        }
-    })
 
     document.getElementById('apply-btn-tag').addEventListener('click', () => {
         if (!store.isPendingResponse) {
@@ -881,17 +839,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             const changeSourceButton = document.getElementById("changeSourceButton") as HTMLButtonElement;
 
             if (chatInput && changeSourceButton) {
-                // Run once on load
-                changeSourceButton.disabled = chatInput.value.trim().length === 0;
-
-                // Listen for changes in textarea
-                chatInput.addEventListener("input", () => {
-                    if (chatInput.value.trim().length > 0) {
-                        changeSourceButton.disabled = false;
-                    } else {
-                        changeSourceButton.disabled = true;
-                    }
-                });
+                // Enabled by default
+                changeSourceButton.disabled = false;
             };
             document.getElementById(`copyPrompt-${index}`)?.addEventListener('click', () => copyText(chat.Prompt));
             const savePromptele = document.getElementById(`savePrompt-${index}`);
