@@ -324,23 +324,7 @@ function logoheader(storedUrl) {
       <div class="dropdown d-inline">
         <i class="fa fa-tools c-pointer me-3" id="settingsDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Settings"></i>
         <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
-        <li>
-            <a class="dropdown-item" href="#" id="define-formatting">
-              <i class="fa fa-sliders-h me-2" aria-hidden="true"></i> Define Formatting
-            </a>
-          </li>
-          <li>
-            <a class="dropdown-item disabled-link" href="#" id="glossary" tabindex="-1" aria-disabled="true">
-              <i class="fa fa-book me-2" aria-hidden="true"></i> Apply Glossary
-            </a>
-          </li>
-          <li>
-            <a class="dropdown-item disabled-link" href="#" id="removeFormatting" tabindex="-1" aria-disabled="true">
-              <i class="fa fa-eraser me-2" aria-hidden="true"></i> Remove Formatting
-            </a>
-          </li>
-          <li><hr class="dropdown-divider"></li>
-          <li>
+         <li>
             <a class="dropdown-item" href="#" id="predefined-table">
               <i class="fa fa-table me-2" aria-hidden="true"></i> Default Tables
             </a>
@@ -360,6 +344,23 @@ function logoheader(storedUrl) {
               <i class="fa fa-palette me-2" aria-hidden="true"></i> Customized Styles
             </a>
           </li>
+          <li><hr class="dropdown-divider"></li>
+        <li>
+            <a class="dropdown-item" href="#" id="define-formatting">
+              <i class="fa fa-sliders-h me-2" aria-hidden="true"></i> Define Formatting
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item disabled-link" href="#" id="glossary" tabindex="-1" aria-disabled="true">
+              <i class="fa fa-book me-2" aria-hidden="true"></i> Apply Glossary
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item disabled-link" href="#" id="removeFormatting" tabindex="-1" aria-disabled="true">
+              <i class="fa fa-eraser me-2" aria-hidden="true"></i> Remove Formatting
+            </a>
+          </li>
+         
         </ul>
       </div>
 
@@ -399,7 +400,7 @@ function customizeTextStylePopup(selectedValue: string, availableStyles: string[
   const isDark = store.theme === "Dark";
   const popupClass = isDark ? "bg-dark text-light" : "bg-light text-dark";
   const selectClass = isDark ? "bg-dark text-light border-light" : "bg-white text-dark border-dark";
-  
+
   if (selectedValue && !availableStyles.includes(selectedValue)) {
     availableStyles.push(selectedValue);
     availableStyles.sort((a, b) => a.localeCompare(b));
@@ -410,11 +411,11 @@ function customizeTextStylePopup(selectedValue: string, availableStyles: string[
       <label for="text-style-dropdown" class="form-label fw-bold">Select Default Paragraph Style</label>
       <select class="form-select ${selectClass}" id="text-style-dropdown" style="max-height: 200px;">
         ${availableStyles
-          .map(style => {
-            const isSelected = style === selectedValue;
-            return `<option value="${style}" ${isSelected ? "selected" : ""}>${style}</option>`;
-          })
-          .join("")}
+      .map(style => {
+        const isSelected = style === selectedValue;
+        return `<option value="${style}" ${isSelected ? "selected" : ""}>${style}</option>`;
+      })
+      .join("")}
       </select>
     </div>
   `;
@@ -465,11 +466,11 @@ function customizedStylePopup(selectedValue: string, availableStyles: any[]) {
       <label for="customized-style-dropdown" class="form-label fw-bold">Select Customized Style</label>
       <select class="form-select ${selectClass} mb-3" id="customized-style-dropdown">
         ${availableStyles
-          .map(style => {
-            const isSelected = style.id === selectedValue;
-            return `<option value="${style.id}" ${isSelected ? "selected" : ""}>${style.name}</option>`;
-          })
-          .join("")}
+      .map(style => {
+        const isSelected = style.id === selectedValue;
+        return `<option value="${style.id}" ${isSelected ? "selected" : ""}>${style.name}</option>`;
+      })
+      .join("")}
       </select>
     </div>
   `;
