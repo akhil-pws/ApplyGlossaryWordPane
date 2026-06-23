@@ -385,10 +385,12 @@ async function fetchDocument(action) {
 
     // Register selection change handler for tag detection
     if (action === 'Init') {
-      Office.context.document.addHandlerAsync(
-        Office.EventType.DocumentSelectionChanged,
-        handleSelectionChange
-      );
+      if (store.jwt) {
+        Office.context.document.addHandlerAsync(
+          Office.EventType.DocumentSelectionChanged,
+          handleSelectionChange
+        );
+      }
     }
 
     UIService.toggleLoader(false);
@@ -1279,6 +1281,9 @@ export async function applyglossary() {
 
 async function handleSelectionChange() {
   const store = StoreService.getInstance();
+  if (!store.jwt) {
+    return;
+  }
 
   // Handle glossary mode
   if (store.isGlossaryActive) {
