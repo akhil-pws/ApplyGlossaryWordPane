@@ -488,3 +488,12 @@ ul {
   content: '';
   margin: auto;
 }
+
+#jump-to-next-tag {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+#jump-to-next-tag:hover {
+  transform: scale(1.15);
+  color: #356ba5 !important;
+}
