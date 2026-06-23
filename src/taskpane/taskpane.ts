@@ -2672,9 +2672,9 @@ async function loadPromptTemplates() {
 
 async function logBookmarksInSelection() {
   const store = StoreService.getInstance();
-  if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null) {
-    return;
-  }
+  // if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null) {
+  //   return;
+  // }
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
 
