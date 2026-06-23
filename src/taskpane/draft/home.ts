@@ -380,17 +380,22 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     const DisplayName = type === 'Summary' ? tag.Name : tag.DisplayName;
     const closeBar = `
     <div class="chat-header sticky-top ${headerBgClass} z-3">
-        <div class="d-flex justify-content-between align-items-center px-2 pt-3">
-            <div class="d-flex align-items-center ms-3">
-                <i class="fa fa-microchip-ai text-muted me-2"></i>
-                <span class="fw-bold">${DisplayName}</span>
+        <div class="d-flex justify-content-between align-items-start px-3 pt-3 pb-1">
+            <div class="d-flex align-items-start flex-grow-1" style="max-width: calc(100% - 50px);">
+                <i class="fa fa-microchip-ai text-muted me-2 mt-1" style="font-size: 13px;"></i>
+                <span class="fw-bold" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;">${DisplayName}</span>
             </div>
-            <div class="d-flex justify-content-center align-items-center me-3 c-pointer" id="close-btn-tag">
-                <i class="${closeBtnClass}" id="close-ai-window"></i>
+            <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
+                <button id="jump-to-next-tag" class="btn btn-sm p-0 me-2 border-0 bg-transparent text-primary c-pointer" title="Jump to next replaced instance" style="display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
+                    <i class="fa-solid fa-circle-chevron-right" style="font-size: 13px;"></i>
+                </button>
+                <div class="c-pointer d-inline-flex align-items-center justify-content-center" id="close-btn-tag">
+                    <i class="${closeBtnClass}" id="close-ai-window" style="font-size: 13px;"></i>
+                </div>
             </div>
         </div>
         <hr class="mt-2 mb-1 mx-3">
-        </div>
+    </div>
     `;
 
     const chatBody = `
@@ -1057,6 +1062,11 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             }
         });
 
+        // Jump to next bookmark button
+        document.getElementById(`jump-to-next-tag`)?.addEventListener('click', async () => {
+            await jumpToNextBookmarkOfTag(tag, type);
+        });
+
         // Close button
         document.getElementById(`close-btn-tag`)?.addEventListener('click', () => {
             confirmSwitchChatHistory(() => {
@@ -1094,5 +1104,62 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         // Mention dropdown
         mentionDropdownFn(`chatInput`, `mention-dropdown`, 'edit');
     }, 0);
+}
+
+export async function jumpToNextBookmarkOfTag(tag: any, type: "Summary" | "AITag") {
+    return Word.run(async (context) => {
+        const selection = context.document.getSelection();
+        const bodyRange = context.document.body.getRange();
+        const bookmarks = bodyRange.getBookmarks();
+        await context.sync();
+
+        const bookmarkNames = bookmarks.value || [];
+        const prefix = type === "Summary" ? "SM" : "ID";
+        const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+        const targetPrefix = `${prefix}${tagId}_Split_`;
+
+        // Filter relevant bookmarks (case-insensitive start match)
+        const relevantNames = bookmarkNames.filter(name =>
+            name.toUpperCase().startsWith(targetPrefix.toUpperCase())
+        );
+
+        if (relevantNames.length === 0) {
+            toaster("No replaced instances found for this tag in the document.", "info");
+            return;
+        }
+
+        // Get range and compare relation for each
+        const items = relevantNames.map(name => {
+            const r = context.document.getBookmarkRangeOrNullObject(name);
+            r.load("isNullObject");
+            const rel = r.compareLocationWith(selection);
+            return { name, range: r, rel };
+        });
+
+        await context.sync();
+
+        const validItems = items.filter(item => !item.range.isNullObject);
+        if (validItems.length === 0) {
+            toaster("No active instances found for this tag.", "info");
+            return;
+        }
+
+        // Find the first bookmark that is positioned after the current selection
+        let nextIndex = validItems.findIndex(item => {
+            const val = String(item.rel.value).toLowerCase();
+            return val === "after" || val === "adjacentafter";
+        });
+
+        // If none is after, wrap around to the first one
+        if (nextIndex === -1) {
+            nextIndex = 0;
+        }
+
+        const targetItem = validItems[nextIndex];
+        targetItem.range.select();
+        await context.sync();
+
+        toaster(`Jumped to instance ${nextIndex + 1} of ${validItems.length}`, "success");
+    });
 }
 
