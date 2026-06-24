@@ -387,7 +387,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
             </div>
             <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
                 <button id="jump-to-next-tag" class="btn btn-sm p-0 me-2 border-0 bg-transparent text-primary c-pointer" title="Jump to next replaced instance" style="display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
-                    <i class="fa-solid fa-circle-chevron-right" style="font-size: 13px;"></i>
+                    <i class="fa-solid fa-up-right-from-square" style="font-size: 13px;"></i>
                 </button>
                 <div class="c-pointer d-inline-flex align-items-center justify-content-center" id="close-btn-tag">
                     <i class="${closeBtnClass}" id="close-ai-window" style="font-size: 13px;"></i>
