@@ -222,8 +222,10 @@ ul {
 .tooltiptext {
   visibility: hidden;
   min-width: 80px;
-  background-color: #212529 !important;
-  color: #fff;
+  background-color: #ffffff;
+  color: #212529;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   text-align: center;
   border-radius: 6px;
   padding: 5px;
@@ -233,6 +235,20 @@ ul {
   position: absolute;
   z-index: 1;
   right: 50px;
+}
+
+body.light-theme .tooltiptext {
+  background-color: #ffffff !important;
+  color: #212529 !important;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+body.dark-theme .tooltiptext {
+  background-color: #212529 !important;
+  color: #fff !important;
+  border: 1px solid #444;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
 }
 
 .ngb-tooltip:hover .tooltiptext {

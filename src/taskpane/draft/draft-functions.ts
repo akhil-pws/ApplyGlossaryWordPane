@@ -289,6 +289,22 @@ function jsonToHtmlTable(jsonData) {
 
 
 
+function formatChatDate(dateStr: any): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 export function generateChatHistoryHtml(chatList: any[]): string {
   const store = StoreService.getInstance();
   const promptclass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
@@ -299,6 +315,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
   return chatList.map((chat, index) => {
     const includeSaveIcon = globalPromptUpdate?.UserRoleAccessID === 3;
     const includeReferenceIcon = chat.Evidences && chat.Evidences.length > 0;
+    const formattedDate = formatChatDate(chat.CreatedDate);
 
     return `
       <div class="row chat-entry m-0 p-0">
@@ -312,7 +329,13 @@ export function generateChatHistoryHtml(chatList: any[]): string {
             <!-- Icons Stack -->
             <div class="d-flex flex-column align-items-center ms-2">
               <i class="fa fa-copy text-secondary c-pointer mb-2" title="Copy Prompt" id="copyPrompt-${index}"></i>
-              ${includeSaveIcon ? `<i class="fa fa-save text-secondary c-pointer" title="Save Prompt" id="savePrompt-${index}"></i>` : ''}
+              ${includeSaveIcon ? `<i class="fa fa-save text-secondary c-pointer mb-2" title="Save Prompt" id="savePrompt-${index}"></i>` : ''}
+              <div class="ngb-tooltip d-inline-block">
+                <span class="tooltiptext" style="white-space: nowrap; line-height: 1.4;">
+                  Created By: ${chat.CreatedByName || 'Unknown User'}<br>Date: ${formattedDate || 'N/A'}
+                </span>
+                <i class="fa-solid fa-circle-info text-secondary c-pointer" id="infoPrompt-${index}"></i>
+              </div>
             </div>
           </div>
         </div>
