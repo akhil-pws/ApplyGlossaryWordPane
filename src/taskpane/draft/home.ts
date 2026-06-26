@@ -375,6 +375,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     const closeBtnClass = isDark
         ? 'fa-solid fa-circle-xmark bg-dark text-light'
         : 'fa-solid fa-circle-xmark bg-light text-dark';
+    const jumpBtnColorClass = isDark ? 'text-light' : 'text-dark';
 
     const headerBgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
     const DisplayName = type === 'Summary' ? tag.Name : tag.DisplayName;
@@ -386,8 +387,12 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
                 <span class="fw-bold" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;">${DisplayName}</span>
             </div>
             <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
-                <button id="jump-to-next-tag" class="btn btn-sm p-0 me-2 border-0 bg-transparent text-primary c-pointer" title="Jump to next replaced instance" style="display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
-                    <i class="fa-solid fa-up-right-from-square" style="font-size: 13px;"></i>
+                <button id="jump-to-next-tag" class="btn btn-sm p-0 me-2 border-0 bg-transparent ${jumpBtnColorClass} c-pointer" title="Jump to next replaced instance" style="display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M 15 14 L 15 12.5 A 2.5 2.5 0 0 0 12.5 10 L 9 10" />
+                        <polyline points="11 8 9 10 11 12" />
+                    </svg>
                 </button>
                 <div class="c-pointer d-inline-flex align-items-center justify-content-center" id="close-btn-tag">
                     <i class="${closeBtnClass}" id="close-ai-window" style="font-size: 13px;"></i>
