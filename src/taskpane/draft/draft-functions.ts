@@ -3,6 +3,7 @@ import { generateCheckboxHistory } from "./home";
 import { wordTableStyleLocales } from "../components/tablestyles";
 import { StoreService } from "../services/store.service";
 import { DocStorage } from "../utils/doc-storage";
+import { faFolderGear, faMicrochipAi, getIconSvg } from "../utils/fontawesome-icons";
 
 export function insertLineWithHeadingStyle(
   paragraph: Word.Paragraph,
@@ -353,9 +354,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
                 title="Copy Response"
                 id="copyResponse-${index}"></i>
               ${includeReferenceIcon
-        ? `<i class="fa fa-folder-gear text-secondary c-pointer ms-2"
-                    title="Open Reference"
-                    id="openRefferance-${index}"></i>`
+        ? getIconSvg(faFolderGear, 'text-secondary c-pointer ms-2', '', `title="Open Reference" id="openRefferance-${index}"`)
         : ''}
             </div>
           </span>
@@ -460,7 +459,7 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           const badge = document.createElement('span');
           badge.className = 'badge rounded-pill border bg-white text-dark px-3 py-2 shadow-sm d-flex align-items-center badge-clickable';
           badge.style.cursor = 'pointer';
-          badge.innerHTML = `${aiTag.DisplayName} <i class="fa-solid fa-microchip-ai ms-2 text-muted" aria-label="AI Suggested"></i>`;
+          badge.innerHTML = `${aiTag.DisplayName} ${getIconSvg(faMicrochipAi, 'ms-2 text-muted', '', 'aria-label="AI Suggested"')}`;
           badge.addEventListener('click', async () => {
             confirmSwitchChatHistory(async () => {
               await selectMatchingBookmarkFromSelection(name);

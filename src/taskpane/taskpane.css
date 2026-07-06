@@ -513,3 +513,12 @@ body.dark-theme .tooltiptext {
   transform: scale(1.15);
   color: #356ba5 !important;
 }
+
+.svg-inline--fa {
+  display: inline-block;
+  height: 1.25em;
+  width: auto;
+  overflow: visible;
+  vertical-align: -0.25em;
+}
+
