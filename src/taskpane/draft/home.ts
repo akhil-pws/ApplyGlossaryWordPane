@@ -8,6 +8,7 @@ import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 import { DocStorage } from "../utils/doc-storage";
+import { faMicrochipAi, getIconSvg } from "../utils/fontawesome-icons";
 
 let preview = '';
 
@@ -93,7 +94,7 @@ export function loadHomepage(availableKeys) {
 
                 // ICON LOGIC
                 let icon = `<i class="fa-solid fa-layer-group text-muted me-2"></i>`; // default (TEXT)
-                if (isAISection) icon = `<i class="fa-solid fa-microchip-ai text-muted me-2"></i>`;
+                if (isAISection) icon = getIconSvg(faMicrochipAi, 'text-muted me-2');
                 if (isImageSection) icon = `<i class="fa-solid fa-image text-muted me-2"></i>`;
 
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
@@ -383,7 +384,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
     <div class="chat-header sticky-top ${headerBgClass} z-3">
         <div class="d-flex justify-content-between align-items-start px-3 pt-3 pb-1">
             <div class="d-flex align-items-start flex-grow-1" style="max-width: calc(100% - 50px);">
-                <i class="fa fa-microchip-ai text-muted me-2 mt-1" style="font-size: 13px;"></i>
+                ${getIconSvg(faMicrochipAi, 'text-muted me-2 mt-1', 'font-size: 13px;')}
                 <span class="fw-bold" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;">${DisplayName}</span>
             </div>
             <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
