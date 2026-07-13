@@ -114,17 +114,27 @@ export class AIService {
 
 
                     // Update lists in Store
-                    store.aiTagList.forEach((currentTag: any) => {
-                        if (currentTag.ID === tag.ID) {
-                            AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
-                        }
-                    });
+                    if (type === 'Summary') {
+                        store.summaryTagList.forEach((currentTag: any) => {
+                            const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
+                            const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+                            if (currentId === tagId) {
+                                AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
+                            }
+                        });
+                    } else {
+                        store.aiTagList.forEach((currentTag: any) => {
+                            if (currentTag.ID === tag.ID) {
+                                AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
+                            }
+                        });
 
-                    store.availableKeys.forEach((currentTag: any) => {
-                        if (currentTag.ID === tag.ID) {
-                            AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
-                        }
-                    });
+                        store.availableKeys.forEach((currentTag: any) => {
+                            if (currentTag.ID === tag.ID) {
+                                AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
+                            }
+                        });
+                    }
 
                     const appbody = document.getElementById('app-body');
                     if (appbody) appbody.innerHTML = await generateCheckboxHistory(tag, type);

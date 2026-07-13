@@ -1,4 +1,4 @@
-import { addGenAITags } from "../taskpane";
+import { addGenAITags, applyTagFn } from "../taskpane";
 import {
   activateSummaryMode,
   getSummaryTagsByReportHeadId,
@@ -36,6 +36,11 @@ export async function loadSummarypage(availableKeys: any[]) {
             <li>
               <a class="dropdown-item" href="#" id="add-btn-tag">
                 <i class="fa-solid fa-plus me-2"></i> Add
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" id="apply-btn-tag">
+                <i class="fa-solid fa-circle-check me-2"></i> Apply
               </a>
             </li>
 
@@ -108,10 +113,12 @@ export async function loadSummarypage(availableKeys: any[]) {
   const btnLast = document.getElementById('page-last') as HTMLButtonElement;
 
   const addBtn = document.getElementById('add-btn-tag') as HTMLAnchorElement;
+  const applyBtn = document.getElementById('apply-btn-tag') as HTMLAnchorElement;
   const reanalyzeBtn = document.getElementById('reanalyze-draft') as HTMLAnchorElement;
 
   function disableActionButtons(disabled: boolean) {
     if (addBtn) addBtn.classList.toggle("disabled", disabled);
+    if (applyBtn) applyBtn.classList.toggle("disabled", disabled);
   }
 
   function setReanalyzeButtonState(enabled: boolean) {
@@ -308,6 +315,10 @@ export async function loadSummarypage(availableKeys: any[]) {
   // ✅ Action button wiring
   addBtn?.addEventListener('click', () => {
     if (!isSummaryLoading) addGenAITags();
+  });
+
+  applyBtn?.addEventListener('click', () => {
+    if (!isSummaryLoading) applyTagFn();
   });
 
   // --------------------------
