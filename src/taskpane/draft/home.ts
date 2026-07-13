@@ -1030,36 +1030,55 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
 
                             const currentlySelected = tag.FilteredReportHeadAIHistoryList.some((item: any) => item.Selected === 1);
                             tag.IsApplied = !currentlySelected;
-                            availableKeys.forEach(currentTag => {
-                                if (currentTag.ID === tag.ID) {
-                                    const isTable = chat.FormattedResponse !== '';
-                                    const finalResponse = chat.FormattedResponse
-                                        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-                                        : chat.Response;
-                                    currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                    currentTag.UserValue = finalResponse;
-                                    currentTag.EditorValue = finalResponse;
-                                    currentTag.text = finalResponse;
-                                    currentTag.IsApplied = tag.IsApplied;
-                                }
-                            })
+                            if (type === 'Summary') {
+                                const store = StoreService.getInstance();
+                                store.summaryTagList.forEach(currentTag => {
+                                    const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
+                                    const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+                                    if (currentId === tagId) {
+                                        const isTable = chat.FormattedResponse !== '';
+                                        const finalResponse = chat.FormattedResponse
+                                            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                                            : chat.Response;
+                                        currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+                                        currentTag.UserValue = finalResponse;
+                                        currentTag.EditorValue = finalResponse;
+                                        currentTag.text = finalResponse;
+                                        currentTag.IsApplied = tag.IsApplied;
+                                    }
+                                });
+                            } else {
+                                availableKeys.forEach(currentTag => {
+                                    if (currentTag.ID === tag.ID) {
+                                        const isTable = chat.FormattedResponse !== '';
+                                        const finalResponse = chat.FormattedResponse
+                                            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                                            : chat.Response;
+                                        currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+                                        currentTag.UserValue = finalResponse;
+                                        currentTag.EditorValue = finalResponse;
+                                        currentTag.text = finalResponse;
+                                        currentTag.IsApplied = tag.IsApplied;
+                                    }
+                                });
 
-                            const store = StoreService.getInstance();
-                            store.aiTagList.forEach(currentTag => {
-                                if (currentTag.ID === tag.ID) {
-                                    const isTable = chat.FormattedResponse !== '';
-                                    const finalResponse = chat.FormattedResponse
-                                        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-                                        : chat.Response;
+                                const store = StoreService.getInstance();
+                                store.aiTagList.forEach(currentTag => {
+                                    if (currentTag.ID === tag.ID) {
+                                        const isTable = chat.FormattedResponse !== '';
+                                        const finalResponse = chat.FormattedResponse
+                                            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                                            : chat.Response;
 
 
-                                    currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                    currentTag.UserValue = finalResponse;
-                                    currentTag.EditorValue = finalResponse;
-                                    currentTag.text = finalResponse;
-                                    currentTag.IsApplied = tag.IsApplied;
-                                }
-                            });
+                                        currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+                                        currentTag.UserValue = finalResponse;
+                                        currentTag.EditorValue = finalResponse;
+                                        currentTag.text = finalResponse;
+                                        currentTag.IsApplied = tag.IsApplied;
+                                    }
+                                });
+                            }
                         }
                     } catch (err) {
                         console.error('Failed to update AI history:', err);

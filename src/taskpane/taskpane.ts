@@ -746,20 +746,27 @@ async function logout() {
 }
 
 export async function applyTagFn() {
-
+  const store = StoreService.getInstance();
   return Word.run(async (context) => {
     try {
       const body = context.document.body;
 
       context.load(body, 'text');
       await context.sync();
-      await applyAITagFn(body, context);
-      await applyImageTagFn(body, context);
+      if (store.mode === 'Summary') {
+        await applySummaryTagFn(body, context);
+      } else {
+        await applyAITagFn(body, context);
+        await applyImageTagFn(body, context);
+      }
     } catch (err) {
       toaster("Something went wrong", "error")
       console.error("Error during tag application:", err);
-      const store = StoreService.getInstance();
-      loadHomepage(store.availableKeys);
+      if (store.mode === 'Summary') {
+        loadSummarypage(store.availableKeys);
+      } else {
+        loadHomepage(store.availableKeys);
+      }
     }
   });
 }
@@ -800,6 +807,238 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
   await context.sync();
   toaster("AI tag application completed!", "success");
   loadHomepage(store.availableKeys);
+}
+
+export async function applySummaryTagFn(
+  body: Word.Body,
+  context: Word.RequestContext
+) {
+  document.getElementById('app-body').innerHTML = `
+  <div id="button-container">
+    <div class="loader" id="loader"></div>
+    <div id="highlighted-text"></div>
+  </div>`
+  toaster("Please wait... applying Summary tags", "info");
+
+  const store = StoreService.getInstance();
+  for (const tag of store.summaryTagList) {
+    tag.EditorValue = removeQuotes(tag.Response);
+    if (!tag.Response) continue;
+
+    const results = body.search(`#${tag.Name}#`, {
+      matchCase: false,
+      matchWholeWord: false
+    });
+
+    context.load(results, "items");
+    await context.sync();
+
+    for (const item of results.items) {
+      /* --------------------------------------------------
+         1️⃣ Anchor correctly (NO invisible chars)
+      -------------------------------------------------- */
+      const anchor = item.getRange("Start");
+
+      // Remove placeholder text completely
+      item.delete();
+      await context.sync();
+
+      let cursor = anchor;
+
+      let bookmarkStart: Word.Range | null = null;
+      let bookmarkEnd: Word.Range | null = null;
+
+      const include = (r: Word.Range) => {
+        if (!bookmarkStart) {
+          bookmarkStart = r.getRange("Start");
+        }
+        bookmarkEnd = r.getRange("End");
+      };
+
+      /* --------------------------------------------------
+         2️⃣ Insert content forward from anchor
+      -------------------------------------------------- */
+
+      // TABLE CONTENT
+      if (tag.ComponentKeyDataType === "TABLE") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(tag.EditorValue, "text/html");
+        const nodes = Array.from(doc.body.childNodes);
+
+        for (const node of nodes) {
+          // TEXT NODE
+          if (node.nodeType === Node.TEXT_NODE) {
+            let txt = node.textContent?.trim();
+            if (!txt) continue;
+
+            txt = txt.replace(/\n- /g, "\n• ");
+            for (const line of txt.split(/\r?\n/)) {
+              if (!line.trim()) {
+                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                insertLineWithHeadingStyle(p, "");
+                include(p.getRange());
+                cursor = p.getRange();
+                continue;
+              }
+
+              const p = cursor.insertParagraph("", Word.InsertLocation.after);
+              insertLineWithHeadingStyle(p, line);
+
+              include(p.getRange());
+              cursor = p.getRange();
+            }
+          }
+
+          // ELEMENT NODE
+          else if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+
+            // TABLE
+            if (el.tagName.toLowerCase() === "table") {
+              const rows = Array.from(el.querySelectorAll("tr"));
+              if (!rows.length) continue;
+
+              let grid = parseHtmlTableToGrid(rows);
+              const tableCase = detectTableCase(grid);
+
+              const store = StoreService.getInstance();
+              const base = store.tableStyle.split(" - ")[0].trim();
+
+              if (base === 'Table Grid 2') {
+                store.isReversed = true;
+              } else {
+                store.isReversed = false;
+              }
+              if (store.isReversed && tableCase !== "CASE_1") {
+                grid = transposeGrid(grid);
+              }
+
+              const numRows = grid.length;
+              const numCols = grid[0]?.length || 0;
+
+              const p = cursor.insertParagraph("", Word.InsertLocation.after);
+              const table = p.insertTable(
+                numRows,
+                numCols,
+                Word.InsertLocation.after
+              );
+
+              const resolvedTableStyle = resolveWordTableStyle(store.tableStyle);
+              if (resolvedTableStyle !== 'none') {
+                table.style = resolvedTableStyle;
+              }
+
+              // Population/Merging logic
+              if (!store.isReversed) {
+                if (!store.colorPallete.Customize) {
+                  grid.forEach((rowGrid, rowIndex) => {
+                    rowGrid.forEach((cellValue, cellIndex) => {
+                      const tableCell = table.getCell(rowIndex, cellIndex);
+                      tableCell.value = cellValue;
+                      applyCustomTextStyleToCell(tableCell, store);
+                    });
+                  });
+
+                  // Vertical merging logic for 1st column (standard view)
+                  let lastParamRowIndex = -1;
+                  grid.forEach((rowGrid, rowIndex) => {
+                    if (rowIndex === 0) return; // skip header
+                    const firstColText = rowGrid[0];
+                    if (firstColText) {
+                      lastParamRowIndex = rowIndex;
+                    } else if (lastParamRowIndex !== -1) {
+                      const topCell = table.getCell(lastParamRowIndex, 0);
+                      const bottomCell = table.getCell(rowIndex, 0);
+                      (topCell as any).merge(bottomCell);
+                      try {
+                        topCell.verticalAlignment = Word.VerticalAlignment.center;
+                        topCell.body.paragraphs.getFirst().alignment = Word.Alignment.centered as any;
+                      } catch (e) { }
+                    }
+                  });
+                }
+              } else {
+                // Manual population for transposed table
+                grid.forEach((rowGrid, rowIndex) => {
+                  rowGrid.forEach((cellValue, cellIndex) => {
+                    const tableCell = table.getCell(rowIndex, cellIndex);
+                    tableCell.value = cellValue;
+                    applyCustomTextStyleToCell(tableCell, store);
+                  });
+                });
+              }
+
+              // Styling logic
+              if (store.colorPallete.Customize) {
+                await colorTable(table, rows, context, store.isReversed);
+              }
+
+              include(table.getRange());
+              cursor = table.getRange();
+            }
+
+            // OTHER ELEMENTS
+            else {
+              let txt = el.innerText?.trim();
+              if (!txt) continue;
+
+              txt = txt.replace(/\n- /g, "\n• ");
+              for (const line of txt.split(/\r?\n/)) {
+                if (!line.trim()) {
+                  const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                  insertLineWithHeadingStyle(p, "");
+                  include(p.getRange());
+                  cursor = p.getRange();
+                  continue;
+                }
+                const p = cursor.insertParagraph("", Word.InsertLocation.after);
+                insertLineWithHeadingStyle(p, line);
+
+                include(p.getRange());
+                cursor = p.getRange();
+              }
+            }
+          }
+        }
+      }
+
+      // TEXT CONTENT
+      else {
+        const txt = tag.EditorValue
+          .replace(/\n- /g, "\n• ")
+          .trim();
+
+        for (const line of txt.split(/\r?\n/)) {
+          if (!line.trim()) {
+            const p = cursor.insertParagraph("", Word.InsertLocation.after);
+            insertLineWithHeadingStyle(p, "");
+            include(p.getRange());
+            cursor = p.getRange();
+            continue;
+          }
+
+          const p = cursor.insertParagraph("", Word.InsertLocation.after);
+          insertLineWithHeadingStyle(p, line);
+
+          include(p.getRange());
+          cursor = p.getRange();
+        }
+      }
+
+      await context.sync();
+
+      /* --------------------------------------------------
+         3️⃣ Create SINGLE bookmark
+      -------------------------------------------------- */
+      if (bookmarkStart && bookmarkEnd) {
+        const bookmarkName = `SM${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
+        bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
+      }
+    }
+  }
+  await context.sync();
+  toaster("Summary tag application completed!", "success");
+  loadSummarypage(store.availableKeys);
 }
 
 export async function applyAITagFn(
