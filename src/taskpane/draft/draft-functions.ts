@@ -315,7 +315,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
 
   return chatList.map((chat, index) => {
     const includeSaveIcon = globalPromptUpdate?.UserRoleAccessID === 3;
-    const includeReferenceIcon = chat.Evidences && chat.Evidences.length > 0;
+    const includeReferenceIcon = true;
     const formattedDate = formatChatDate(chat.CreatedDate);
 
     return `

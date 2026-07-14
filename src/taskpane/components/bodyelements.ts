@@ -229,6 +229,46 @@ function DataModalPopup(selectedData) {
   const isDark = store.theme === 'Dark';
   const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
 
+  const hasEvidences = selectedData?.Data && selectedData.Data.length > 0;
+
+  let bodyContent = '';
+  if (hasEvidences) {
+    bodyContent = `
+      <div class="row g-2 list-height">
+        ${selectedData.Data.map(item => `
+          <div class="col-md-12 mt-3">
+            <div class="border rounded p-2 ${isDark ? 'bg-secondary text-light' : 'bg-light text-dark'} shadow-sm h-100">
+              <div class="fw-bold small text-truncate" title="${item.FileName}">
+                ${item.FileName}
+              </div>
+              <div class="text-muted small mb-1">Page: ${item.PageNumber}</div>
+              <div class="small" style="white-space: normal;">
+                ${item.Sentence}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  } else {
+    const sources = selectedData?.Sources || [];
+    const isSpreadsheetFile = (fileName: string) => {
+      if (!fileName) return false;
+      const lower = fileName.trim().toLowerCase();
+      return lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv');
+    };
+    const isExclusivelySpreadsheet = sources.length > 0 && sources.every(src => isSpreadsheetFile(src.FileName));
+    const message = isExclusivelySpreadsheet
+      ? "Reference details are not available for responses generated exclusively from spreadsheet sources."
+      : "No reference details are available for this response. The AI model did not provide source references.";
+
+    bodyContent = `
+      <div class="p-3 mb-3" style="background-color: #f0f8ff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 4px solid #0056b3 !important;">
+        <div style="color: #6c757d; white-space: normal; font-size: 0.9rem; line-height: 1.4;">
+          ${message}
+        </div>
+      </div>`;
+  }
+
   return `
 <div class="modal show d-block" tabindex="-1">
   <div class="modal-dialog modal-lg">
@@ -249,21 +289,7 @@ function DataModalPopup(selectedData) {
       </div>
 
       <div class="modal-body p-3 add-ai-gen">
-        <div class="row g-2 list-height">
-          ${selectedData?.Data?.map(item => `
-            <div class="col-md-12 mt-3">
-              <div class="border rounded p-2 ${isDark ? 'bg-secondary text-light' : 'bg-light text-dark'} shadow-sm h-100">
-                <div class="fw-bold small text-truncate" title="${item.FileName}">
-                  ${item.FileName}
-                </div>
-                <div class="text-muted small mb-1">Page: ${item.PageNumber}</div>
-                <div class="small" style="white-space: normal;">
-                  ${item.Sentence}
-                </div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
+        ${bodyContent}
 
         <div class="d-flex w-100 justify-content-end mt-3 align-items-center">
           <button type="button" class="btn btn-primary text-white" id="datamodel-popup-ok">OK</button>
