@@ -14,7 +14,8 @@ export async function loginUser(organization: string, username: string, password
     body: JSON.stringify({
       ClientName: organization,
       Username: username,
-      Password: password
+      Password: password,
+      LoginType: 'ADDIN'
     })
   });
 
