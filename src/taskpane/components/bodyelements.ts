@@ -250,16 +250,7 @@ function DataModalPopup(selectedData) {
         `).join('')}
       </div>`;
   } else {
-    const sources = selectedData?.Sources || [];
-    const isSpreadsheetFile = (fileName: string) => {
-      if (!fileName) return false;
-      const lower = fileName.trim().toLowerCase();
-      return lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv');
-    };
-    const isExclusivelySpreadsheet = sources.length > 0 && sources.every(src => isSpreadsheetFile(src.FileName));
-    const message = isExclusivelySpreadsheet
-      ? "Reference details are not available for responses generated exclusively from spreadsheet sources."
-      : "No reference details are available for this response. The AI model did not provide source references.";
+    const message = "No reference details are available for this response. The AI model did not provide source references.";
 
     bodyContent = `
       <div class="p-3 mb-3" style="background-color: #f0f8ff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 4px solid #0056b3 !important;">
@@ -404,7 +395,7 @@ const navTabs = `<ul class="nav nav-tabs" id="tabList" role="tablist">
     <a class="nav-link active" id="tag-tab" data-bs-toggle="tab" href="#tag" role="tab">Tag</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" id="prompt-tab" data-bs-toggle="tab" href="#prompt" role="tab">Prompt builder</a>
+    <a class="nav-link" id="prompt-tab" data-bs-toggle="tab" href="#prompt" role="tab">Prompt Builder</a>
   </li>
 </ul>
 
@@ -536,4 +527,43 @@ function customizedStylePopup(selectedValue: string, availableStyles: any[]) {
   `;
 }
 
-export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup, customizedStylePopup };
+function PromptBuilderModalPopup() {
+  const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
+  const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
+
+  return `
+<div class="modal show d-block" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold">Prompt Builder</h5>
+      </div>
+
+      <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+        <div class="form-group mb-3">
+          <label class='form-label'><span class="text-danger">*</span> Prompt Builder Template</label>
+          <select id="promptBuilderTemplatePopup" class="form-select ${isDark ? 'bg-secondary text-light border-secondary' : ''}">
+            <option value="" disabled selected>Select a template</option>
+          </select>
+          <div id="templateErrorPopup" class="invalid-feedback d-none">Type is required.</div>
+        </div>
+
+        <div id="fieldsContainerPopup"></div>
+
+        <div class="form-group mb-3" id="previewContainerPopup" style="display: none;">
+          <label class="mb-2 fw-bold">Preview</label>
+          <div id="previewPopup" class="form-control border p-2 ${isDark ? 'bg-secondary text-light border-secondary' : 'bg-light text-dark'}" style="min-height: 50px; white-space: pre-wrap; word-break: break-word;"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-link ${isDark ? 'text-info' : 'text-primary'}" id="prompt-builder-popup-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-white" id="prompt-builder-popup-insert" disabled>Insert</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, PromptBuilderModalPopup };
