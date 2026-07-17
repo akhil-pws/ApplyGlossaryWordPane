@@ -3,7 +3,7 @@ import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingSty
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
-import { Confirmationpopup, DataModalPopup, toaster } from "../components/bodyelements";
+import { Confirmationpopup, DataModalPopup, toaster, PromptBuilderModalPopup } from "../components/bodyelements";
 import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
@@ -455,7 +455,7 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
   <div class="d-flex justify-content-between px-3 align-items-center mt-3">
     <span id="resetBtn" class="text-primary fw-bold" style="cursor: pointer;">Reset</span>
-    <button id="applyBtn" class="btn btn-primary text-white" disabled>Apply Prompt</button>
+    <button id="applyBtn" class="btn btn-primary text-white" disabled>Insert</button>
   </div>
 `;
 
@@ -836,6 +836,154 @@ export function getDateTimeStamp() {
 
 
 
+export async function openPromptBuilderModal(tag: any, type: "Summary" | "AITag") {
+    const container = document.getElementById('confirmation-popup');
+    if (!container) return;
+
+    // Show the modal
+    container.innerHTML = PromptBuilderModalPopup();
+
+    const store = StoreService.getInstance();
+    const promptBuilderList = store.promptBuilderList || [];
+
+    // References to modal elements
+    const templateSelect = document.getElementById('promptBuilderTemplatePopup') as HTMLSelectElement;
+    const insertBtn = document.getElementById('prompt-builder-popup-insert') as HTMLButtonElement;
+    const cancelBtn = document.getElementById('prompt-builder-popup-cancel') as HTMLButtonElement;
+    const previewDiv = document.getElementById('previewPopup') as HTMLDivElement;
+    const fieldsContainer = document.getElementById('fieldsContainerPopup') as HTMLDivElement;
+    const previewContainer = document.getElementById('previewContainerPopup') as HTMLDivElement;
+    const templateError = document.getElementById('templateErrorPopup') as HTMLDivElement;
+
+    let fieldsList: any[] = [];
+    let templateText = '';
+    let currentPreview = '';
+
+    // Populate template dropdown
+    promptBuilderList.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.ID.toString();
+        option.textContent = item.Name;
+        templateSelect.appendChild(option);
+    });
+
+    // Close/Cancel functions
+    const closeModal = () => {
+        container.innerHTML = '';
+    };
+
+    cancelBtn.addEventListener('click', closeModal);
+
+    // Template change logic
+    templateSelect.addEventListener('change', async () => {
+        const templateId = templateSelect.value;
+        const jwt = DocStorage.getItem('token') || '';
+
+        try {
+            const data = await getPromptTemplateById(templateId, jwt);
+            if (data.Status && data.Data) {
+                fieldsList = data.Data;
+                const selectedTemplateObj = promptBuilderList.find((item) => item.ID.toString() === templateId);
+                templateText = selectedTemplateObj ? selectedTemplateObj.Template : '';
+                currentPreview = templateText;
+            }
+            if (!templateId) {
+                templateError.classList.remove('d-none');
+                return;
+            }
+
+            templateError.classList.add('d-none');
+
+            renderFields();
+            updatePreview();
+        } catch (err) {
+            console.error("Failed to load prompt template fields:", err);
+            toaster("Failed to load template fields", "error");
+        }
+    });
+
+    function renderFields() {
+        fieldsContainer.innerHTML = '';
+
+        fieldsList.forEach((field) => {
+            const div = document.createElement('div');
+            div.className = 'form-group mb-3';
+
+            const label = document.createElement('label');
+            label.className = 'form-label fw-semibold small';
+            label.textContent = field.Label;
+            div.appendChild(label);
+
+            if (field.Type === 1) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-control';
+                input.id = `modal-field-${field.Label}`;
+                input.addEventListener('input', replaceKeywordsManually);
+                div.appendChild(input);
+            } else if (field.Type === 2) {
+                const select = document.createElement('select');
+                select.className = 'form-select';
+                select.id = `modal-field-${field.Label}`;
+                field.PromptTemplateOptionList.forEach((opt: any) => {
+                    const option = document.createElement('option');
+                    option.value = opt.Text;
+                    option.textContent = opt.Option;
+                    select.appendChild(option);
+                });
+                select.addEventListener('change', replaceKeywordsManually);
+                div.appendChild(select);
+            }
+
+            fieldsContainer.appendChild(div);
+        });
+    }
+
+    function replaceKeywordsManually() {
+        const keywordMap: { [key: string]: string } = {};
+
+        fieldsList.forEach((field) => {
+            const id = `modal-field-${field.Label}`;
+            const keyword = `#${field.Label}#`;
+
+            let value = '';
+            const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
+
+            if (element) {
+                value = element.value || '';
+            }
+
+            keywordMap[keyword] = value ? value : keyword;
+        });
+
+        let insertValue = templateText;
+        for (const [keyword, value] of Object.entries(keywordMap)) {
+            insertValue = insertValue.replace(new RegExp(keyword, 'g'), value);
+        }
+
+        currentPreview = insertValue;
+        previewDiv.textContent = currentPreview;
+        previewContainer.style.display = currentPreview ? 'block' : 'none';
+        insertBtn.disabled = currentPreview === '';
+    }
+
+    function updatePreview() {
+        replaceKeywordsManually();
+    }
+
+    // Insert logic: copy generated template text and insert into #chatInput
+    insertBtn.addEventListener('click', () => {
+        if (!currentPreview) return;
+        const chatInput = document.getElementById('chatInput') as HTMLTextAreaElement;
+        if (chatInput) {
+            chatInput.value = currentPreview;
+            chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        closeModal();
+    });
+}
+
+
 export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any, type: "Summary" | "AITag") {
     setTimeout(() => {
         tag.FilteredReportHeadAIHistoryList.forEach((chat: any, index: number) => {
@@ -1104,6 +1252,11 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                     loadSummarypage(availableKeys);
                 }
             });
+        });
+
+        // Button: Prompt Builder
+        document.getElementById(`promptBuilderButton`)?.addEventListener('click', () => {
+            openPromptBuilderModal(tag, type);
         });
 
         // Button: Insert Tag

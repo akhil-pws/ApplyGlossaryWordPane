@@ -372,7 +372,7 @@ export function chatfooter(tag: any) {
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
   return ` <textarea class="form-control ${promptclass}"
-                      rows="5"
+                      rows="7"
                       id="chatInput"
                       ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
@@ -381,12 +381,14 @@ export function chatfooter(tag: any) {
                 <span class="tooltiptext">Insert</span>
                 <i class="fa fa-plus text-light c-pointer"></i>
               </button>
-             <div class="ngb-tooltip d-inline-block">
-                 ${tooltipButton}
-                <button class="btn btn-secondary ms-2 mb-2 text-white" id="changeSourceButton">
-                  <i class="fa fa-file-lines text-white"></i>
-                </button>
-              </div>
+              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton">
+                <span class="tooltiptext">Prompt Builder</span>
+                <i class="fa fa-keyboard text-light c-pointer"></i>
+              </button>
+              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="changeSourceButton">
+                ${tooltipButton}
+                <i class="fa fa-file-lines text-light c-pointer"></i>
+              </button>
 
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton">
                 <span class="tooltiptext">Send</span>
