@@ -27,7 +27,7 @@ Office.onReady((info) => {
     // AuthService.init(); // if needed
 
     // Retrieve Properties via Service
-    DocumentService.retrieveDocumentProperties().then((props) => {
+    DocumentService.retrieveDocumentProperties().then(async (props) => {
       if (props) {
         if (!CONFIG.environment.includes(props.environment) && props.environment !== 'unknown') {
           document.getElementById('app-body').innerHTML = `
@@ -71,7 +71,7 @@ Office.onReady((info) => {
 
             window.location.hash = '#/dashboard';
             toaster('You are successfully logged in', 'success');
-            displayMenu(); // Trigger legacy menu display
+            await displayMenu(); // Trigger legacy menu display
           } else {
             loadLoginPage();
           }
@@ -180,7 +180,7 @@ async function handleLogin(event) {
         if (localPallete) store.colorPallete = JSON.parse(localPallete);
 
         toaster('You are successfully logged in', 'success');
-        displayMenu();
+        await displayMenu();
         window.location.hash = '#/dashboard';
       } else {
         showLoginError(result.message || "Login failed");
@@ -203,12 +203,11 @@ function showLoginError(message) {
   errorDiv.textContent = message;
 }
 
-function displayMenu() {
+async function displayMenu(): Promise<void> {
   const store = StoreService.getInstance();
   store.userId = Number(DocStorage.getItem('userId'))
   // document.getElementById('aitag').addEventListener('click', redirectAI);
-  fetchDocument('Init');
-
+  await fetchDocument('Init');
 }
 
 async function getTableStyle() {
@@ -317,6 +316,8 @@ async function fetchDocument(action) {
         confirmSwitchChatHistory(async () => {
           if (!store.isPendingResponse) {
             if (store.isGlossaryActive) await removeMatchingContentControls();
+            store.currentChatTagId = -1;
+            DocStorage.setItem("currentChatTagId", "-1");
             loadHomepage(store.availableKeys);
           }
           store.mode = 'Home';
@@ -327,6 +328,8 @@ async function fetchDocument(action) {
         confirmSwitchChatHistory(async () => {
           if (!store.isPendingResponse) {
             if (store.isGlossaryActive) await removeMatchingContentControls();
+            store.currentChatTagId = -1;
+            DocStorage.setItem("currentChatTagId", "-1");
             loadSummarypage(store.availableKeys);
           }
           store.mode = 'Summary';
@@ -3024,6 +3027,15 @@ async function logBookmarksInSelection() {
           const singleName = matchedNames[0];
           const tag = findTag(singleName);
           if (tag) {
+            const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+              document.getElementById('tags-in-selected-text')
+                ?.classList.replace('d-none', 'd-block');
+              store.selectedNames = [singleName];
+              renderSelectedTags(store.selectedNames, store.availableKeys);
+              return;
+            }
+
             confirmSwitchChatHistory(async () => {
               const appBody = document.getElementById('app-body');
               appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
