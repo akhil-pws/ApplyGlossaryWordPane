@@ -220,6 +220,10 @@ export async function loadSummarypage(availableKeys: any[]) {
       `;
 
       row.onclick = async () => {
+        const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+        if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+          return;
+        }
         confirmSwitchChatHistory(async () => {
           try {
             const appBody = document.getElementById('app-body');

@@ -429,6 +429,10 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.style.cursor = 'pointer';
           badge.innerHTML = `${summaryTag.Name} <i class="fa-solid fa-wand-magic-sparkles ms-2 text-muted" aria-label="Summary Tag"></i>`;
           badge.addEventListener('click', async () => {
+            const tagId = summaryTag.ID || summaryTag.ReportHeadSummaryTagID;
+            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+              return;
+            }
             confirmSwitchChatHistory(async () => {
               await selectMatchingBookmarkFromSelection(name);
 
@@ -463,6 +467,10 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.style.cursor = 'pointer';
           badge.innerHTML = `${aiTag.DisplayName} ${getIconSvg(faMicrochipAi, 'ms-2 text-muted', '', 'aria-label="AI Suggested"')}`;
           badge.addEventListener('click', async () => {
+            const tagId = aiTag.ID || aiTag.ReportHeadSummaryTagID;
+            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+              return;
+            }
             confirmSwitchChatHistory(async () => {
               await selectMatchingBookmarkFromSelection(name);
 

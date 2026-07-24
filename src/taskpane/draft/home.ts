@@ -101,6 +101,10 @@ export function loadHomepage(availableKeys) {
 
                 listItem.onclick = () => {
                     if (isAISection) {
+                        const tagId = mention.ID || mention.ReportHeadSummaryTagID;
+                        if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+                            return;
+                        }
                         confirmSwitchChatHistory(() => {
                             const appBody = document.getElementById('app-body');
                             appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
