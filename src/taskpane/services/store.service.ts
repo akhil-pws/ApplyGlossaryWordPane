@@ -11,6 +11,7 @@ export class StoreService {
     public UserRole: any = {};
     public documentID: string = '';
     public organizationName: string = '';
+    public documentInstruction: string = '';
     public aiTagList: any[] = [];
     public summaryTagList: any[] = [];
     public imageList: any[] = [];
@@ -90,6 +91,7 @@ export class StoreService {
             UserRole: this.UserRole,
             documentID: this.documentID,
             organizationName: this.organizationName,
+            documentInstruction: this.documentInstruction,
             theme: this.theme,
             mode: this.mode,
             userId: this.userId,
@@ -113,6 +115,7 @@ export class StoreService {
                 if (data.jwt) this.jwt = data.jwt;
                 if (data.UserRole) this.UserRole = data.UserRole;
                 if (data.organizationName) this.organizationName = data.organizationName;
+                if (data.documentInstruction) this.documentInstruction = data.documentInstruction;
                 if (data.theme) this.theme = data.theme;
                 if (data.mode) this.mode = data.mode;
                 if (data.userId) this.userId = data.userId;
@@ -136,6 +139,7 @@ export class StoreService {
         this.jwt = '';
         this.UserRole = {};
         this.userId = 0;
+        this.documentInstruction = '';
         this.isReversed = false;
         this.aiTagList = [];
         this.summaryTagList = [];

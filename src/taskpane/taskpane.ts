@@ -280,6 +280,7 @@ async function fetchDocument(action) {
 
     // Assign to store
     store.dataList = reportData.dataList;
+    store.documentInstruction = reportData.documentInstruction || store.dataList?.DocumentInstruction || store.dataList?.DocumentInstructions || '';
     await getTableStyle();
     await getCustomTextStyles();
     await loadPromptTemplates();
