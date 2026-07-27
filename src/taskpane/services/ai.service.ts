@@ -55,6 +55,8 @@ export class AIService {
             if (iconelement) iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
 
             let payload: any;
+            const documentInstruction = store.documentInstruction || store.dataList?.DocumentInstruction || store.dataList?.DocumentInstructions || '';
+
             if (type === 'Summary') {
                 payload = {
                     ReportHeadID: store.dataList.ID,
@@ -63,7 +65,8 @@ export class AIService {
                     Response: "",
                     Selected: 1,
                     SourceVector: tag.TempSourceValue ? tag.TempSourceValue.join(",") : "",
-                    Name: tag.Name
+                    Name: tag.Name,
+                    DocumentInstruction: documentInstruction
                 };
             } else {
                 payload = {
@@ -83,7 +86,8 @@ export class AIService {
                     VectorID: store.dataList.VectorID,
                     Selected: 0,
                     ID: 0,
-                    SourceValue: tag.TempSourceValue ? tag.TempSourceValue : []
+                    SourceValue: tag.TempSourceValue ? tag.TempSourceValue : [],
+                    DocumentInstruction: documentInstruction
                 };
             }
 

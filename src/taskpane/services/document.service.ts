@@ -1,5 +1,5 @@
 /* global Word */
-import { DocumentProperty } from "../models/app.model";
+import { StoreService } from "./store.service";
 import { getReportById, getAllClients, getAllPromptTemplates, getGeneralImages, getReportHeadImageById } from "../draft/draft.api";
 import { updateEditorFinalTable, mapImagesToComponentObjects } from "../draft/draft-functions";
 
@@ -22,6 +22,8 @@ export class DocumentService {
             }
 
             const dataList = data.Data;
+            const documentInstruction = dataList.DocumentInstruction || dataList.DocumentInstructions || '';
+            StoreService.getInstance().documentInstruction = documentInstruction;
 
             // Basic processing
             if (!dataList.SourceTypeList) dataList.SourceTypeList = [];
@@ -66,6 +68,7 @@ export class DocumentService {
 
             return {
                 dataList,
+                documentInstruction,
                 availableKeys,
                 sourceList,
                 clientId,

@@ -333,7 +333,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
               ${includeSaveIcon ? `<i class="fa fa-save text-secondary c-pointer mb-2" title="Save Prompt" id="savePrompt-${index}"></i>` : ''}
               <div class="ngb-tooltip d-inline-block">
                 <span class="tooltiptext" style="white-space: nowrap; line-height: 1.4;">
-                  Created By: ${chat.CreatedByName || 'Unknown User'}<br>Date: ${formattedDate || 'N/A'}
+                  ${chat.DocumentInstruction ? `Document Instruction: ${chat.DocumentInstruction}<br>` : ''}Created By: ${chat.CreatedByName || 'Unknown User'}<br>Date: ${formattedDate || 'N/A'}
                 </span>
                 <i class="fa-solid fa-circle-info text-secondary c-pointer" id="infoPrompt-${index}"></i>
               </div>
