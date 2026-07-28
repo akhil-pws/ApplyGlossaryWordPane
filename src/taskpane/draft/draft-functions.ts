@@ -332,9 +332,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
               <i class="fa fa-copy text-secondary c-pointer mb-2" title="Copy Prompt" id="copyPrompt-${index}"></i>
               ${includeSaveIcon ? `<i class="fa fa-save text-secondary c-pointer mb-2" title="Save Prompt" id="savePrompt-${index}"></i>` : ''}
               <div class="ngb-tooltip d-inline-block">
-                <span class="tooltiptext" style="white-space: nowrap; line-height: 1.4;">
-                  ${chat.DocumentInstruction ? `Document Instruction: ${chat.DocumentInstruction}<br>` : ''}Created By: ${chat.CreatedByName || 'Unknown User'}<br>Date: ${formattedDate || 'N/A'}
-                </span>
+                <span class="tooltiptext info-tooltip-text">${chat.DocumentInstruction ? `<strong>Document Instruction:</strong> ${chat.DocumentInstruction}<br>` : ''}<strong>Created By:</strong> ${chat.CreatedByName || 'Unknown User'}<br><strong>Date:</strong> ${formattedDate || 'N/A'}</span>
                 <i class="fa-solid fa-circle-info text-secondary c-pointer" id="infoPrompt-${index}"></i>
               </div>
             </div>
