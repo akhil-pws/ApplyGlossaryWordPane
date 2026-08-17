@@ -23,6 +23,23 @@ Office.onReady((info) => {
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("footer").innerText = `© ${new Date().getFullYear()} - TrialAssure LINK AI Assistant ${CONFIG.version}`;
 
+    // 1. Check for SSO start parameter (inside dialog)
+    const ssoStart = getQueryParam('ssoStart');
+    if (ssoStart === 'true') {
+      const targetUrl = getQueryParam('redirectUrl');
+      if (targetUrl) {
+        window.location.href = targetUrl;
+        return;
+      }
+    }
+
+    // 2. Check for SSO key inside the dialog
+    const ssoKey = getQueryParam('key');
+    if (ssoKey && typeof Office !== 'undefined' && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+      Office.context.ui.messageParent(JSON.stringify({ key: ssoKey }));
+      return;
+    }
+
     // Initialize Services
     // AuthService.init(); // if needed
 
@@ -45,35 +62,77 @@ Office.onReady((info) => {
             CONFIG.dataUrl = props.URL
           }
 
-          // Check Session
-          const session = AuthService.restoreSession();
-          if (session) {
-            // Restore session state
-            store.jwt = session.jwt;
-            store.UserRole = session.userRole;
-            if (session.tableStyle) store.tableStyle = session.tableStyle;
-            if (session.colorPallete) store.colorPallete = session.colorPallete;
-            if (session.defaultTextStyle) store.defaultTextStyle = session.defaultTextStyle;
+          // Check for SSO key first
+          if (ssoKey) {
+            UIService.toggleLoader(true);
+            AuthService.ssoComplete(ssoKey).then(async (ssoResult) => {
+              // Clear query params to clean up the URL
+              const url = new URL(window.location.href);
+              url.searchParams.delete('key');
+              window.history.replaceState({}, document.title, url.toString());
 
-            // Handle custom text style null properties fallback check
-            if (store.customizedTextStyle && store.customizedTextStyle.properties === null) {
-              getDocumentParagraphStyles().then((availableStyles) => {
-                const styleNameInWord = availableStyles.find(
-                  s => s.toLowerCase() === store.customizedTextStyle.name.toLowerCase() || s.toLowerCase() === store.customizedTextStyle.id.toLowerCase()
-                );
-                if (styleNameInWord) {
-                  store.defaultTextStyle = styleNameInWord;
-                  DocStorage.setItem("defaultTextStyle", styleNameInWord);
-                  store.saveToStorage();
-                }
-              }).catch(e => console.error("Error restoring custom style fallback on load:", e));
-            }
+              if (ssoResult.success) {
+                const data = ssoResult.data;
+                store.jwt = data.token;
+                store.UserRole = data.userRole;
+                store.userId = data.userId;
+                store.saveToStorage();
 
-            window.location.hash = '#/dashboard';
-            toaster('You are successfully logged in', 'success');
-            await displayMenu(); // Trigger legacy menu display
+                // Preserve legacy logic for style restoring
+                const style = DocStorage.getItem('tableStyle');
+                if (style) store.tableStyle = style;
+
+                const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+                if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+
+                const localPallete = DocStorage.getItem('colorPallete');
+                if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+                UIService.toggleLoader(false);
+                toaster('You are successfully logged in', 'success');
+                await displayMenu();
+                window.location.hash = '#/dashboard';
+              } else {
+                UIService.toggleLoader(false);
+                toaster(ssoResult.message || 'SSO Login failed', 'error');
+                loadLoginPage();
+              }
+            }).catch(err => {
+              console.error("SSO completion error:", err);
+              UIService.toggleLoader(false);
+              loadLoginPage();
+            });
           } else {
-            loadLoginPage();
+            // Check Session
+            const session = AuthService.restoreSession();
+            if (session) {
+              // Restore session state
+              store.jwt = session.jwt;
+              store.UserRole = session.userRole;
+              if (session.tableStyle) store.tableStyle = session.tableStyle;
+              if (session.colorPallete) store.colorPallete = session.colorPallete;
+              if (session.defaultTextStyle) store.defaultTextStyle = session.defaultTextStyle;
+
+              // Handle custom text style null properties fallback check
+              if (store.customizedTextStyle && store.customizedTextStyle.properties === null) {
+                getDocumentParagraphStyles().then((availableStyles) => {
+                  const styleNameInWord = availableStyles.find(
+                    s => s.toLowerCase() === store.customizedTextStyle.name.toLowerCase() || s.toLowerCase() === store.customizedTextStyle.id.toLowerCase()
+                  );
+                  if (styleNameInWord) {
+                    store.defaultTextStyle = styleNameInWord;
+                    DocStorage.setItem("defaultTextStyle", styleNameInWord);
+                    store.saveToStorage();
+                  }
+                }).catch(e => console.error("Error restoring custom style fallback on load:", e));
+              }
+
+              window.location.hash = '#/dashboard';
+              toaster('You are successfully logged in', 'success');
+              await displayMenu(); // Trigger legacy menu display
+            } else {
+              loadLoginPage();
+            }
           }
         }
       } else {
@@ -136,13 +195,47 @@ async function login() {
   }
 }
 
+let currentAuthType: string = 'TrialAssure';
+
+async function handleUserBlur() {
+  const orgEl = document.getElementById('organization') as HTMLInputElement;
+  const userEl = document.getElementById('username') as HTMLInputElement;
+  if (!orgEl || !userEl) return;
+
+  const org = orgEl.value;
+  const username = userEl.value;
+  if (org && username) {
+    const detectedType = await AuthService.checkLoginType(org, username);
+    currentAuthType = detectedType;
+    const passwordContainer = document.getElementById('password-container');
+    const passwordInput = document.getElementById('password') as HTMLInputElement;
+
+    if (detectedType === 'AzureAD') {
+      if (passwordContainer) {
+        passwordContainer.style.display = 'none';
+      }
+      if (passwordInput) {
+        passwordInput.removeAttribute('required');
+        passwordInput.value = '';
+      }
+    } else {
+      if (passwordContainer) {
+        passwordContainer.style.display = 'block';
+      }
+      if (passwordInput) {
+        passwordInput.setAttribute('required', 'true');
+      }
+    }
+  }
+}
+
 function loadLoginPage() {
   const store = StoreService.getInstance();
   UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
     store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
     UIService.applyTheme(store.theme as 'Light' | 'Dark');
     DocStorage.setItem('theme', store.theme);
-  });
+  }, handleUserBlur);
 }
 
 async function handleLogin(event) {
@@ -159,48 +252,207 @@ async function handleLogin(event) {
     const enteredOrg = (organizationInput || '').toLowerCase().trim();
 
     if (enteredOrg === targetOrg && targetOrg !== '') {
-      // Use AuthService
-      const result = await AuthService.login(organizationInput, username, password);
+      const detectedType = await AuthService.checkLoginType(organizationInput, username);
+      currentAuthType = detectedType;
 
-      if (result.success) {
-        const data = result.data;
-        store.jwt = data.token;
-        store.UserRole = data.userRole;
-        store.userId = data.userId;
-        store.saveToStorage();
+      if (currentAuthType === 'AzureAD') {
+        const result = await AuthService.ssoLogin(organizationInput, username);
+        if (result.success && result.redirectUrl) {
+          const localRedirectUrl = window.location.origin + window.location.pathname + 
+            "?ssoStart=true&redirectUrl=" + encodeURIComponent(result.redirectUrl);
 
-        // Preserve legacy logic for style restoring
-        const style = DocStorage.getItem('tableStyle');
-        if (style) store.tableStyle = style;
+          Office.context.ui.displayDialogAsync(localRedirectUrl, { height: 60, width: 35, displayInIframe: false }, (asyncResult) => {
+            if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+              UIService.toggleLoader(false);
+              showLoginError("Could not open login window: " + asyncResult.error.message + "\nURL attempted: " + result.redirectUrl);
+              return;
+            }
+            const dialog = asyncResult.value;
+            dialog.addEventHandler(Office.EventType.DialogMessageReceived, async (args: any) => {
+              dialog.close();
+              UIService.toggleLoader(true);
+              if (args.message) {
+                try {
+                  const parsed = JSON.parse(args.message);
+                  if (parsed.key) {
+                    const ssoResult = await AuthService.ssoComplete(parsed.key);
+                    if (ssoResult.success) {
+                      const data = ssoResult.data;
+                      store.jwt = data.token;
+                      store.UserRole = data.userRole;
+                      store.userId = data.userId;
+                      store.saveToStorage();
 
-        const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
-        if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+                      // Preserve legacy logic for style restoring
+                      const style = DocStorage.getItem('tableStyle');
+                      if (style) store.tableStyle = style;
 
-        const localPallete = DocStorage.getItem('colorPallete');
-        if (localPallete) store.colorPallete = JSON.parse(localPallete);
+                      const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+                      if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
 
-        toaster('You are successfully logged in', 'success');
-        await displayMenu();
-        window.location.hash = '#/dashboard';
+                      const localPallete = DocStorage.getItem('colorPallete');
+                      if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+                      UIService.toggleLoader(false);
+                      toaster('You are successfully logged in', 'success');
+                      await displayMenu();
+                      window.location.hash = '#/dashboard';
+                    } else {
+                      UIService.toggleLoader(false);
+                      showLoginError(ssoResult.message || "SSO complete failed");
+                    }
+                  } else {
+                    UIService.toggleLoader(false);
+                    showLoginError("SSO login failed: no key received.");
+                  }
+                } catch (e) {
+                  console.error("SSO message parsing error:", e);
+                  UIService.toggleLoader(false);
+                  showLoginError("SSO login failed: invalid message data.");
+                }
+              } else {
+                UIService.toggleLoader(false);
+                showLoginError("SSO login failed: empty response.");
+              }
+            });
+            dialog.addEventHandler(Office.EventType.DialogEventReceived, (args: any) => {
+              UIService.toggleLoader(false);
+              console.log("SSO dialog event: ", args);
+            });
+          });
+        } else {
+          showLoginError(result.message || "SSO Login failed");
+        }
       } else {
-        showLoginError(result.message || "Login failed");
+        if (!password) {
+          throw new Error("Password is required.");
+        }
+        // Use AuthService
+        const result = await AuthService.login(organizationInput, username, password);
+
+        if (result.success) {
+          const data = result.data;
+          store.jwt = data.token;
+          store.UserRole = data.userRole;
+          store.userId = data.userId;
+          store.saveToStorage();
+
+          // Preserve legacy logic for style restoring
+          const style = DocStorage.getItem('tableStyle');
+          if (style) store.tableStyle = style;
+
+          const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+          if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+
+          const localPallete = DocStorage.getItem('colorPallete');
+          if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+          toaster('You are successfully logged in', 'success');
+          await displayMenu();
+          window.location.hash = '#/dashboard';
+        } else {
+          showLoginError(result.message || "Login failed");
+        }
       }
     } else {
       showLoginError("The organization specified is not associated with this document");
     }
   } catch (error) {
     console.error("Login process error:", error);
-    showLoginError("An unexpected error occurred. Please try again.");
+    const msg = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+    showLoginError(msg);
   } finally {
     UIService.toggleLoader(false);
   }
 }
 
+function handleSsoMessage(event: MessageEvent) {
+  if (!event.data) {
+    return;
+  }
+
+  let parsedData = event.data;
+
+  // If the payload was sent as a string, parse it into an object
+  if (typeof event.data === 'string') {
+    try {
+      parsedData = JSON.parse(event.data);
+    } catch (e) {
+      // Not a JSON string (could be internal webpack/chrome messages), ignore it
+      return;
+    }
+  }
+
+  // Verify if this message is our login payload (should contain a Token and a User ID/Username)
+  const hasToken =
+    parsedData.Token !== undefined || parsedData.token !== undefined;
+  const hasUser =
+    parsedData.UserID !== undefined ||
+    parsedData.userId !== undefined ||
+    parsedData.ID !== undefined ||
+    parsedData.Username !== undefined;
+
+  if (hasToken && hasUser) {
+    window.removeEventListener('message', handleSsoMessage);
+
+    const token = parsedData.Token || parsedData.token;
+    const userRole = parsedData.UserRole || parsedData.userRole;
+    const userId = parsedData.ID || parsedData.UserID || parsedData.userId;
+
+    // Store properties
+    DocStorage.setItem('token', token);
+    if (userRole) {
+      DocStorage.setItem('userRole', typeof userRole === 'string' ? userRole : JSON.stringify(userRole));
+    }
+    DocStorage.setItem('userId', userId);
+    DocStorage.setItem('tokenLastUpdated', new Date().toISOString());
+
+    // Sync with StoreService and persist
+    const store = StoreService.getInstance();
+    store.clearStorage();
+    store.jwt = token;
+    if (userRole) {
+      store.UserRole = typeof userRole === 'string' ? JSON.parse(userRole) : userRole;
+    }
+    store.userId = userId;
+    store.saveToStorage();
+
+    // Preserve legacy logic for style restoring
+    const style = DocStorage.getItem('tableStyle');
+    if (style) store.tableStyle = style;
+
+    const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+    if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+
+    const localPallete = DocStorage.getItem('colorPallete');
+    if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+    UIService.toggleLoader(false);
+    toaster('You are successfully logged in', 'success');
+    displayMenu().then(() => {
+      window.location.hash = '#/dashboard';
+    });
+  }
+}
+
+function getQueryParam(name: string): string | null {
+  const searchParams = new URLSearchParams(window.location.search);
+  let value = searchParams.get(name);
+  if (!value && window.location.hash.includes('?')) {
+    const hashQuery = window.location.hash.split('?')[1];
+    const hashParams = new URLSearchParams(hashQuery);
+    value = hashParams.get(name);
+  }
+  return value;
+}
+
 function showLoginError(message) {
   loadLoginPage();  // Reload the form UI
   const errorDiv = document.getElementById('login-error');
-  errorDiv.style.display = 'block';
-  errorDiv.textContent = message;
+  if (errorDiv) {
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = message;
+  }
 }
 
 async function displayMenu(): Promise<void> {
