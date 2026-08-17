@@ -11,6 +11,10 @@
   <SupportUrl DefaultValue="https://www.contoso.com/help"/>
   <AppDomains>
     <AppDomain>https://trialassurelink-pace.azurewebsites.net</AppDomain>
+    <AppDomain>https://login.microsoftonline.com</AppDomain>
+    <AppDomain>https://login.live.com</AppDomain>
+    <AppDomain>https://plsdevapp.azurewebsites.net</AppDomain>
+    <AppDomain>https://linkwordplugin-aphgcwcgbfdqeccs.eastus-01.azurewebsites.net</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Document"/>

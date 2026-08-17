@@ -23,6 +23,23 @@ Office.onReady((info) => {
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("footer").innerText = `© ${new Date().getFullYear()} - TrialAssure LINK AI Assistant ${CONFIG.version}`;
 
+    // 1. Check for SSO start parameter (inside dialog)
+    const ssoStart = getQueryParam('ssoStart');
+    if (ssoStart === 'true') {
+      const targetUrl = getQueryParam('redirectUrl');
+      if (targetUrl) {
+        window.location.href = targetUrl;
+        return;
+      }
+    }
+
+    // 2. Check for SSO key inside the dialog
+    const ssoKey = getQueryParam('key');
+    if (ssoKey && typeof Office !== 'undefined' && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+      Office.context.ui.messageParent(JSON.stringify({ key: ssoKey }));
+      return;
+    }
+
     // Initialize Services
     // AuthService.init(); // if needed
 
@@ -46,7 +63,6 @@ Office.onReady((info) => {
           }
 
           // Check for SSO key first
-          const ssoKey = getQueryParam('key');
           if (ssoKey) {
             UIService.toggleLoader(true);
             AuthService.ssoComplete(ssoKey).then(async (ssoResult) => {
@@ -237,13 +253,71 @@ async function handleLogin(event) {
 
     if (enteredOrg === targetOrg && targetOrg !== '') {
       if (currentAuthType === 'AzureAD') {
-        window.addEventListener('message', handleSsoMessage);
-
         const result = await AuthService.ssoLogin(organizationInput, username);
         if (result.success && result.redirectUrl) {
-          window.location.href = result.redirectUrl;
+          const localRedirectUrl = window.location.origin + window.location.pathname + 
+            "?ssoStart=true&redirectUrl=" + encodeURIComponent(result.redirectUrl);
+
+          Office.context.ui.displayDialogAsync(localRedirectUrl, { height: 60, width: 35, displayInIframe: false }, (asyncResult) => {
+            if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+              UIService.toggleLoader(false);
+              showLoginError("Could not open login window: " + asyncResult.error.message + "\nURL attempted: " + result.redirectUrl);
+              return;
+            }
+            const dialog = asyncResult.value;
+            dialog.addEventHandler(Office.EventType.DialogMessageReceived, async (args: any) => {
+              dialog.close();
+              UIService.toggleLoader(true);
+              if (args.message) {
+                try {
+                  const parsed = JSON.parse(args.message);
+                  if (parsed.key) {
+                    const ssoResult = await AuthService.ssoComplete(parsed.key);
+                    if (ssoResult.success) {
+                      const data = ssoResult.data;
+                      store.jwt = data.token;
+                      store.UserRole = data.userRole;
+                      store.userId = data.userId;
+                      store.saveToStorage();
+
+                      // Preserve legacy logic for style restoring
+                      const style = DocStorage.getItem('tableStyle');
+                      if (style) store.tableStyle = style;
+
+                      const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+                      if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+
+                      const localPallete = DocStorage.getItem('colorPallete');
+                      if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+                      UIService.toggleLoader(false);
+                      toaster('You are successfully logged in', 'success');
+                      await displayMenu();
+                      window.location.hash = '#/dashboard';
+                    } else {
+                      UIService.toggleLoader(false);
+                      showLoginError(ssoResult.message || "SSO complete failed");
+                    }
+                  } else {
+                    UIService.toggleLoader(false);
+                    showLoginError("SSO login failed: no key received.");
+                  }
+                } catch (e) {
+                  console.error("SSO message parsing error:", e);
+                  UIService.toggleLoader(false);
+                  showLoginError("SSO login failed: invalid message data.");
+                }
+              } else {
+                UIService.toggleLoader(false);
+                showLoginError("SSO login failed: empty response.");
+              }
+            });
+            dialog.addEventHandler(Office.EventType.DialogEventReceived, (args: any) => {
+              UIService.toggleLoader(false);
+              console.log("SSO dialog event: ", args);
+            });
+          });
         } else {
-          window.removeEventListener('message', handleSsoMessage);
           showLoginError(result.message || "SSO Login failed");
         }
       } else {
