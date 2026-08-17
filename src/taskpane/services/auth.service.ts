@@ -1,6 +1,6 @@
 import { CONFIG } from "../utils/config";
 import { UserProfile } from "../models/user.model";
-import { loginUser } from "../draft/draft.api";
+import { loginUser, checkLoginType, ssoLogin, ssoComplete } from "../draft/draft.api";
 import { StoreService } from "./store.service";
 import { DocStorage } from "../utils/doc-storage";
 
@@ -92,6 +92,88 @@ export class AuthService {
         } catch (error) {
             console.error('Error during login:', error);
             return { success: false, message: "An error occurred during login. Please try again." };
+        }
+    }
+
+    static async checkLoginType(organization: string, username: string): Promise<string> {
+        try {
+            const data = await checkLoginType(organization, username);
+            if (data && data.Status === true && data.Data) {
+                return data.Data.AuthenticationType || 'TrialAssure';
+            }
+            return 'TrialAssure';
+        } catch (error) {
+            console.error('Error during checkLoginType:', error);
+            return 'TrialAssure';
+        }
+    }
+
+    static async ssoLogin(organization: string, username: string): Promise<{ success: boolean, redirectUrl?: string, message?: string }> {
+        try {
+            const data = await ssoLogin(organization, username);
+            if (data && data.Status === true && data.Data && data.Data.RedirectUrl) {
+                return {
+                    success: true,
+                    redirectUrl: data.Data.RedirectUrl
+                };
+            } else {
+                return {
+                    success: false,
+                    message: (data && data.Message) || 'Something went wrong during SSO login'
+                };
+            }
+        } catch (error) {
+            console.error('Error during ssoLogin:', error);
+            return {
+                success: false,
+                message: 'Connection Lost'
+            };
+        }
+    }
+
+    static async ssoComplete(key: string): Promise<{ success: boolean, message?: string, data?: any }> {
+        try {
+            const data = await ssoComplete(key);
+            if (data && data.Status === true && data.Data) {
+                const jwt = data.Data.Token;
+                const userRole = data.Data.UserRole;
+                const userId = data.Data.ID;
+
+                // Store interactions in Local Storage for persistence (scoped to document)
+                DocStorage.setItem('token', jwt);
+                DocStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
+                DocStorage.setItem('userId', userId);
+                DocStorage.setItem('tokenLastUpdated', new Date().toISOString());
+
+                // Sync with StoreService and persist
+                const store = StoreService.getInstance();
+                store.clearStorage();
+                store.jwt = jwt;
+                store.UserRole = userRole;
+                store.userId = userId;
+                store.saveToStorage();
+
+                return {
+                    success: true,
+                    data: {
+                        token: jwt,
+                        userRole: userRole,
+                        userId: userId,
+                        raw: data.Data
+                    }
+                };
+            } else {
+                return {
+                    success: false,
+                    message: (data && data.Message) || 'SSO complete failed'
+                };
+            }
+        } catch (error) {
+            console.error('Error during ssoComplete:', error);
+            return {
+                success: false,
+                message: 'Connection Lost'
+            };
         }
     }
 

@@ -292,3 +292,64 @@ export async function getAllCustomTexts(jwt: string): Promise<any> {
   const data: any = await response.json();
   return data;
 }
+
+export async function checkLoginType(organization: string, username: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/user/check-login-type`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ClientName: organization,
+      Username: username,
+      LoginType: 'ADDIN'
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data: any = await response.json();
+  return data;
+}
+
+export async function ssoLogin(organization: string, username: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/user/sso-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ClientName: organization,
+      Username: username,
+      LoginType: 'ADDIN'
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data: any = await response.json();
+  return data;
+}
+
+export async function ssoComplete(key: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/user/sso-complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      key: key
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data: any = await response.json();
+  return data;
+}

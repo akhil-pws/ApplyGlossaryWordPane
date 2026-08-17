@@ -20,7 +20,12 @@ export class UIService {
         if (loader) loader.style.display = loading ? 'flex' : 'none';
     }
 
-    static renderLoginPage(storedUrl: string, handleLoginCallback: (e: Event) => void, themeToggleCallback: () => void): void {
+    static renderLoginPage(
+        storedUrl: string, 
+        handleLoginCallback: (e: Event) => void, 
+        themeToggleCallback: () => void,
+        onUserBlurCallback?: (e: Event) => void
+    ): void {
         const logoHeader = document.getElementById('logo-header');
         if (logoHeader) {
             logoHeader.innerHTML = `
@@ -43,7 +48,7 @@ export class UIService {
                 <label for="username" class="form-label fw-bold">Username</label>
                 <input type="text" class="form-control" id="username" required>
                 </div>
-                <div class="mb-3">
+                <div class="mb-3" id="password-container">
                 <label for="password" class="form-label fw-bold">Password</label>
                 <input type="password" class="form-control" id="password" required>
                 </div>
@@ -58,6 +63,11 @@ export class UIService {
         // Attach Event Listeners
         document.getElementById('theme-toggle')?.addEventListener('click', themeToggleCallback);
         document.getElementById('login-form')?.addEventListener('submit', handleLoginCallback);
+        
+        if (onUserBlurCallback) {
+            document.getElementById('organization')?.addEventListener('blur', onUserBlurCallback);
+            document.getElementById('username')?.addEventListener('blur', onUserBlurCallback);
+        }
     }
 
     static applyTheme(theme: 'Light' | 'Dark'): void {
