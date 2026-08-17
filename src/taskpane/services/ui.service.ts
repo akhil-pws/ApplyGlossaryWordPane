@@ -50,7 +50,7 @@ export class UIService {
                 </div>
                 <div class="mb-3" id="password-container">
                 <label for="password" class="form-label fw-bold">Password</label>
-                <input type="password" class="form-control" id="password" required>
+                <input type="password" class="form-control" id="password">
                 </div>
                 <div class="d-grid">
                 <button type="submit" class="btn btn-primary bg-primary-clr">Login</button>

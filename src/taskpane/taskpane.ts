@@ -252,6 +252,9 @@ async function handleLogin(event) {
     const enteredOrg = (organizationInput || '').toLowerCase().trim();
 
     if (enteredOrg === targetOrg && targetOrg !== '') {
+      const detectedType = await AuthService.checkLoginType(organizationInput, username);
+      currentAuthType = detectedType;
+
       if (currentAuthType === 'AzureAD') {
         const result = await AuthService.ssoLogin(organizationInput, username);
         if (result.success && result.redirectUrl) {
@@ -321,6 +324,9 @@ async function handleLogin(event) {
           showLoginError(result.message || "SSO Login failed");
         }
       } else {
+        if (!password) {
+          throw new Error("Password is required.");
+        }
         // Use AuthService
         const result = await AuthService.login(organizationInput, username, password);
 
@@ -353,7 +359,8 @@ async function handleLogin(event) {
     }
   } catch (error) {
     console.error("Login process error:", error);
-    showLoginError("An unexpected error occurred. Please try again.");
+    const msg = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+    showLoginError(msg);
   } finally {
     UIService.toggleLoader(false);
   }
