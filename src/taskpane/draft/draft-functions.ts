@@ -305,7 +305,17 @@ function formatChatDate(dateStr: any): string {
     hours = hours ? hours : 12; // the hour '0' should be '12'
     const hh = String(hours).padStart(2, '0');
     const min = String(date.getMinutes()).padStart(2, '0');
-    return `${dd} ${mmm} ${yyyy} ${hh}:${min} ${ampm}`;
+    
+    // Calculate GMT offset
+    const offset = -date.getTimezoneOffset();
+    const diff = offset >= 0 ? '+' : '-';
+    const absOffset = Math.abs(offset);
+    const offsetHours = Math.floor(absOffset / 60);
+    const offsetMinutes = absOffset % 60;
+    const pad = (num: number) => String(num).padStart(2, '0');
+    const gmtStr = `(GMT${diff}${pad(offsetHours)}:${pad(offsetMinutes)})`;
+
+    return `${dd} ${mmm} ${yyyy} ${hh}:${min} ${ampm} ${gmtStr}`;
   } catch (e) {
     return dateStr;
   }
