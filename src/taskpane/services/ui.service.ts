@@ -24,7 +24,7 @@ export class UIService {
         storedUrl: string, 
         handleLoginCallback: (e: Event) => void, 
         themeToggleCallback: () => void,
-        onUserBlurCallback?: (e: Event) => void
+        handleMicrosoftLoginCallback?: (e: Event) => void
     ): void {
         const logoHeader = document.getElementById('logo-header');
         if (logoHeader) {
@@ -50,10 +50,13 @@ export class UIService {
                 </div>
                 <div class="mb-3" id="password-container">
                 <label for="password" class="form-label fw-bold">Password</label>
-                <input type="password" class="form-control" id="password">
+                <input type="password" class="form-control" id="password" required>
                 </div>
-                <div class="d-grid">
+                <div class="d-grid mb-3">
                 <button type="submit" class="btn btn-primary bg-primary-clr">Login</button>
+                </div>
+                <div class="text-center">
+                <a href="#" id="ms-login-link" class="text-primary text-decoration-underline fw-semibold">Login with Microsoft</a>
                 </div>
             <div id="login-error" class="mt-3 text-danger" style="display: none;"></div>
             </form>
@@ -64,9 +67,8 @@ export class UIService {
         document.getElementById('theme-toggle')?.addEventListener('click', themeToggleCallback);
         document.getElementById('login-form')?.addEventListener('submit', handleLoginCallback);
         
-        if (onUserBlurCallback) {
-            document.getElementById('organization')?.addEventListener('blur', onUserBlurCallback);
-            document.getElementById('username')?.addEventListener('blur', onUserBlurCallback);
+        if (handleMicrosoftLoginCallback) {
+            document.getElementById('ms-login-link')?.addEventListener('click', handleMicrosoftLoginCallback);
         }
     }
 
