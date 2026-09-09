@@ -109,6 +109,8 @@ Office.onReady((info) => {
               // Restore session state
               store.jwt = session.jwt;
               store.UserRole = session.userRole;
+              if (session.userId) store.userId = session.userId;
+              if (session.loginId) store.loginId = session.loginId;
               if (session.tableStyle) store.tableStyle = session.tableStyle;
               if (session.colorPallete) store.colorPallete = session.colorPallete;
               if (session.defaultTextStyle) store.defaultTextStyle = session.defaultTextStyle;
@@ -195,47 +197,13 @@ async function login() {
   }
 }
 
-let currentAuthType: string = 'TrialAssure';
-
-async function handleUserBlur() {
-  const orgEl = document.getElementById('organization') as HTMLInputElement;
-  const userEl = document.getElementById('username') as HTMLInputElement;
-  if (!orgEl || !userEl) return;
-
-  const org = orgEl.value;
-  const username = userEl.value;
-  if (org && username) {
-    const detectedType = await AuthService.checkLoginType(org, username);
-    currentAuthType = detectedType;
-    const passwordContainer = document.getElementById('password-container');
-    const passwordInput = document.getElementById('password') as HTMLInputElement;
-
-    if (detectedType === 'AzureAD') {
-      if (passwordContainer) {
-        passwordContainer.style.display = 'none';
-      }
-      if (passwordInput) {
-        passwordInput.removeAttribute('required');
-        passwordInput.value = '';
-      }
-    } else {
-      if (passwordContainer) {
-        passwordContainer.style.display = 'block';
-      }
-      if (passwordInput) {
-        passwordInput.setAttribute('required', 'true');
-      }
-    }
-  }
-}
-
 function loadLoginPage() {
   const store = StoreService.getInstance();
   UIService.renderLoginPage(CONFIG.storeUrl, handleLogin, () => {
     store.theme = store.theme === 'Light' ? 'Dark' : 'Light';
     UIService.applyTheme(store.theme as 'Light' | 'Dark');
     DocStorage.setItem('theme', store.theme);
-  }, handleUserBlur);
+  }, handleMicrosoftLogin);
 }
 
 async function handleLogin(event) {
@@ -251,115 +219,142 @@ async function handleLogin(event) {
     const targetOrg = (store.organizationName || '').toLowerCase().trim();
     const enteredOrg = (organizationInput || '').toLowerCase().trim();
 
-    if (enteredOrg === targetOrg && targetOrg !== '') {
-      const detectedType = await AuthService.checkLoginType(organizationInput, username);
-      currentAuthType = detectedType;
-
-      if (currentAuthType === 'AzureAD') {
-        const result = await AuthService.ssoLogin(organizationInput, username);
-        if (result.success && result.redirectUrl) {
-          const localRedirectUrl = window.location.origin + window.location.pathname + 
-            "?ssoStart=true&redirectUrl=" + encodeURIComponent(result.redirectUrl);
-
-          Office.context.ui.displayDialogAsync(localRedirectUrl, { height: 60, width: 35, displayInIframe: false }, (asyncResult) => {
-            if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-              UIService.toggleLoader(false);
-              showLoginError("Could not open login window: " + asyncResult.error.message + "\nURL attempted: " + result.redirectUrl);
-              return;
-            }
-            const dialog = asyncResult.value;
-            dialog.addEventHandler(Office.EventType.DialogMessageReceived, async (args: any) => {
-              dialog.close();
-              UIService.toggleLoader(true);
-              if (args.message) {
-                try {
-                  const parsed = JSON.parse(args.message);
-                  if (parsed.key) {
-                    const ssoResult = await AuthService.ssoComplete(parsed.key);
-                    if (ssoResult.success) {
-                      const data = ssoResult.data;
-                      store.jwt = data.token;
-                      store.UserRole = data.userRole;
-                      store.userId = data.userId;
-                      store.saveToStorage();
-
-                      // Preserve legacy logic for style restoring
-                      const style = DocStorage.getItem('tableStyle');
-                      if (style) store.tableStyle = style;
-
-                      const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
-                      if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
-
-                      const localPallete = DocStorage.getItem('colorPallete');
-                      if (localPallete) store.colorPallete = JSON.parse(localPallete);
-
-                      UIService.toggleLoader(false);
-                      toaster('You are successfully logged in', 'success');
-                      await displayMenu();
-                      window.location.hash = '#/dashboard';
-                    } else {
-                      UIService.toggleLoader(false);
-                      showLoginError(ssoResult.message || "SSO complete failed");
-                    }
-                  } else {
-                    UIService.toggleLoader(false);
-                    showLoginError("SSO login failed: no key received.");
-                  }
-                } catch (e) {
-                  console.error("SSO message parsing error:", e);
-                  UIService.toggleLoader(false);
-                  showLoginError("SSO login failed: invalid message data.");
-                }
-              } else {
-                UIService.toggleLoader(false);
-                showLoginError("SSO login failed: empty response.");
-              }
-            });
-            dialog.addEventHandler(Office.EventType.DialogEventReceived, (args: any) => {
-              UIService.toggleLoader(false);
-              console.log("SSO dialog event: ", args);
-            });
-          });
-        } else {
-          showLoginError(result.message || "SSO Login failed");
-        }
-      } else {
-        if (!password) {
-          throw new Error("Password is required.");
-        }
-        // Use AuthService
-        const result = await AuthService.login(organizationInput, username, password);
-
-        if (result.success) {
-          const data = result.data;
-          store.jwt = data.token;
-          store.UserRole = data.userRole;
-          store.userId = data.userId;
-          store.saveToStorage();
-
-          // Preserve legacy logic for style restoring
-          const style = DocStorage.getItem('tableStyle');
-          if (style) store.tableStyle = style;
-
-          const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
-          if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
-
-          const localPallete = DocStorage.getItem('colorPallete');
-          if (localPallete) store.colorPallete = JSON.parse(localPallete);
-
-          toaster('You are successfully logged in', 'success');
-          await displayMenu();
-          window.location.hash = '#/dashboard';
-        } else {
-          showLoginError(result.message || "Login failed");
-        }
-      }
-    } else {
+    if (targetOrg !== '' && enteredOrg !== targetOrg) {
       showLoginError("The organization specified is not associated with this document");
+      return;
+    }
+
+    if (!password) {
+      throw new Error("Password is required.");
+    }
+
+    const result = await AuthService.login(organizationInput, username, password);
+
+    if (result.success) {
+      const data = result.data;
+      store.jwt = data.token;
+      store.UserRole = data.userRole;
+      store.userId = data.userId;
+      if (data.loginId) store.loginId = data.loginId;
+      store.saveToStorage();
+
+      // Preserve legacy logic for style restoring
+      const style = DocStorage.getItem('tableStyle');
+      if (style) store.tableStyle = style;
+
+      const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+      if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+
+      const localPallete = DocStorage.getItem('colorPallete');
+      if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+      toaster('You are successfully logged in', 'success');
+      await displayMenu();
+      window.location.hash = '#/dashboard';
+    } else {
+      showLoginError(result.message || "Login failed");
     }
   } catch (error) {
     console.error("Login process error:", error);
     const msg = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
+    showLoginError(msg);
+  } finally {
+    UIService.toggleLoader(false);
+  }
+}
+
+async function handleMicrosoftLogin(event) {
+  event.preventDefault();
+  UIService.toggleLoader(true);
+
+  try {
+    const store = StoreService.getInstance();
+    let organization = store.organizationName;
+
+    if (!organization) {
+      const props = await DocumentService.retrieveDocumentProperties();
+      if (props && props.organizationName) {
+        organization = props.organizationName;
+        store.organizationName = organization;
+      }
+    }
+
+    if (!organization) {
+      showLoginError("Organization not found in document properties.");
+      return;
+    }
+
+    const result = await AuthService.ssoLogin(organization, "");
+    if (result.success && result.redirectUrl) {
+      const localRedirectUrl = window.location.origin + window.location.pathname +
+        "?ssoStart=true&redirectUrl=" + encodeURIComponent(result.redirectUrl);
+
+      Office.context.ui.displayDialogAsync(localRedirectUrl, { height: 60, width: 35, displayInIframe: false }, (asyncResult) => {
+        if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+          UIService.toggleLoader(false);
+          showLoginError("Could not open login window: " + asyncResult.error.message + "\nURL attempted: " + result.redirectUrl);
+          return;
+        }
+        const dialog = asyncResult.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, async (args: any) => {
+          dialog.close();
+          UIService.toggleLoader(true);
+          if (args.message) {
+            try {
+              const parsed = JSON.parse(args.message);
+              if (parsed.key) {
+                const ssoResult = await AuthService.ssoComplete(parsed.key);
+                if (ssoResult.success) {
+                  const data = ssoResult.data;
+                  store.jwt = data.token;
+                  store.UserRole = data.userRole;
+                  store.userId = data.userId;
+                  if (data.loginId) store.loginId = data.loginId;
+                  store.saveToStorage();
+
+                  // Preserve legacy logic for style restoring
+                  const style = DocStorage.getItem('tableStyle');
+                  if (style) store.tableStyle = style;
+
+                  const defaultTextStyle = DocStorage.getItem('defaultTextStyle');
+                  if (defaultTextStyle) store.defaultTextStyle = defaultTextStyle;
+
+                  const localPallete = DocStorage.getItem('colorPallete');
+                  if (localPallete) store.colorPallete = JSON.parse(localPallete);
+
+                  UIService.toggleLoader(false);
+                  toaster('You are successfully logged in', 'success');
+                  await displayMenu();
+                  window.location.hash = '#/dashboard';
+                } else {
+                  UIService.toggleLoader(false);
+                  showLoginError(ssoResult.message || "SSO complete failed");
+                }
+              } else {
+                UIService.toggleLoader(false);
+                showLoginError("SSO login failed: no key received.");
+              }
+            } catch (e) {
+              console.error("SSO message parsing error:", e);
+              UIService.toggleLoader(false);
+              showLoginError("SSO login failed: invalid message data.");
+            }
+          } else {
+            UIService.toggleLoader(false);
+            showLoginError("SSO login failed: empty response.");
+          }
+        });
+        dialog.addEventHandler(Office.EventType.DialogEventReceived, (args: any) => {
+          UIService.toggleLoader(false);
+          console.log("SSO dialog event: ", args);
+        });
+      });
+    } else {
+      showLoginError(result.message || "SSO Login failed");
+    }
+  } catch (error) {
+    console.error("Microsoft login error:", error);
+    const msg = error instanceof Error ? error.message : "An unexpected error occurred during Microsoft login.";
     showLoginError(msg);
   } finally {
     UIService.toggleLoader(false);
@@ -613,7 +608,7 @@ async function fetchDocument(action) {
         confirmSwitchChatHistory(async () => {
           if (!store.isPendingResponse) {
             if (store.isGlossaryActive) await removeMatchingContentControls();
-            logout();
+            await logout();
           }
         });
       },
@@ -992,7 +987,7 @@ async function logout() {
   if (store.isGlossaryActive) {
     await removeMatchingContentControls();
   }
-  AuthService.logout();
+  await AuthService.logout();
   DocStorage.clearAll();
   sessionStorage.clear();
   window.location.hash = '#/new';

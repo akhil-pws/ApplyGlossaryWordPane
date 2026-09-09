@@ -1,6 +1,6 @@
 import { CONFIG } from "../utils/config";
 import { UserProfile } from "../models/user.model";
-import { loginUser, checkLoginType, ssoLogin, ssoComplete } from "../draft/draft.api";
+import { loginUser, checkLoginType, ssoLogin, ssoComplete, logoutUser } from "../draft/draft.api";
 import { StoreService } from "./store.service";
 import { DocStorage } from "../utils/doc-storage";
 
@@ -10,6 +10,7 @@ export class AuthService {
     private static readonly STYLE_KEY = 'tableStyle';
     private static readonly PALETTE_KEY = 'colorPallete';
     private static readonly TEXT_STYLE_KEY = 'defaultTextStyle';
+    private static readonly LOGIN_ID_KEY = 'loginId';
 
     static getStoredToken(): string | null {
         return DocStorage.getItem('token'); 
@@ -43,6 +44,7 @@ export class AuthService {
                 tableStyle: DocStorage.getItem(this.STYLE_KEY),
                 colorPallete: JSON.parse(DocStorage.getItem(this.PALETTE_KEY) || 'null'),
                 userId: DocStorage.getItem('userId'),
+                loginId: DocStorage.getItem(this.LOGIN_ID_KEY),
                 defaultTextStyle: DocStorage.getItem(this.TEXT_STYLE_KEY)
             };
         }
@@ -59,11 +61,15 @@ export class AuthService {
                     const jwt = data.Data.Token;
                     const userRole = data.Data.UserRole;
                     const userId = data.Data.ID;
+                    const loginId = data.Data.LoginID;
 
                     // Store interactions in Local Storage for persistence (scoped to document)
                     DocStorage.setItem('token', jwt);
                     DocStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
                     DocStorage.setItem('userId', userId);
+                    if (loginId !== undefined && loginId !== null) {
+                        DocStorage.setItem(this.LOGIN_ID_KEY, String(loginId));
+                    }
                     DocStorage.setItem('tokenLastUpdated', new Date().toISOString());
 
                     // Sync with StoreService and persist
@@ -72,6 +78,9 @@ export class AuthService {
                     store.jwt = jwt;
                     store.UserRole = userRole;
                     store.userId = userId;
+                    if (loginId !== undefined && loginId !== null) {
+                        store.loginId = loginId;
+                    }
                     store.saveToStorage();
 
                     return {
@@ -80,6 +89,7 @@ export class AuthService {
                             token: jwt,
                             userRole: userRole,
                             userId: userId,
+                            loginId: loginId,
                             raw: data.Data
                         }
                     };
@@ -138,11 +148,15 @@ export class AuthService {
                 const jwt = data.Data.Token;
                 const userRole = data.Data.UserRole;
                 const userId = data.Data.ID;
+                const loginId = data.Data.LoginID;
 
                 // Store interactions in Local Storage for persistence (scoped to document)
                 DocStorage.setItem('token', jwt);
                 DocStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
                 DocStorage.setItem('userId', userId);
+                if (loginId !== undefined && loginId !== null) {
+                    DocStorage.setItem(this.LOGIN_ID_KEY, String(loginId));
+                }
                 DocStorage.setItem('tokenLastUpdated', new Date().toISOString());
 
                 // Sync with StoreService and persist
@@ -151,6 +165,9 @@ export class AuthService {
                 store.jwt = jwt;
                 store.UserRole = userRole;
                 store.userId = userId;
+                if (loginId !== undefined && loginId !== null) {
+                    store.loginId = loginId;
+                }
                 store.saveToStorage();
 
                 return {
@@ -159,6 +176,7 @@ export class AuthService {
                         token: jwt,
                         userRole: userRole,
                         userId: userId,
+                        loginId: loginId,
                         raw: data.Data
                     }
                 };
@@ -177,14 +195,26 @@ export class AuthService {
         }
     }
 
-    static logout(): void {
-        DocStorage.removeItem('token');
-        DocStorage.removeItem(this.USER_ROLE_KEY);
-        DocStorage.removeItem('userId');
-        DocStorage.removeItem('tokenLastUpdated');
-        
-        const store = StoreService.getInstance();
-        store.clearStorage();
-        console.log("Logged out");
+    static async logout(): Promise<void> {
+        const token = DocStorage.getItem('token') || StoreService.getInstance().jwt;
+        const loginId = DocStorage.getItem(this.LOGIN_ID_KEY) || StoreService.getInstance().loginId;
+
+        try {
+            if (token) {
+                await logoutUser(loginId, token);
+            }
+        } catch (error) {
+            console.error('Error during logout API call:', error);
+        } finally {
+            DocStorage.removeItem('token');
+            DocStorage.removeItem(this.USER_ROLE_KEY);
+            DocStorage.removeItem('userId');
+            DocStorage.removeItem(this.LOGIN_ID_KEY);
+            DocStorage.removeItem('tokenLastUpdated');
+            
+            const store = StoreService.getInstance();
+            store.clearStorage();
+            console.log("Logged out");
+        }
     }
 }
