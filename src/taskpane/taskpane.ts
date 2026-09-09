@@ -109,6 +109,8 @@ Office.onReady((info) => {
               // Restore session state
               store.jwt = session.jwt;
               store.UserRole = session.userRole;
+              if (session.userId) store.userId = session.userId;
+              if (session.loginId) store.loginId = session.loginId;
               if (session.tableStyle) store.tableStyle = session.tableStyle;
               if (session.colorPallete) store.colorPallete = session.colorPallete;
               if (session.defaultTextStyle) store.defaultTextStyle = session.defaultTextStyle;
@@ -233,6 +235,7 @@ async function handleLogin(event) {
       store.jwt = data.token;
       store.UserRole = data.userRole;
       store.userId = data.userId;
+      if (data.loginId) store.loginId = data.loginId;
       store.saveToStorage();
 
       // Preserve legacy logic for style restoring
@@ -306,6 +309,7 @@ async function handleMicrosoftLogin(event) {
                   store.jwt = data.token;
                   store.UserRole = data.userRole;
                   store.userId = data.userId;
+                  if (data.loginId) store.loginId = data.loginId;
                   store.saveToStorage();
 
                   // Preserve legacy logic for style restoring
@@ -604,7 +608,7 @@ async function fetchDocument(action) {
         confirmSwitchChatHistory(async () => {
           if (!store.isPendingResponse) {
             if (store.isGlossaryActive) await removeMatchingContentControls();
-            logout();
+            await logout();
           }
         });
       },
@@ -983,7 +987,7 @@ async function logout() {
   if (store.isGlossaryActive) {
     await removeMatchingContentControls();
   }
-  AuthService.logout();
+  await AuthService.logout();
   DocStorage.clearAll();
   sessionStorage.clear();
   window.location.hash = '#/new';

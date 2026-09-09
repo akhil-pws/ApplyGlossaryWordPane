@@ -353,3 +353,27 @@ export async function ssoComplete(key: string): Promise<any> {
   const data: any = await response.json();
   return data;
 }
+
+export async function logoutUser(loginId?: string | number | null, jwt?: string | null): Promise<any> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (jwt) {
+    headers['Authorization'] = `Bearer ${jwt}`;
+  }
+
+  const response = await fetch(`${baseUrl}/api/user/logout`, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({
+      LoginID: loginId ? Number(loginId) : 0
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data: any = await response.json();
+  return data;
+}

@@ -29,6 +29,7 @@ export class StoreService {
     public isNoFormatTextAvailable: boolean = false;
     public clientId: string = '0';
     public userId: number = 0;
+    public loginId: string | number = '';
     public clientList: any[] = [];
     public currentYear: number = new Date().getFullYear();
     public sourceList: any;
@@ -95,6 +96,7 @@ export class StoreService {
             theme: this.theme,
             mode: this.mode,
             userId: this.userId,
+            loginId: this.loginId,
             tableStyle: this.tableStyle,
             colorPallete: this.colorPallete,
             clientId: this.clientId,
@@ -119,6 +121,7 @@ export class StoreService {
                 if (data.theme) this.theme = data.theme;
                 if (data.mode) this.mode = data.mode;
                 if (data.userId) this.userId = data.userId;
+                if (data.loginId) this.loginId = data.loginId;
                 if (data.tableStyle) this.tableStyle = data.tableStyle;
                 if (data.colorPallete) this.colorPallete = data.colorPallete;
                 if (data.clientId) this.clientId = data.clientId;
@@ -139,6 +142,7 @@ export class StoreService {
         this.jwt = '';
         this.UserRole = {};
         this.userId = 0;
+        this.loginId = '';
         this.documentInstruction = '';
         this.isReversed = false;
         this.aiTagList = [];
