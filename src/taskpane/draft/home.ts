@@ -3,7 +3,7 @@ import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingSty
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
-import { Confirmationpopup, DataModalPopup, toaster, PromptBuilderModalPopup } from "../components/bodyelements";
+import { Confirmationpopup, DataModalPopup, toaster, PromptBuilderModalPopup, NewChatSourceModalPopup } from "../components/bodyelements";
 import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
@@ -345,34 +345,100 @@ export async function openAITag(tag) {
 
 }
 
-export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
+export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", targetChatId?: string | number) {
     const store = StoreService.getInstance();
     store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
     DocStorage.setItem("currentChatTagId", String(store.currentChatTagId));
 
-    var skipFetch = false;
-    if ((!tag.FilteredReportHeadAIHistoryList || tag.FilteredReportHeadAIHistoryList.length === 0) && !skipFetch) {
+    if (!tag.ChatSessions || tag.ChatSessions.length === 0) {
         if (type !== 'Summary') {
             await AIService.fetchAIHistory(tag);
         } else {
             await summaryService.fetchSummaryAIHistory(tag);
         }
     }
-    const history = tag.FilteredReportHeadAIHistoryList;
 
-    const chat = history.find((item: any) => item.Selected === 1);
+    const sessions = tag.ChatSessions || [];
 
-    const finalResponse = chat.FormattedResponse
-        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-        : chat.Response;
+    // If targetChatId is provided from bookmark, locate its conversation thread and message
+    if (targetChatId !== undefined && targetChatId !== null && String(targetChatId).trim() !== '') {
+        const strChatId = String(targetChatId).trim();
+        let foundSessionIndex = -1;
+        let foundMessageIndex = -1;
 
-    tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-    tag.UserValue = finalResponse;
-    tag.EditorValue = finalResponse;
-    tag.text = finalResponse;
+        for (let sIdx = 0; sIdx < sessions.length; sIdx++) {
+            const sess = sessions[sIdx];
+            if (sess.history && sess.history.length > 0) {
+                const mIdx = sess.history.findIndex((m: any) =>
+                    String(m.ID) === strChatId ||
+                    String(m.ReportHeadAIHistoryID) === strChatId
+                );
+                if (mIdx !== -1) {
+                    foundSessionIndex = sIdx;
+                    foundMessageIndex = mIdx;
+                    break;
+                }
+            }
+        }
 
-    if (history.length === 0) {
-        return '<div>No AI history available.</div>';
+        if (foundSessionIndex !== -1) {
+            tag.ActiveSessionIndex = foundSessionIndex;
+            const targetSession = sessions[foundSessionIndex];
+            if (targetSession.history) {
+                targetSession.history.forEach((m: any, idx: number) => {
+                    m.Selected = (idx === foundMessageIndex) ? 1 : 0;
+                });
+            }
+        } else {
+            // Chat ID not found in any session, open the most recent chat (index 0)
+            tag.ActiveSessionIndex = 0;
+            if (sessions[0]?.history && sessions[0].history.length > 0) {
+                if (!sessions[0].history.some((m: any) => m.Selected === 1)) {
+                    sessions[0].history[0].Selected = 1;
+                }
+            }
+        }
+    } else {
+        // No chat ID in bookmark: keep active session or default to 0
+        if (tag.ActiveSessionIndex === undefined || tag.ActiveSessionIndex < 0 || tag.ActiveSessionIndex >= sessions.length) {
+            tag.ActiveSessionIndex = 0;
+        }
+        const curSession = sessions[tag.ActiveSessionIndex];
+        if (curSession?.history && curSession.history.length > 0) {
+            if (!curSession.history.some((m: any) => m.Selected === 1)) {
+                curSession.history[0].Selected = 1;
+            }
+        }
+    }
+
+    const activeIdx = (tag.ActiveSessionIndex !== undefined && tag.ActiveSessionIndex >= 0 && tag.ActiveSessionIndex < sessions.length)
+        ? tag.ActiveSessionIndex
+        : 0;
+
+    const activeSession = sessions[activeIdx] || {
+        id: 'default',
+        chatHistoryId: 0,
+        title: 'Conversation',
+        createdAt: new Date().toISOString(),
+        sources: tag.Sources || [],
+        sourceValues: tag.TempSourceValue || [],
+        history: tag.FilteredReportHeadAIHistoryList || []
+    };
+
+    const history = activeSession.history || [];
+    tag.FilteredReportHeadAIHistoryList = history;
+    tag.ReportHeadAIHistoryList = history;
+
+    const chat = history.find((item: any) => item.Selected === 1) || history[0];
+    if (chat) {
+        const finalResponse = chat.FormattedResponse
+            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+            : chat.Response;
+
+        tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
+        tag.UserValue = finalResponse;
+        tag.EditorValue = finalResponse;
+        tag.text = finalResponse;
     }
 
     // Check current theme
@@ -381,17 +447,53 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
         ? 'fa-solid fa-circle-xmark bg-dark text-light'
         : 'fa-solid fa-circle-xmark bg-light text-dark';
     const jumpBtnColorClass = isDark ? 'text-light' : 'text-dark';
-
     const headerBgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
     const DisplayName = type === 'Summary' ? tag.Name : tag.DisplayName;
+
+    const activeSources = activeSession.sources || tag.Sources || [];
+    const sourcesSummary = activeSources.length > 0 ? activeSources.join(', ') : 'No sources attached';
+    const sourcesCount = activeSources.length;
+
+    // Session dropdown menu items
+    const sessionMenuItems = sessions.map((s: any, idx: number) => {
+        const isActive = idx === activeIdx;
+        const msgCount = s.history ? s.history.length : 0;
+        const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        const rawTitle = s.title || `Chat ${idx + 1}`;
+        const titleSafe = String(rawTitle).replace(/"/g, '&quot;');
+        return `
+            <li>
+                <a class="dropdown-item chat-session-item d-flex align-items-center justify-content-between py-2 px-3 c-pointer ${isActive ? (isDark ? 'bg-secondary text-light' : 'bg-light text-primary fw-bold') : (isDark ? 'text-light' : 'text-dark')}" href="#" data-session-index="${idx}" title="${titleSafe}">
+                    <div class="d-flex align-items-center text-truncate me-2" style="max-width: 200px;" title="${titleSafe}">
+                        <i class="fa-regular ${isActive ? 'fa-comment-dots text-primary' : 'fa-message text-muted'} me-2"></i>
+                        <span class="text-truncate ${isActive ? 'fw-bold' : 'fw-normal'}" title="${titleSafe}">${rawTitle}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                        <span class="badge rounded-pill ${isDark ? 'bg-dark text-light' : 'bg-white text-muted border'} small" style="font-size: 9.5px;">${msgCount} msg${msgCount === 1 ? '' : 's'}</span>
+                        ${dateStr ? `<span class="text-muted small" style="font-size: 9.5px;">${dateStr}</span>` : ''}
+                    </div>
+                </a>
+            </li>
+        `;
+    }).join('');
+
+    const activeTitleSafe = String(activeSession.title || `Chat ${activeIdx + 1}`).replace(/"/g, '&quot;');
+    const sourcesSummarySafe = String(sourcesSummary).replace(/"/g, '&quot;');
+    const displayNameSafe = String(DisplayName).replace(/"/g, '&quot;');
+
     const closeBar = `
     <div class="chat-header sticky-top ${headerBgClass} z-3">
-        <div class="d-flex justify-content-between align-items-start px-3 pt-3 pb-1">
-            <div class="d-flex align-items-start flex-grow-1" style="max-width: calc(100% - 50px);">
-                ${getIconSvg(faMicrochipAi, 'text-muted me-2 mt-1', 'font-size: 13px;')}
-                <span class="fw-bold" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;">${DisplayName}</span>
+        <!-- Main Tag Header (Selected Text Tag Bar) -->
+        <div class="d-flex justify-content-between align-items-center px-3 pt-2 pb-1">
+            <div class="d-flex align-items-center flex-grow-1 text-truncate" style="max-width: calc(100% - 85px);" title="${displayNameSafe}">
+                ${getIconSvg(faMicrochipAi, 'text-muted me-2', 'font-size: 13px;')}
+                <span class="fw-bold text-truncate" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;" title="${displayNameSafe}">${DisplayName}</span>
             </div>
             <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
+                <!-- Toggle Hide/Show Icon for Chat Selector, New Chat & Sources -->
+                <button id="toggleChatControlsBtn" class="btn btn-sm p-0 me-2 border-0 bg-transparent ${jumpBtnColorClass} c-pointer" title="Hide chat & source controls" style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;">
+                    <i class="fa-solid fa-chevron-up" id="toggleControlsIcon" style="font-size: 11px; transition: transform 0.2s ease;"></i>
+                </button>
                 <button id="jump-to-next-tag" class="btn btn-sm p-0 me-2 border-0 bg-transparent ${jumpBtnColorClass} c-pointer" title="Jump to next replaced instance" style="display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10" />
@@ -399,12 +501,50 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag") {
                         <polyline points="11 8 9 10 11 12" />
                     </svg>
                 </button>
-                <div class="c-pointer d-inline-flex align-items-center justify-content-center" id="close-btn-tag">
+                <div class="c-pointer d-inline-flex align-items-center justify-content-center" id="close-btn-tag" title="Close AI chat">
                     <i class="${closeBtnClass}" id="close-ai-window" style="font-size: 13px;"></i>
                 </div>
             </div>
         </div>
-        <hr class="mt-2 mb-1 mx-3">
+
+        <!-- Collapsible Controls Panel (Session Selector, New Chat, and Sources) -->
+        <div id="chatControlsPanel" class="chat-controls-panel">
+            <hr class="mt-1 mb-0 mx-3">
+
+            <!-- Multi-Session Toolbar -->
+            <div class="chat-session-toolbar px-3 py-2 border-bottom ${headerBgClass} d-flex align-items-center justify-content-between gap-2 shadow-xs">
+                <!-- Session Selector Dropdown -->
+                <div class="dropdown flex-grow-1" style="min-width: 0;">
+                    <button class="btn btn-sm ${isDark ? 'btn-outline-secondary text-light' : 'btn-outline-secondary text-dark'} dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between text-truncate chat-thread-selector-btn"
+                            type="button" id="chatSessionDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="${activeTitleSafe}" style="background: ${isDark ? '#2b3035' : '#f8f9fa'}; border-color: ${isDark ? '#495057' : '#dee2e6'};">
+                        <span class="text-truncate d-flex align-items-center me-2" title="${activeTitleSafe}">
+                            <i class="fa-regular fa-message me-2 text-primary"></i>
+                            <span class="fw-semibold active-chat-title text-truncate" title="${activeTitleSafe}">${activeSession.title || `Chat ${activeIdx + 1}`}</span>
+                        </span>
+                    </button>
+                    <ul class="dropdown-menu shadow w-100 p-1 chat-session-menu ${isDark ? 'dropdown-menu-dark' : ''}" aria-labelledby="chatSessionDropdown" style="max-height: 240px; overflow-y: auto; z-index: 1060;">
+                        <li class="dropdown-header small text-muted px-3 py-1 fw-bold text-uppercase" style="font-size: 10px; letter-spacing: 0.5px;">Conversations (${sessions.length})</li>
+                        ${sessionMenuItems}
+                    </ul>
+                </div>
+
+                <!-- + New Chat Button -->
+                <button class="btn btn-sm btn-primary text-white d-flex align-items-center text-nowrap new-chat-btn shadow-sm px-2 py-1" id="addNewChatBtn" title="Start a new chat with selected sources">
+                    <i class="fa fa-plus me-1" style="font-size: 11px;"></i>
+                    <span class="fw-semibold" style="font-size: 11.5px;">New Chat</span>
+                </button>
+            </div>
+
+            <!-- Active Sources Banner -->
+            <div class="chat-sources-banner px-3 py-1 ${isDark ? 'bg-secondary text-light' : 'bg-light text-muted'} border-bottom d-flex align-items-center justify-content-between" style="font-size: 11px;" title="${sourcesSummarySafe}">
+                <div class="d-flex align-items-center text-truncate me-2" title="${sourcesSummarySafe}">
+                    <i class="fa-solid fa-file-lines me-1 text-primary" style="font-size: 11px;"></i>
+                    <span class="fw-bold me-1">Sources:</span>
+                    <span class="text-truncate active-sources-text" title="${sourcesSummarySafe}">${sourcesSummary}</span>
+                </div>
+                <span class="badge rounded-pill ${isDark ? 'bg-dark text-light' : 'bg-secondary text-white'}" style="font-size: 9.5px;" title="${sourcesCount} source document${sourcesCount === 1 ? '' : 's'} included">${sourcesCount}</span>
+            </div>
+        </div>
     </div>
     `;
 
@@ -805,8 +945,16 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             -------------------------------------------------- */
             if (bookmarkStart && bookmarkEnd) {
                 const prefix = type === "Summary" ? "SM" : "ID";
+                const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+                const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
+                    ? tag.ChatSessions[tag.ActiveSessionIndex]
+                    : null;
+                const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || [];
+                const selectedChat = history.find((item: any) => item.Selected === 1) || history[0];
+                const chatId = selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || '';
+                const chatSuffix = chatId ? `_${chatId}` : '';
                 const bookmarkName =
-                    `${prefix}${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
+                    `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;
 
                 bookmarkStart
                     .expandTo(bookmarkEnd)
@@ -1239,6 +1387,54 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             }
         });
 
+        // Chat Session Switcher items click
+        document.querySelectorAll('.chat-session-item').forEach((elem: Element) => {
+            elem.addEventListener('click', (e) => {
+                e.preventDefault();
+                const sessionIdx = parseInt(elem.getAttribute('data-session-index') || '0', 10);
+                if (sessionIdx === (tag.ActiveSessionIndex || 0)) return;
+
+                confirmSwitchChatHistory(async () => {
+                    AIService.switchChatSession(tag, sessionIdx);
+                    const appBody = document.getElementById('app-body');
+                    if (appBody) {
+                        appBody.innerHTML = await generateCheckboxHistory(tag, type);
+                    }
+                });
+            });
+        });
+
+        // + New Chat button click
+        document.getElementById('addNewChatBtn')?.addEventListener('click', () => {
+            openNewChatModal(tag, type);
+        });
+
+        // Toggle Chat Controls (Hide/Show selector dropdown, new chat, and sources banner)
+        const toggleChatControlsBtn = document.getElementById('toggleChatControlsBtn');
+        const chatControlsPanel = document.getElementById('chatControlsPanel');
+        const toggleControlsIcon = document.getElementById('toggleControlsIcon');
+
+        toggleChatControlsBtn?.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!chatControlsPanel) return;
+            const isHidden = chatControlsPanel.classList.contains('d-none');
+            if (isHidden) {
+                chatControlsPanel.classList.remove('d-none');
+                if (toggleControlsIcon) {
+                    toggleControlsIcon.classList.remove('fa-chevron-down');
+                    toggleControlsIcon.classList.add('fa-chevron-up');
+                }
+                toggleChatControlsBtn.setAttribute('title', 'Hide chat & source controls');
+            } else {
+                chatControlsPanel.classList.add('d-none');
+                if (toggleControlsIcon) {
+                    toggleControlsIcon.classList.remove('fa-chevron-up');
+                    toggleControlsIcon.classList.add('fa-chevron-down');
+                }
+                toggleChatControlsBtn.setAttribute('title', 'Show chat & source controls');
+            }
+        });
+
         // Jump to next bookmark button
         document.getElementById(`jump-to-next-tag`)?.addEventListener('click', async () => {
             await jumpToNextBookmarkOfTag(tag, type);
@@ -1344,4 +1540,166 @@ export async function jumpToNextBookmarkOfTag(tag: any, type: "Summary" | "AITag
         toaster(`Jumped to instance ${nextIndex + 1} of ${validItems.length}`, "success");
     });
 }
+
+/**
+ * Opens modal allowing user to select knowledge sources and start a New Chat conversation
+ */
+export function openNewChatModal(tag: any, type: "Summary" | "AITag" = "AITag") {
+    confirmSwitchChatHistory(() => {
+        const store = StoreService.getInstance();
+        const container = document.getElementById('confirmation-popup');
+        if (!container) return;
+
+        const sourceList = type === 'Summary'
+            ? (store.sourceSummaryList && store.sourceSummaryList.length > 0 ? store.sourceSummaryList : store.sourceList)
+            : (store.sourceList && store.sourceList.length > 0 ? store.sourceList : store.sourceSummaryList);
+
+        const currentSessionsCount = tag.ChatSessions ? tag.ChatSessions.length : 0;
+        const defaultTitle = `Chat ${currentSessionsCount + 1}`;
+
+        container.innerHTML = NewChatSourceModalPopup(sourceList || [], defaultTitle, type);
+
+        setTimeout(() => {
+            const searchInput = document.getElementById('new-chat-source-search') as HTMLInputElement;
+            const selectAllChk = document.getElementById('new-chat-select-all') as HTMLInputElement;
+            const groupCheckboxes = document.querySelectorAll('.group-source-checkbox');
+            const singleCheckboxes = document.querySelectorAll('.single-source-checkbox');
+            const badgeElem = document.getElementById('new-chat-selected-badge');
+            const confirmBtn = document.getElementById('new-chat-confirm-btn') as HTMLButtonElement;
+            const cancelBtn = document.getElementById('new-chat-cancel-btn');
+            const closeXBtn = document.getElementById('new-chat-close-x');
+            const errorElem = document.getElementById('new-chat-source-error');
+
+            const closeModal = () => {
+                if (container) container.innerHTML = '';
+            };
+
+            cancelBtn?.addEventListener('click', closeModal);
+            closeXBtn?.addEventListener('click', closeModal);
+
+            let selectedValues: string[] = [];
+            let selectedVectorIds: string[] = [];
+
+            // Pre-select all available sources by default
+            singleCheckboxes.forEach((cb: Element) => {
+                const input = cb as HTMLInputElement;
+                input.checked = true;
+                selectedValues.push(input.value);
+                if (input.dataset.vectorId) selectedVectorIds.push(input.dataset.vectorId);
+            });
+            if (selectAllChk) selectAllChk.checked = true;
+            groupCheckboxes.forEach((gcb: Element) => (gcb as HTMLInputElement).checked = true);
+
+            const updateSelectedState = () => {
+                selectedValues = [];
+                selectedVectorIds = [];
+                singleCheckboxes.forEach((cb: Element) => {
+                    const input = cb as HTMLInputElement;
+                    if (input.checked) {
+                        selectedValues.push(input.value);
+                        if (input.dataset.vectorId) selectedVectorIds.push(input.dataset.vectorId);
+                    }
+                });
+
+                if (badgeElem) {
+                    badgeElem.innerText = `${selectedValues.length} Selected`;
+                }
+
+                if (selectedValues.length === 0) {
+                    if (errorElem) errorElem.classList.remove('d-none');
+                    if (confirmBtn) {
+                        confirmBtn.disabled = true;
+                        confirmBtn.classList.add('opacity-50');
+                    }
+                } else {
+                    if (errorElem) errorElem.classList.add('d-none');
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.classList.remove('opacity-50');
+                    }
+                }
+            };
+
+            updateSelectedState();
+
+            // Select All listener
+            selectAllChk?.addEventListener('change', () => {
+                const isChecked = selectAllChk.checked;
+                singleCheckboxes.forEach((cb: Element) => {
+                    (cb as HTMLInputElement).checked = isChecked;
+                });
+                groupCheckboxes.forEach((gcb: Element) => {
+                    (gcb as HTMLInputElement).checked = isChecked;
+                });
+                updateSelectedState();
+            });
+
+            // Group checkbox listener
+            groupCheckboxes.forEach((gcb: Element) => {
+                gcb.addEventListener('change', () => {
+                    const groupInput = gcb as HTMLInputElement;
+                    const groupIdx = groupInput.dataset.groupIndex;
+                    const childBoxes = document.querySelectorAll(`.single-source-checkbox[data-group-index="${groupIdx}"]`);
+                    childBoxes.forEach((cb: Element) => ((cb as HTMLInputElement).checked = groupInput.checked));
+
+                    if (selectAllChk) {
+                        selectAllChk.checked = Array.from(singleCheckboxes).every((cb: Element) => (cb as HTMLInputElement).checked);
+                    }
+                    updateSelectedState();
+                });
+            });
+
+            // Single checkbox listener
+            singleCheckboxes.forEach((cb: Element) => {
+                cb.addEventListener('change', () => {
+                    const singleInput = cb as HTMLInputElement;
+                    const groupIdx = singleInput.dataset.groupIndex;
+                    const groupItems = document.querySelectorAll(`.single-source-checkbox[data-group-index="${groupIdx}"]`);
+                    const groupChk = document.getElementById(`group-chk-${groupIdx}`) as HTMLInputElement;
+                    if (groupChk) {
+                        groupChk.checked = Array.from(groupItems).every((item: Element) => (item as HTMLInputElement).checked);
+                    }
+                    if (selectAllChk) {
+                        selectAllChk.checked = Array.from(singleCheckboxes).every((item: Element) => (item as HTMLInputElement).checked);
+                    }
+                    updateSelectedState();
+                });
+            });
+
+            // Search live filter
+            searchInput?.addEventListener('input', () => {
+                const term = searchInput.value.trim().toLowerCase();
+                const sourceRows = document.querySelectorAll('.source-item-row');
+                sourceRows.forEach((row: Element) => {
+                    const rowElem = row as HTMLElement;
+                    const text = rowElem.dataset.searchText || '';
+                    if (term === '' || text.includes(term)) {
+                        rowElem.style.display = 'block';
+                    } else {
+                        rowElem.style.display = 'none';
+                    }
+                });
+            });
+
+            // Confirm Start Chat
+            confirmBtn?.addEventListener('click', async () => {
+                if (selectedValues.length === 0) {
+                    if (errorElem) errorElem.classList.remove('d-none');
+                    return;
+                }
+
+                AIService.createNewChatSession(tag, defaultTitle, selectedValues, selectedVectorIds);
+                closeModal();
+
+                toaster(`Started new conversation`, 'success');
+
+                const appBody = document.getElementById('app-body');
+                if (appBody) {
+                    appBody.innerHTML = await generateCheckboxHistory(tag, type);
+                }
+            });
+        }, 0);
+    });
+}
+
 

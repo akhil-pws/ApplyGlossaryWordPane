@@ -1,5 +1,6 @@
 import { removeQuotes, updateEditorFinalTable } from "../draft/draft-functions";
 import { getSummaryTagHistory } from "../summary/summary.api";
+import { AIService } from "./ai.service";
 import { StoreService } from "./store.service";
 
 export class summaryService {
@@ -9,38 +10,53 @@ export class summaryService {
         try {
             const data = await getSummaryTagHistory(tag.ID || tag.ReportHeadSummaryTagID, store.jwt);
 
-            if (data.Status && data.Data && data.Data.length > 0) {
-                tag.ReportHeadAIHistoryList = data['Data'] || [];
-                tag.FilteredReportHeadAIHistoryList = [];
+            if (data.Status && data.Data && Array.isArray(data.Data) && data.Data.length > 0) {
+                const sessions = AIService.groupHistoryIntoSessions(data.Data, tag, store, "Summary");
+                tag.ChatSessions = sessions;
 
-                const latestHistory = tag.ReportHeadAIHistoryList[0];
-                const rawSources = latestHistory.SourceVector || latestHistory.SourceValue || '';
-                const sourceIds = Array.isArray(rawSources)
-                    ? rawSources.map(String)
-                    : String(rawSources).split(',').map(s => s.trim()).filter(Boolean);
+                if (tag.ActiveSessionIndex === undefined || tag.ActiveSessionIndex < 0 || tag.ActiveSessionIndex >= sessions.length) {
+                    tag.ActiveSessionIndex = 0;
+                }
 
-                const selectedSources = store.sourceSummaryList.filter((list: any) =>
-                    sourceIds.includes(String(list.VectorID))
-                );
+                const activeSession = sessions[tag.ActiveSessionIndex];
+                if (activeSession) {
+                    tag.FilteredReportHeadAIHistoryList = activeSession.history;
+                    tag.ReportHeadAIHistoryList = activeSession.history;
+                    tag.Sources = [...activeSession.sources];
+                    tag.SourceName = [...activeSession.sources];
+                    tag.TempSourceValue = [...activeSession.sourceValues];
+                    tag.SourceValueID = activeSession.sourceValues;
 
-                tag.SourceName = selectedSources.map((item: any) => item.FileName || item.SourceName);
-                tag.Sources = [...tag.SourceName];
-                tag.TempSourceValue = selectedSources.map((item: any) =>
-                    item.VectorID ? String(item.VectorID) : item.SourceValue
-                );
+                    const selectedChat = activeSession.history.find((item: any) => item.Selected === 1) || activeSession.history[0];
+                    if (selectedChat) {
+                        const finalResponse = selectedChat.FormattedResponse
+                            ? '\n' + updateEditorFinalTable(selectedChat.FormattedResponse)
+                            : selectedChat.Response;
 
-                tag.ReportHeadAIHistoryList.forEach((historyList: any) => {
-                    historyList.Response = removeQuotes(historyList.Response);
-                    tag.FilteredReportHeadAIHistoryList.unshift(historyList);
-                });
-                return tag.FilteredReportHeadAIHistoryList;
+                        tag.ComponentKeyDataType = selectedChat.FormattedResponse ? 'TABLE' : 'TEXT';
+                        tag.UserValue = finalResponse;
+                        tag.EditorValue = finalResponse;
+                        tag.text = finalResponse;
+                    }
+                    return tag.FilteredReportHeadAIHistoryList;
+                }
             } else {
                 console.warn("No Summary AI history available.");
+                tag.ChatSessions = [];
+                tag.ActiveSessionIndex = 0;
+                tag.FilteredReportHeadAIHistoryList = [];
+                tag.ReportHeadAIHistoryList = [];
                 return [];
             }
+            return [];
         } catch (error) {
             console.error('Error fetching Summary AI history:', error);
+            tag.ChatSessions = [];
+            tag.ActiveSessionIndex = 0;
+            tag.FilteredReportHeadAIHistoryList = [];
+            tag.ReportHeadAIHistoryList = [];
             return [];
         }
     }
 }
+

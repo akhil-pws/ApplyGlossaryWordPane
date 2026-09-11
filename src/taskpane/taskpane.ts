@@ -1282,7 +1282,14 @@ export async function applySummaryTagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const bookmarkName = `SM${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
+        const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
+          ? tag.ChatSessions[tag.ActiveSessionIndex]
+          : null;
+        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
+        const selectedChat = history.find((item: any) => item.Selected === 1) || history[0];
+        const chatId = selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || '';
+        const chatSuffix = chatId ? `_${chatId}` : '';
+        const bookmarkName = `SM${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}${chatSuffix}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
@@ -1535,7 +1542,14 @@ export async function applyAITagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const bookmarkName = `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+        const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
+          ? tag.ChatSessions[tag.ActiveSessionIndex]
+          : null;
+        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
+        const selectedChat = history.find((item: any) => item.Selected === 1) || history[0];
+        const chatId = selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || '';
+        const chatSuffix = chatId ? `_${chatId}` : '';
+        const bookmarkName = `ID${tag.ID}_Split_${getDateTimeStamp()}${chatSuffix}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
@@ -3288,12 +3302,12 @@ async function logBookmarksInSelection() {
               const appBody = document.getElementById('app-body');
               appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-              await selectMatchingBookmarkFromSelection(singleName);
+              const targetChatId = await selectMatchingBookmarkFromSelection(singleName);
 
               if (store.mode === 'Home') {
-                appBody.innerHTML = await generateCheckboxHistory(tag, "AITag");
+                appBody.innerHTML = await generateCheckboxHistory(tag, "AITag", targetChatId || undefined);
               } else if (store.mode === 'Summary') {
-                appBody.innerHTML = await generateCheckboxHistory(tag, "Summary");
+                appBody.innerHTML = await generateCheckboxHistory(tag, "Summary", targetChatId || undefined);
               }
 
               document.getElementById('tags-in-selected-text')

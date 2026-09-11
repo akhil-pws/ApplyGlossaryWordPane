@@ -447,13 +447,13 @@ export function renderSelectedTags(selectedNames, availableKeys) {
               return;
             }
             confirmSwitchChatHistory(async () => {
-              await selectMatchingBookmarkFromSelection(name);
+              const targetChatId = await selectMatchingBookmarkFromSelection(name);
 
               if (summaryTag) {
                 const appBody = document.getElementById('app-body');
                 appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-                generateCheckboxHistory(summaryTag, "Summary").then(html => {
+                generateCheckboxHistory(summaryTag, "Summary", targetChatId || undefined).then(html => {
                   appBody.innerHTML = html;
                 });
               }
@@ -485,13 +485,13 @@ export function renderSelectedTags(selectedNames, availableKeys) {
               return;
             }
             confirmSwitchChatHistory(async () => {
-              await selectMatchingBookmarkFromSelection(name);
+              const targetChatId = await selectMatchingBookmarkFromSelection(name);
 
               if (aiTag) {
                 const appBody = document.getElementById('app-body');
                 appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-                generateCheckboxHistory(aiTag, "AITag").then(html => {
+                generateCheckboxHistory(aiTag, "AITag", targetChatId || undefined).then(html => {
                   appBody.innerHTML = html;
                 });
               }
@@ -525,14 +525,32 @@ export function switchModeIcon() {
   DocStorage.setItem("mode", store.mode);
 }
 
+/**
+ * Extracts chat/response ID from bookmark format like ID455997_Split_20260903_105201_101 or SM12_Split_20260903_105201_201
+ */
+export function extractChatIdFromBookmark(bookmarkName: string): string | null {
+  if (!bookmarkName || !bookmarkName.includes('_Split_')) {
+    return null;
+  }
+  const splitParts = bookmarkName.split('_Split_');
+  if (splitParts.length > 1) {
+    const afterSplit = splitParts[1];
+    const parts = afterSplit.split('_');
+    // Format: [YYYYMMDD, HHMMSS, chatId] or [YYYYMMDD, HHMMSS]
+    if (parts.length >= 3) {
+      return parts.slice(2).join('_');
+    }
+  }
+  return null;
+}
 
-export async function selectMatchingBookmarkFromSelection(displayName) {
+export async function selectMatchingBookmarkFromSelection(displayName): Promise<string | null> {
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
     const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
     await context.sync();
 
-    const targetBookmarkName = bookmarks.value.find(bookmark => {
+    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
       const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
       return cleanName.toLowerCase() === displayName.toLowerCase();
     });
@@ -545,9 +563,12 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
       if (!range.isNullObject) {
         range.select(); // Select the entire bookmark
       }
+      return extractChatIdFromBookmark(targetBookmarkName);
     }
+    return null;
   });
 }
+
 
 export function applyCustomTextStyleToCell(cell: any, store: any) {
   try {
