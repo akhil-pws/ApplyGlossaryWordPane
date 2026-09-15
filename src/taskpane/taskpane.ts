@@ -1291,11 +1291,23 @@ export async function applySummaryTagFn(
           (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
           (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName))
         ) || tag;
-        const activeSession = (tag.ChatSessions && tag.ActiveSessionIndex !== undefined ? tag.ChatSessions[tag.ActiveSessionIndex] : null) ||
-                              (matchedKey.ChatSessions && matchedKey.ActiveSessionIndex !== undefined ? matchedKey.ChatSessions[matchedKey.ActiveSessionIndex] : null);
-        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
-        const selectedChat = history.find((item: any) => item.Selected === 1);
-        const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+
+        // Find the selected/checked chat message across all sessions or history
+        let checkedChat: any = null;
+        const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
+        for (const s of allSessions) {
+          const found = s.history?.find((item: any) => item.Selected === 1);
+          if (found) {
+            checkedChat = found;
+            break;
+          }
+        }
+        if (!checkedChat) {
+          const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+          checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+        }
+
+        const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
         const chatSuffix = chatId ? `_${chatId}` : '';
         const timeStamp = getDateTimeStamp();
         const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
@@ -1568,11 +1580,22 @@ export async function applyAITagFn(
           (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
         ) || tag;
 
-        const activeSession = (tag.ChatSessions && tag.ActiveSessionIndex !== undefined ? tag.ChatSessions[tag.ActiveSessionIndex] : null) ||
-                              (matchedKey.ChatSessions && matchedKey.ActiveSessionIndex !== undefined ? matchedKey.ChatSessions[matchedKey.ActiveSessionIndex] : null);
-        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
-        const selectedChat = history.find((item: any) => item.Selected === 1);
-        const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        // Find the selected/checked chat message across all sessions or history
+        let checkedChat: any = null;
+        const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
+        for (const s of allSessions) {
+          const found = s.history?.find((item: any) => item.Selected === 1);
+          if (found) {
+            checkedChat = found;
+            break;
+          }
+        }
+        if (!checkedChat) {
+          const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+          checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+        }
+
+        const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
         const chatSuffix = chatId ? `_${chatId}` : '';
         const timeStamp = getDateTimeStamp();
         const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';

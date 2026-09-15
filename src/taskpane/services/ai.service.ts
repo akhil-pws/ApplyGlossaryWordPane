@@ -98,20 +98,6 @@ export class AIService {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
 
-        // Ensure at most ONE message is selected across all sessions
-        let foundSelected = false;
-        sessions.forEach(s => {
-            s.history.forEach(m => {
-                if (m.Selected === 1) {
-                    if (!foundSelected) {
-                        foundSelected = true;
-                    } else {
-                        m.Selected = 0;
-                    }
-                }
-            });
-        });
-
         return sessions;
     }
 
@@ -230,20 +216,6 @@ export class AIService {
             tag.ChatSessions = [];
         }
 
-        // Uncheck all prompts across all existing chat sessions of this tag
-        tag.ChatSessions.forEach((session: any) => {
-            if (session.history && Array.isArray(session.history)) {
-                session.history.forEach((m: any) => {
-                    m.Selected = 0;
-                });
-            }
-        });
-        if (tag.ReportHeadAIHistoryList && Array.isArray(tag.ReportHeadAIHistoryList)) {
-            tag.ReportHeadAIHistoryList.forEach((m: any) => {
-                m.Selected = 0;
-            });
-        }
-
         const sessionIndex = tag.ChatSessions.length + 1;
         const newSession: ChatSession = {
             id: `session-new-${Date.now()}`,
@@ -264,11 +236,6 @@ export class AIService {
         tag.SourceName = [...newSession.sources];
         tag.TempSourceValue = [...newSession.sourceValues];
         tag.SourceValueID = newSession.sourceValues;
-        tag.ChatHistoryID = 0;
-        tag.UserValue = '';
-        tag.EditorValue = '';
-        tag.text = '';
-        tag.IsApplied = true;
 
         // Sync across store lists
         const store = StoreService.getInstance();
@@ -281,11 +248,6 @@ export class AIService {
                 currentTag.ActiveSessionIndex = 0;
                 currentTag.FilteredReportHeadAIHistoryList = [];
                 currentTag.ReportHeadAIHistoryList = [];
-                currentTag.ChatHistoryID = 0;
-                currentTag.UserValue = '';
-                currentTag.EditorValue = '';
-                currentTag.text = '';
-                currentTag.IsApplied = true;
                 currentTag.Sources = [...newSession.sources];
                 currentTag.SourceName = [...newSession.sources];
                 currentTag.TempSourceValue = [...newSession.sourceValues];
@@ -299,11 +261,6 @@ export class AIService {
                 currentTag.ActiveSessionIndex = 0;
                 currentTag.FilteredReportHeadAIHistoryList = [];
                 currentTag.ReportHeadAIHistoryList = [];
-                currentTag.ChatHistoryID = 0;
-                currentTag.UserValue = '';
-                currentTag.EditorValue = '';
-                currentTag.text = '';
-                currentTag.IsApplied = true;
                 currentTag.Sources = [...newSession.sources];
                 currentTag.SourceName = [...newSession.sources];
                 currentTag.TempSourceValue = [...newSession.sourceValues];
@@ -317,11 +274,6 @@ export class AIService {
                 currentTag.ActiveSessionIndex = 0;
                 currentTag.FilteredReportHeadAIHistoryList = [];
                 currentTag.ReportHeadAIHistoryList = [];
-                currentTag.ChatHistoryID = 0;
-                currentTag.UserValue = '';
-                currentTag.EditorValue = '';
-                currentTag.text = '';
-                currentTag.IsApplied = true;
                 currentTag.Sources = [...newSession.sources];
                 currentTag.SourceName = [...newSession.sources];
                 currentTag.TempSourceValue = [...newSession.sourceValues];
@@ -343,25 +295,23 @@ export class AIService {
         tag.ActiveSessionIndex = sessionIndex;
         const activeSession = tag.ChatSessions[sessionIndex];
 
-        // Find if active session has a selected message
-        let selectedChat = activeSession.history.find((item: any) => item.Selected === 1);
-
-        // Ensure all other messages across all sessions are Selected = 0
-        tag.ChatSessions.forEach((s: any) => {
-            s.history?.forEach((m: any) => {
-                m.Selected = (selectedChat && m === selectedChat) ? 1 : 0;
-            });
-        });
-
-        tag.FilteredReportHeadAIHistoryList = activeSession.history;
-        tag.ReportHeadAIHistoryList = activeSession.history;
+        tag.FilteredReportHeadAIHistoryList = activeSession.history || [];
+        tag.ReportHeadAIHistoryList = activeSession.history || [];
         tag.Sources = [...activeSession.sources];
         tag.SourceName = [...activeSession.sources];
         tag.TempSourceValue = [...activeSession.sourceValues];
         tag.SourceValueID = activeSession.sourceValues;
 
-        const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || activeSession?.chatHistoryId || '';
-        tag.ChatHistoryID = chatId;
+        // Find if active session has a selected message, or if any other session has a selected message
+        let selectedChat = activeSession.history?.find((item: any) => item.Selected === 1);
+        let selectedSession = activeSession;
+        if (!selectedChat && tag.ChatSessions && Array.isArray(tag.ChatSessions)) {
+            const foundSession = tag.ChatSessions.find((s: any) => s.history?.some((m: any) => m.Selected === 1));
+            if (foundSession) {
+                selectedSession = foundSession;
+                selectedChat = foundSession.history?.find((m: any) => m.Selected === 1);
+            }
+        }
 
         if (selectedChat) {
             const finalResponse = selectedChat.FormattedResponse
@@ -373,11 +323,13 @@ export class AIService {
             tag.EditorValue = finalResponse;
             tag.text = finalResponse;
             tag.IsApplied = false;
+            tag.ChatHistoryID = selectedChat.ChatHistoryID || selectedChat.ID || selectedChat.ReportHeadAIHistoryID || selectedSession?.chatHistoryId || '';
         } else {
             tag.UserValue = '';
             tag.EditorValue = '';
             tag.text = '';
             tag.IsApplied = true;
+            tag.ChatHistoryID = '';
         }
 
         const store = StoreService.getInstance();
@@ -389,10 +341,11 @@ export class AIService {
                 currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
                 currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
                 currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
-                currentTag.ChatHistoryID = chatId;
+                currentTag.ChatHistoryID = tag.ChatHistoryID;
                 currentTag.UserValue = tag.UserValue;
                 currentTag.EditorValue = tag.EditorValue;
                 currentTag.text = tag.text;
+                currentTag.IsApplied = tag.IsApplied;
                 currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
             }
         });
@@ -403,10 +356,11 @@ export class AIService {
                 currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
                 currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
                 currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
-                currentTag.ChatHistoryID = chatId;
+                currentTag.ChatHistoryID = tag.ChatHistoryID;
                 currentTag.UserValue = tag.UserValue;
                 currentTag.EditorValue = tag.EditorValue;
                 currentTag.text = tag.text;
+                currentTag.IsApplied = tag.IsApplied;
                 currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
             }
         });
@@ -417,10 +371,11 @@ export class AIService {
                 currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
                 currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
                 currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
-                currentTag.ChatHistoryID = chatId;
+                currentTag.ChatHistoryID = tag.ChatHistoryID;
                 currentTag.UserValue = tag.UserValue;
                 currentTag.EditorValue = tag.EditorValue;
                 currentTag.text = tag.text;
+                currentTag.IsApplied = tag.IsApplied;
                 currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
             }
         });

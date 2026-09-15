@@ -356,7 +356,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
 
         <div class="col-md-12 mb-2 p-2 d-flex">
           <span class="d-flex align-items-baseline w-100">
-            <div class="flex-grow-1 c-pointer ai-response-container px-2 pe-3 pt-3 ${chat.Selected === 1 ? 'ai-selected-response' : 'bg-light'}" id="responseContainer-${index}">
+            <div class="flex-grow-1 c-pointer ai-response-container px-2 pe-3 pt-3 ai-selected-response" id="responseContainer-${index}">
               <input
                 class="form-check-input c-pointer me-2 response-checkbox"
                 type="checkbox"

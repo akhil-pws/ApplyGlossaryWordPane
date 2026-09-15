@@ -431,11 +431,27 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         tag.IsApplied = false;
         tag.ChatHistoryID = chat.ChatHistoryID || chat.ID || chat.ReportHeadAIHistoryID || activeSession?.chatHistoryId || '';
     } else {
-        tag.UserValue = '';
-        tag.EditorValue = '';
-        tag.text = '';
-        tag.IsApplied = true;
-        tag.ChatHistoryID = '';
+        // Active session does not have a selected prompt, check if another session has one
+        const anySelectedSession = sessions.find((s: any) => s.history?.some((m: any) => m.Selected === 1));
+        const anySelectedChat = anySelectedSession?.history?.find((m: any) => m.Selected === 1);
+        if (anySelectedChat) {
+            const finalResponse = anySelectedChat.FormattedResponse
+                ? '\n' + updateEditorFinalTable(anySelectedChat.FormattedResponse)
+                : anySelectedChat.Response;
+
+            tag.ComponentKeyDataType = anySelectedChat.FormattedResponse ? 'TABLE' : 'TEXT';
+            tag.UserValue = finalResponse;
+            tag.EditorValue = finalResponse;
+            tag.text = finalResponse;
+            tag.IsApplied = false;
+            tag.ChatHistoryID = anySelectedChat.ChatHistoryID || anySelectedChat.ID || anySelectedChat.ReportHeadAIHistoryID || anySelectedSession.chatHistoryId || '';
+        } else {
+            tag.UserValue = '';
+            tag.EditorValue = '';
+            tag.text = '';
+            tag.IsApplied = true;
+            tag.ChatHistoryID = '';
+        }
     }
 
     // Check current theme
@@ -488,6 +504,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     const groupKeys = Object.keys(sourceGroups);
     let totalSourcesCount = 0;
     let selectedSourcesCount = 0;
+    const selectedSourceNames: string[] = [];
 
     const groupedSourcesHtml = groupKeys.map((groupName, gIdx) => {
         const items = sourceGroups[groupName];
@@ -506,6 +523,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
             if (isChecked) {
                 selectedSourcesCount++;
                 groupSelectedCount++;
+                selectedSourceNames.push(name);
             }
 
             return `
@@ -538,11 +556,10 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     }).join('');
 
     const isAllChecked = totalSourcesCount > 0 && selectedSourcesCount === totalSourcesCount;
-    const sourcesLabel = selectedSourcesCount === 0
-        ? 'No Sources Selected'
-        : (selectedSourcesCount === 1
-            ? (activeSourcesList[0] || '1 Source Selected')
-            : `${selectedSourcesCount} Sources Selected`);
+    const sourcesNamesText = selectedSourcesCount === 0
+        ? 'No sources selected'
+        : selectedSourceNames.join(', ');
+    const fullSourcesTitle = `Sources: ${sourcesNamesText}`;
 
     const activeTitleSafe = String(activeSession.title || `Chat ${activeIdx + 1}`).replace(/"/g, '&quot;');
     const displayNameSafe = String(DisplayName).replace(/"/g, '&quot;');
@@ -601,18 +618,20 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
                 </button>
             </div>
 
-            <!-- Active Sources Dropdown Bar (Below Chat Dropdown & New Chat Button) -->
-            <div class="chat-sources-toolbar px-3 py-1.5 border-bottom ${headerBgClass} d-flex align-items-center gap-2">
-                <div class="dropdown flex-grow-1" style="min-width: 0;" id="chatSourceDropdownContainer">
-                    <button class="btn btn-sm ${isDark ? 'btn-outline-secondary text-light' : 'btn-outline-secondary text-dark'} dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between text-truncate chat-sources-dropdown-btn"
-                            type="button" id="chatSourcesDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" style="background: ${isDark ? '#2b3035' : '#ffffff'}; border-color: ${isDark ? '#495057' : '#ced4da'}; font-size: 11.5px; padding: 5px 8px;">
-                        <span class="text-truncate d-flex align-items-center me-2" id="chatSourcesDropdownLabel" title="${sourcesLabel}">
-                            <i class="fa-regular fa-folder-open me-2 text-primary" style="font-size: 12px;"></i>
-                            <span class="text-truncate fw-medium" id="chatSourcesDropdownText">${sourcesLabel}</span>
-                        </span>
-                        <span class="badge rounded-pill bg-primary text-white flex-shrink-0" style="font-size: 9.5px;" id="chatSourcesCountBadge">${selectedSourcesCount}</span>
+            <!-- Active Sources Bar (Matching Image 2) -->
+            <div class="chat-sources-toolbar border-bottom ${isDark ? 'border-secondary' : 'border-light-subtle'}" style="background-color: ${isDark ? '#212529' : '#f8f9fa'};">
+                <div class="dropdown w-100" id="chatSourceDropdownContainer">
+                    <button class="btn btn-sm w-100 text-start d-flex align-items-center justify-content-between p-0 border-0 bg-transparent chat-sources-trigger-btn"
+                            type="button" id="chatSourcesDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                            title="${fullSourcesTitle}" style="padding: 7px 14px !important;">
+                        <div class="d-flex align-items-center text-truncate me-2" style="min-width: 0;">
+                            <i class="fa-solid fa-file-lines me-2 flex-shrink-0" style="font-size: 13.5px; color: #4361ee;"></i>
+                            <span class="fw-bold me-1.5 flex-shrink-0 ${isDark ? 'text-light' : 'text-dark'}" style="font-size: 12px;">Sources:</span>
+                            <span class="text-truncate ${isDark ? 'text-light-50' : 'text-muted'}" id="chatSourcesDropdownText" style="font-size: 12px;">${sourcesNamesText}</span>
+                        </div>
+                        <span class="badge rounded-circle flex-shrink-0 d-inline-flex align-items-center justify-content-center" id="chatSourcesCountBadge" style="width: 19px; height: 19px; min-width: 19px; font-size: 10.5px; font-weight: 600; background-color: #6c757d; color: #ffffff; padding: 0;">${selectedSourcesCount}</span>
                     </button>
-                    <ul class="dropdown-menu shadow w-100 p-2.5 chat-sources-menu ${isDark ? 'dropdown-menu-dark' : ''}" aria-labelledby="chatSourcesDropdown" style="max-height: 290px; overflow-y: auto; z-index: 1060; min-width: 270px;">
+                    <ul class="dropdown-menu shadow w-100 p-2.5 chat-sources-menu ${isDark ? 'dropdown-menu-dark' : ''}" aria-labelledby="chatSourcesDropdown" style="max-height: 290px; overflow-y: auto; z-index: 1060; min-width: 270px; margin-top: 1px;">
                         <!-- Select All item -->
                         <li class="pb-2 border-bottom ${isDark ? 'border-secondary' : 'border-light'} mb-2">
                             <div class="d-flex align-items-center gap-2 px-3 py-1.5">
@@ -1027,12 +1046,23 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             if (bookmarkStart && bookmarkEnd) {
                 const prefix = type === "Summary" ? "SM" : "ID";
                 const tagId = tag.ID || tag.ReportHeadSummaryTagID || tag.ReportHeadGroupKeyID;
-                const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
-                    ? tag.ChatSessions[tag.ActiveSessionIndex]
-                    : null;
-                const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || [];
-                const selectedChat = history.find((item: any) => item.Selected === 1);
-                const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || '';
+                
+                // Find the selected/checked chat message across all sessions or history
+                let checkedChat: any = null;
+                const allSessions = tag.ChatSessions || [];
+                for (const s of allSessions) {
+                    const found = s.history?.find((item: any) => item.Selected === 1);
+                    if (found) {
+                        checkedChat = found;
+                        break;
+                    }
+                }
+                if (!checkedChat) {
+                    const fallbackHistory = tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
+                    checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+                }
+
+                const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || '';
                 const chatSuffix = chatId ? `_${chatId}` : '';
                 const bookmarkName =
                     `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;
@@ -1539,7 +1569,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         const chatSourceSingleBoxes = document.querySelectorAll('.chat-source-single-checkbox');
         const chatSourcesText = document.getElementById('chatSourcesDropdownText');
         const chatSourcesBadge = document.getElementById('chatSourcesCountBadge');
-        const chatSourcesLabel = document.getElementById('chatSourcesDropdownLabel');
+        const chatSourcesDropdown = document.getElementById('chatSourcesDropdown');
 
         const updateInChatSources = () => {
             const selectedNames: string[] = [];
@@ -1568,13 +1598,14 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             tag.SourceValueID = selectedValues;
 
             const count = selectedNames.length;
-            const newLabel = count === 0
-                ? 'No Sources Selected'
-                : (count === 1 ? selectedNames[0] : `${count} Sources Selected`);
+            const newNamesText = count === 0
+                ? 'No sources selected'
+                : selectedNames.join(', ');
+            const fullTitle = `Sources: ${newNamesText}`;
 
-            if (chatSourcesText) chatSourcesText.innerText = newLabel;
+            if (chatSourcesText) chatSourcesText.innerText = newNamesText;
             if (chatSourcesBadge) chatSourcesBadge.innerText = String(count);
-            if (chatSourcesLabel) chatSourcesLabel.setAttribute('title', newLabel);
+            if (chatSourcesDropdown) chatSourcesDropdown.setAttribute('title', fullTitle);
 
             // Update group counts & group checkbox states
             chatSourceGroupBoxes.forEach((gcb: Element) => {
