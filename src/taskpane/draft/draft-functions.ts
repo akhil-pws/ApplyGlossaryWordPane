@@ -63,14 +63,14 @@ export function insertLineWithHeadingStyle(
       if (props.backgroundColor && props.backgroundColor !== "transparent") {
         try {
           paragraph.font.highlightColor = props.backgroundColor;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   } catch (e) {
     console.error("Error setting paragraph style, falling back to normal:", e);
     try {
       paragraph.styleBuiltIn = Word.BuiltInStyleName.normal;
-    } catch (err) {}
+    } catch (err) { }
   }
 
   const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(_(.+?)_)/g;
@@ -305,7 +305,7 @@ function formatChatDate(dateStr: any): string {
     hours = hours ? hours : 12; // the hour '0' should be '12'
     const hh = String(hours).padStart(2, '0');
     const min = String(date.getMinutes()).padStart(2, '0');
-    
+
     // Calculate GMT offset
     const offset = -date.getTimezoneOffset();
     const diff = offset >= 0 ? '+' : '-';
@@ -356,7 +356,7 @@ export function generateChatHistoryHtml(chatList: any[]): string {
 
         <div class="col-md-12 mb-2 p-2 d-flex">
           <span class="d-flex align-items-baseline w-100">
-            <div class="flex-grow-1 c-pointer ai-response-container px-2 pe-3 pt-3 ai-selected-response" id="responseContainer-${index}">
+            <div class="flex-grow-1 c-pointer ai-response-container px-2 pe-3 pt-3 ${chat.Selected === 1 ? 'ai-selected-response' : 'bg-light'}" id="responseContainer-${index}">
               <input
                 class="form-check-input c-pointer me-2 response-checkbox"
                 type="checkbox"
@@ -385,7 +385,7 @@ export function chatfooter(tag: any) {
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
   return ` <textarea class="form-control ${promptclass}"
-                      rows="7"
+                      rows="5"
                       id="chatInput"
                       ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
@@ -397,10 +397,6 @@ export function chatfooter(tag: any) {
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton">
                 <span class="tooltiptext">Prompt Builder</span>
                 <i class="fa fa-keyboard text-light c-pointer"></i>
-              </button>
-              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="changeSourceButton">
-                ${tooltipButton}
-                <i class="fa fa-file-lines text-light c-pointer"></i>
               </button>
 
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton">
@@ -599,7 +595,7 @@ export function applyCustomTextStyleToCell(cell: any, store: any) {
     if (props.backgroundColor && props.backgroundColor !== "transparent") {
       try {
         font.highlightColor = props.backgroundColor;
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 }

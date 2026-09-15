@@ -1084,7 +1084,8 @@ export async function applySummaryTagFn(
     context.load(results, "items");
     await context.sync();
 
-    for (const item of results.items) {
+    for (let itemIndex = 0; itemIndex < results.items.length; itemIndex++) {
+      const item = results.items[itemIndex];
       /* --------------------------------------------------
          1️⃣ Anchor correctly (NO invisible chars)
       -------------------------------------------------- */
@@ -1117,6 +1118,7 @@ export async function applySummaryTagFn(
         const nodes = Array.from(doc.body.childNodes);
 
         for (const node of nodes) {
+
           // TEXT NODE
           if (node.nodeType === Node.TEXT_NODE) {
             let txt = node.textContent?.trim();
@@ -1282,14 +1284,22 @@ export async function applySummaryTagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
-          ? tag.ChatSessions[tag.ActiveSessionIndex]
-          : null;
-        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
-        const selectedChat = history.find((item: any) => item.Selected === 1) || history[0];
-        const chatId = selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || '';
+        const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+        const matchedKey = (store.summaryTagList || []).find((k: any) =>
+          k === tag ||
+          (tagId && (k.ID === tagId || k.ReportHeadSummaryTagID === tagId)) ||
+          (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
+          (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName))
+        ) || tag;
+        const activeSession = (tag.ChatSessions && tag.ActiveSessionIndex !== undefined ? tag.ChatSessions[tag.ActiveSessionIndex] : null) ||
+                              (matchedKey.ChatSessions && matchedKey.ActiveSessionIndex !== undefined ? matchedKey.ChatSessions[matchedKey.ActiveSessionIndex] : null);
+        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+        const selectedChat = history.find((item: any) => item.Selected === 1);
+        const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
         const chatSuffix = chatId ? `_${chatId}` : '';
-        const bookmarkName = `SM${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}${chatSuffix}`;
+        const timeStamp = getDateTimeStamp();
+        const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
+        const bookmarkName = `SM${tagId}_Split_${timeStamp}${instanceSuffix}${chatSuffix}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
@@ -1323,7 +1333,8 @@ export async function applyAITagFn(
     context.load(results, "items");
     await context.sync();
 
-    for (const item of results.items) {
+    for (let itemIndex = 0; itemIndex < results.items.length; itemIndex++) {
+      const item = results.items[itemIndex];
 
       /* --------------------------------------------------
          1️⃣ Anchor correctly (NO invisible chars)
@@ -1542,14 +1553,30 @@ export async function applyAITagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
-          ? tag.ChatSessions[tag.ActiveSessionIndex]
-          : null;
-        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
-        const selectedChat = history.find((item: any) => item.Selected === 1) || history[0];
-        const chatId = selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || '';
+        const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+        const matchedKey = (store.availableKeys || []).find((k: any) =>
+          k === tag ||
+          (tagId && (k.ID === tagId || k.ReportHeadGroupKeyID === tagId)) ||
+          (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
+          (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName)) ||
+          (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
+        ) || (store.aiTagList || []).find((k: any) =>
+          k === tag ||
+          (tagId && (k.ID === tagId || k.ReportHeadGroupKeyID === tagId)) ||
+          (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
+          (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName)) ||
+          (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
+        ) || tag;
+
+        const activeSession = (tag.ChatSessions && tag.ActiveSessionIndex !== undefined ? tag.ChatSessions[tag.ActiveSessionIndex] : null) ||
+                              (matchedKey.ChatSessions && matchedKey.ActiveSessionIndex !== undefined ? matchedKey.ChatSessions[matchedKey.ActiveSessionIndex] : null);
+        const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+        const selectedChat = history.find((item: any) => item.Selected === 1);
+        const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
         const chatSuffix = chatId ? `_${chatId}` : '';
-        const bookmarkName = `ID${tag.ID}_Split_${getDateTimeStamp()}${chatSuffix}`;
+        const timeStamp = getDateTimeStamp();
+        const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
+        const bookmarkName = `ID${tagId}_Split_${timeStamp}${instanceSuffix}${chatSuffix}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }

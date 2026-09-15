@@ -589,23 +589,21 @@ function NewChatSourceModalPopup(sourceList: any[] = [], defaultTitle: string = 
       const val = src.VectorID ? String(src.VectorID) : (src.SourceValue || name);
       const safeName = String(name).replace(/"/g, '&quot;');
       return `
-        <div class="form-check py-1 px-3 border-bottom ${itemBorder} source-item-row" data-search-text="${safeName.toLowerCase()}">
-          <input class="form-check-input single-source-checkbox" type="checkbox" value="${val}" data-vector-id="${src.VectorID || ''}" data-group-index="${gIdx}" id="new-chat-src-${gIdx}-${sIdx}" checked>
-          <label class="form-check-label small text-truncate d-block c-pointer" for="new-chat-src-${gIdx}-${sIdx}" title="${safeName}">
-            <i class="fa-regular fa-file-lines me-1 text-muted"></i>
-            ${name}
+        <div class="d-flex align-items-center py-2 ps-4 pe-3 border-bottom ${itemBorder} source-item-row gap-2" data-search-text="${safeName.toLowerCase()}">
+          <input class="form-check-input single-source-checkbox m-0 flex-shrink-0" type="checkbox" value="${val}" data-vector-id="${src.VectorID || ''}" data-group-index="${gIdx}" id="new-chat-src-${gIdx}-${sIdx}" checked>
+          <label class="form-check-label small text-truncate flex-grow-1 m-0 c-pointer d-flex align-items-center gap-2" for="new-chat-src-${gIdx}-${sIdx}" title="${safeName}">
+            <i class="fa-regular fa-file-lines text-muted flex-shrink-0"></i>
+            <span class="text-truncate">${name}</span>
           </label>
         </div>
       `;
     }).join('');
 
     return `
-      <div class="source-group-section mb-2">
-        <div class="d-flex align-items-center justify-content-between px-3 py-1 bg-light text-dark fw-bold small rounded-top border">
-          <span class="text-truncate">${groupName}</span>
-          <div class="form-check m-0">
-            <input class="form-check-input group-source-checkbox" type="checkbox" data-group-index="${gIdx}" id="group-chk-${gIdx}" checked>
-          </div>
+      <div class="source-group-section mb-3">
+        <div class="d-flex align-items-center px-3 py-2 bg-light text-dark fw-bold small rounded-top border gap-2">
+          <input class="form-check-input group-source-checkbox m-0 flex-shrink-0" type="checkbox" data-group-index="${gIdx}" id="group-chk-${gIdx}" checked>
+          <label class="form-check-label text-truncate flex-grow-1 m-0 c-pointer" for="group-chk-${gIdx}">${groupName}</label>
         </div>
         <div class="border border-top-0 rounded-bottom">
           ${itemsHtml}
@@ -618,7 +616,7 @@ function NewChatSourceModalPopup(sourceList: any[] = [], defaultTitle: string = 
 <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1055;">
   <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
     <div class="modal-content shadow-lg border-0 ${popupBg}">
-      <div class="modal-header border-bottom px-3 py-2 d-flex align-items-center justify-content-between">
+      <div class="modal-header border-bottom px-3 py-2.5 d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center">
           <i class="fa fa-plus-circle text-primary me-2"></i>
           <h6 class="modal-title fw-bold m-0" style="font-size: 14px;">Start New Conversation</h6>
@@ -626,18 +624,18 @@ function NewChatSourceModalPopup(sourceList: any[] = [], defaultTitle: string = 
         <button type="button" class="btn-close ${isDark ? 'btn-close-white' : ''}" id="new-chat-close-x" aria-label="Close"></button>
       </div>
 
-      <div class="modal-body px-3 py-2" style="max-height: 420px; overflow-y: auto;">
-        <p class="small text-muted mb-2">Select knowledge sources to include for this conversation thread:</p>
+      <div class="modal-body px-3 py-3" style="max-height: 420px; overflow-y: auto;">
+        <p class="small text-muted mb-2.5">Select knowledge sources to include for this conversation thread:</p>
 
         <!-- Search and Select All Toolbar -->
-        <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
+        <div class="d-flex align-items-center justify-content-between mb-3 gap-3">
           <div class="input-group input-group-sm flex-grow-1">
             <span class="input-group-text ${isDark ? 'bg-secondary text-light border-secondary' : ''}"><i class="fa fa-search small"></i></span>
             <input type="text" class="form-control form-control-sm ${isDark ? 'bg-secondary text-light border-secondary' : ''}" id="new-chat-source-search" placeholder="Search sources...">
           </div>
-          <div class="form-check form-check-inline m-0 flex-shrink-0">
-            <input class="form-check-input" type="checkbox" id="new-chat-select-all" checked>
-            <label class="form-check-label small fw-semibold" for="new-chat-select-all">Select All</label>
+          <div class="d-flex align-items-center gap-1.5 flex-shrink-0">
+            <input class="form-check-input m-0" type="checkbox" id="new-chat-select-all" checked>
+            <label class="form-check-label small fw-semibold m-0 c-pointer ms-1" for="new-chat-select-all">Select All</label>
           </div>
         </div>
 
@@ -650,7 +648,7 @@ function NewChatSourceModalPopup(sourceList: any[] = [], defaultTitle: string = 
         </div>
       </div>
 
-      <div class="modal-footer border-top px-3 py-2 d-flex justify-content-between align-items-center">
+      <div class="modal-footer border-top px-3 py-2.5 d-flex justify-content-between align-items-center">
         <span class="badge bg-primary text-white rounded-pill small" id="new-chat-selected-badge">${sourceList.length} Selected</span>
         <div>
           <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="new-chat-cancel-btn">Cancel</button>

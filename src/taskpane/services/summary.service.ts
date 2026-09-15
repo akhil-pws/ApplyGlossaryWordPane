@@ -27,8 +27,15 @@ export class summaryService {
                     tag.TempSourceValue = [...activeSession.sourceValues];
                     tag.SourceValueID = activeSession.sourceValues;
 
-                    const selectedChat = activeSession.history.find((item: any) => item.Selected === 1) || activeSession.history[0];
+                    const selectedChat = activeSession.history.find((item: any) => item.Selected === 1);
                     if (selectedChat) {
+                        // Enforce single selection across all sessions
+                        sessions.forEach(s => {
+                            s.history?.forEach(m => {
+                                m.Selected = (m === selectedChat) ? 1 : 0;
+                            });
+                        });
+
                         const finalResponse = selectedChat.FormattedResponse
                             ? '\n' + updateEditorFinalTable(selectedChat.FormattedResponse)
                             : selectedChat.Response;
@@ -37,7 +44,33 @@ export class summaryService {
                         tag.UserValue = finalResponse;
                         tag.EditorValue = finalResponse;
                         tag.text = finalResponse;
+                        tag.IsApplied = false;
+                    } else {
+                        tag.UserValue = '';
+                        tag.EditorValue = '';
+                        tag.text = '';
+                        tag.IsApplied = true;
                     }
+
+                    const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || activeSession?.chatHistoryId || '';
+                    tag.ChatHistoryID = chatId;
+
+                    const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+                    store.summaryTagList?.forEach((currentTag: any) => {
+                        const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
+                        if (currentTag === tag || currentId === tagId || currentTag.Name === tag.Name || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName)) {
+                            currentTag.ChatSessions = tag.ChatSessions;
+                            currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                            currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                            currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                            currentTag.ChatHistoryID = chatId;
+                            currentTag.UserValue = tag.UserValue;
+                            currentTag.EditorValue = tag.EditorValue;
+                            currentTag.text = tag.text;
+                            currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+                        }
+                    });
+
                     return tag.FilteredReportHeadAIHistoryList;
                 }
             } else {

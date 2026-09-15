@@ -114,6 +114,7 @@ export class UIService {
 
         safeApplyClass('#close-ai-window', 'fa-solid fa-circle-xmark bg-dark text-light', 'fa-solid fa-circle-xmark bg-light text-dark');
         safeApplyClass('#chatInput', 'bg-secondary text-light', 'bg-white text-dark');
+        safeApplyClass('#chatFooter', 'bg-dark', 'bg-white');
         safeApplyClass('.prompt-text', 'bg-secondary text-light', 'bg-white text-dark');
 
         // Toggle Icon

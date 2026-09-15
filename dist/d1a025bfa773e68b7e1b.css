@@ -134,9 +134,10 @@ ul {
 }
 
 #app-body {
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   width: 100%;
+  min-height: calc(100vh - 3rem);
 }
 
 .c-pointer {
@@ -351,8 +352,16 @@ body.dark-theme .tooltiptext {
 }
 
 #chatFooter {
-  position: relative;
-  /* So absolute positioning inside works */
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  flex-shrink: 0;
+  z-index: 100;
+  background-color: #ffffff;
+}
+
+body.dark-theme #chatFooter {
+  background-color: #212529;
 }
 
 .prompt-box {
@@ -417,9 +426,6 @@ body.dark-theme .tooltiptext {
   flex-wrap: wrap;
 }
 
-.chat-body {
-  min-height: calc(100vh - 210px);
-}
 
 .selected-text-box {
   position: absolute;
@@ -460,6 +466,7 @@ body.dark-theme .tooltiptext {
 }
 
 .chat-body {
+  flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
   /* CRITICAL for flex scroll */
@@ -539,4 +546,5 @@ body.dark-theme .tooltiptext {
   overflow: visible;
   vertical-align: -0.25em;
 }
+
 

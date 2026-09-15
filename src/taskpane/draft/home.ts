@@ -368,10 +368,16 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
 
         for (let sIdx = 0; sIdx < sessions.length; sIdx++) {
             const sess = sessions[sIdx];
+            if (String(sess.chatHistoryId) === strChatId || strChatId.endsWith(`_${sess.chatHistoryId}`)) {
+                foundSessionIndex = sIdx;
+            }
             if (sess.history && sess.history.length > 0) {
                 const mIdx = sess.history.findIndex((m: any) =>
                     String(m.ID) === strChatId ||
-                    String(m.ReportHeadAIHistoryID) === strChatId
+                    String(m.ReportHeadAIHistoryID) === strChatId ||
+                    String(m.ChatHistoryID) === strChatId ||
+                    strChatId.endsWith(`_${m.ID}`) ||
+                    strChatId.endsWith(`_${m.ChatHistoryID}`)
                 );
                 if (mIdx !== -1) {
                     foundSessionIndex = sIdx;
@@ -383,31 +389,14 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
 
         if (foundSessionIndex !== -1) {
             tag.ActiveSessionIndex = foundSessionIndex;
-            const targetSession = sessions[foundSessionIndex];
-            if (targetSession.history) {
-                targetSession.history.forEach((m: any, idx: number) => {
-                    m.Selected = (idx === foundMessageIndex) ? 1 : 0;
-                });
-            }
         } else {
             // Chat ID not found in any session, open the most recent chat (index 0)
             tag.ActiveSessionIndex = 0;
-            if (sessions[0]?.history && sessions[0].history.length > 0) {
-                if (!sessions[0].history.some((m: any) => m.Selected === 1)) {
-                    sessions[0].history[0].Selected = 1;
-                }
-            }
         }
     } else {
         // No chat ID in bookmark: keep active session or default to 0
         if (tag.ActiveSessionIndex === undefined || tag.ActiveSessionIndex < 0 || tag.ActiveSessionIndex >= sessions.length) {
             tag.ActiveSessionIndex = 0;
-        }
-        const curSession = sessions[tag.ActiveSessionIndex];
-        if (curSession?.history && curSession.history.length > 0) {
-            if (!curSession.history.some((m: any) => m.Selected === 1)) {
-                curSession.history[0].Selected = 1;
-            }
         }
     }
 
@@ -429,7 +418,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     tag.FilteredReportHeadAIHistoryList = history;
     tag.ReportHeadAIHistoryList = history;
 
-    const chat = history.find((item: any) => item.Selected === 1) || history[0];
+    const chat = history.find((item: any) => item.Selected === 1);
     if (chat) {
         const finalResponse = chat.FormattedResponse
             ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
@@ -439,6 +428,14 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         tag.UserValue = finalResponse;
         tag.EditorValue = finalResponse;
         tag.text = finalResponse;
+        tag.IsApplied = false;
+        tag.ChatHistoryID = chat.ChatHistoryID || chat.ID || chat.ReportHeadAIHistoryID || activeSession?.chatHistoryId || '';
+    } else {
+        tag.UserValue = '';
+        tag.EditorValue = '';
+        tag.text = '';
+        tag.IsApplied = true;
+        tag.ChatHistoryID = '';
     }
 
     // Check current theme
@@ -449,10 +446,6 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     const jumpBtnColorClass = isDark ? 'text-light' : 'text-dark';
     const headerBgClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
     const DisplayName = type === 'Summary' ? tag.Name : tag.DisplayName;
-
-    const activeSources = activeSession.sources || tag.Sources || [];
-    const sourcesSummary = activeSources.length > 0 ? activeSources.join(', ') : 'No sources attached';
-    const sourcesCount = activeSources.length;
 
     // Session dropdown menu items
     const sessionMenuItems = sessions.map((s: any, idx: number) => {
@@ -477,8 +470,81 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         `;
     }).join('');
 
+    // Source pool & grouping for in-chat source dropdown
+    const sourcePool = (type === 'Summary')
+        ? (store.sourceSummaryList?.length ? store.sourceSummaryList : store.sourceList || [])
+        : (store.sourceList?.length ? store.sourceList : store.sourceSummaryList || []);
+
+    const sourceGroups: { [key: string]: any[] } = {};
+    sourcePool.forEach((item: any) => {
+        const group = item.GroupName || item.SourceType || 'Document Sources';
+        if (!sourceGroups[group]) sourceGroups[group] = [];
+        sourceGroups[group].push(item);
+    });
+
+    const activeSourcesList: string[] = activeSession.sources || tag.Sources || [];
+    const activeSourceValuesList: string[] = activeSession.sourceValues || tag.TempSourceValue || [];
+
+    const groupKeys = Object.keys(sourceGroups);
+    let totalSourcesCount = 0;
+    let selectedSourcesCount = 0;
+
+    const groupedSourcesHtml = groupKeys.map((groupName, gIdx) => {
+        const items = sourceGroups[groupName];
+        let groupSelectedCount = 0;
+
+        const itemsHtml = items.map((src: any, sIdx: number) => {
+            totalSourcesCount++;
+            const name = src.SourceName || src.FileName || src.SourceValue || `Source ${sIdx + 1}`;
+            const val = src.VectorID ? String(src.VectorID) : (src.SourceValue || name);
+            const safeName = String(name).replace(/"/g, '&quot;');
+            const safeVal = String(val).replace(/"/g, '&quot;');
+
+            const isChecked = activeSourcesList.some(s => String(s).toLowerCase() === String(name).toLowerCase()) ||
+                activeSourceValuesList.some(v => String(v) === String(val) || String(v) === String(src.VectorID));
+
+            if (isChecked) {
+                selectedSourcesCount++;
+                groupSelectedCount++;
+            }
+
+            return `
+                <li class="chat-source-item-row" data-search-text="${safeName.toLowerCase()}">
+                    <div class="d-flex align-items-center gap-2 py-2 ps-4 pe-3 border-bottom ${isDark ? 'border-secondary' : 'border-light'}">
+                        <input class="form-check-input chat-source-single-checkbox m-0 flex-shrink-0" type="checkbox" value="${safeVal}" data-source-name="${safeName}" data-group-index="${gIdx}" id="chat-src-${gIdx}-${sIdx}" ${isChecked ? 'checked' : ''}>
+                        <label class="form-check-label small text-truncate flex-grow-1 m-0 c-pointer d-flex align-items-center gap-2" for="chat-src-${gIdx}-${sIdx}" title="${safeName}">
+                            <i class="fa-regular fa-file-lines text-muted flex-shrink-0" style="font-size: 11.5px;"></i>
+                            <span class="text-truncate" style="font-size: 12px;">${name}</span>
+                        </label>
+                    </div>
+                </li>
+            `;
+        }).join('');
+
+        const isGroupAllChecked = items.length > 0 && groupSelectedCount === items.length;
+
+        return `
+            <div class="chat-source-group-section mb-2.5">
+                <div class="d-flex align-items-center gap-2 px-3 py-2 bg-light text-dark fw-bold small rounded-top border">
+                    <input class="form-check-input chat-source-group-checkbox m-0 flex-shrink-0" type="checkbox" data-group-index="${gIdx}" id="chat-group-chk-${gIdx}" ${isGroupAllChecked ? 'checked' : ''}>
+                    <label class="form-check-label text-truncate flex-grow-1 m-0 c-pointer" style="font-size: 12px;" for="chat-group-chk-${gIdx}">${groupName}</label>
+                    <span class="badge bg-secondary text-white rounded-pill ms-auto chat-group-count-badge" style="font-size: 9px;">${groupSelectedCount}/${items.length}</span>
+                </div>
+                <ul class="list-unstyled p-0 m-0 border border-top-0 rounded-bottom">
+                    ${itemsHtml}
+                </ul>
+            </div>
+        `;
+    }).join('');
+
+    const isAllChecked = totalSourcesCount > 0 && selectedSourcesCount === totalSourcesCount;
+    const sourcesLabel = selectedSourcesCount === 0
+        ? 'No Sources Selected'
+        : (selectedSourcesCount === 1
+            ? (activeSourcesList[0] || '1 Source Selected')
+            : `${selectedSourcesCount} Sources Selected`);
+
     const activeTitleSafe = String(activeSession.title || `Chat ${activeIdx + 1}`).replace(/"/g, '&quot;');
-    const sourcesSummarySafe = String(sourcesSummary).replace(/"/g, '&quot;');
     const displayNameSafe = String(DisplayName).replace(/"/g, '&quot;');
 
     const closeBar = `
@@ -490,8 +556,8 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
                 <span class="fw-bold text-truncate" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;" title="${displayNameSafe}">${DisplayName}</span>
             </div>
             <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
-                <!-- Toggle Hide/Show Icon for Chat Selector, New Chat & Sources -->
-                <button id="toggleChatControlsBtn" class="btn btn-sm p-0 me-2 border-0 bg-transparent ${jumpBtnColorClass} c-pointer" title="Hide chat & source controls" style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;">
+                <!-- Toggle Hide/Show Icon for Chat Selector & New Chat -->
+                <button id="toggleChatControlsBtn" class="btn btn-sm p-0 me-2 border-0 bg-transparent ${jumpBtnColorClass} c-pointer" title="Hide chat controls" style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;">
                     <i class="fa-solid fa-chevron-up" id="toggleControlsIcon" style="font-size: 11px; transition: transform 0.2s ease;"></i>
                 </button>
                 <button id="jump-to-next-tag" class="btn btn-sm p-0 me-2 border-0 bg-transparent ${jumpBtnColorClass} c-pointer" title="Jump to next replaced instance" style="display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
@@ -507,7 +573,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
             </div>
         </div>
 
-        <!-- Collapsible Controls Panel (Session Selector, New Chat, and Sources) -->
+        <!-- Collapsible Controls Panel (Session Selector, New Chat, and Sources Dropdown) -->
         <div id="chatControlsPanel" class="chat-controls-panel">
             <hr class="mt-1 mb-0 mx-3">
 
@@ -535,14 +601,29 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
                 </button>
             </div>
 
-            <!-- Active Sources Banner -->
-            <div class="chat-sources-banner px-3 py-1 ${isDark ? 'bg-secondary text-light' : 'bg-light text-muted'} border-bottom d-flex align-items-center justify-content-between" style="font-size: 11px;" title="${sourcesSummarySafe}">
-                <div class="d-flex align-items-center text-truncate me-2" title="${sourcesSummarySafe}">
-                    <i class="fa-solid fa-file-lines me-1 text-primary" style="font-size: 11px;"></i>
-                    <span class="fw-bold me-1">Sources:</span>
-                    <span class="text-truncate active-sources-text" title="${sourcesSummarySafe}">${sourcesSummary}</span>
+            <!-- Active Sources Dropdown Bar (Below Chat Dropdown & New Chat Button) -->
+            <div class="chat-sources-toolbar px-3 py-1.5 border-bottom ${headerBgClass} d-flex align-items-center gap-2">
+                <div class="dropdown flex-grow-1" style="min-width: 0;" id="chatSourceDropdownContainer">
+                    <button class="btn btn-sm ${isDark ? 'btn-outline-secondary text-light' : 'btn-outline-secondary text-dark'} dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between text-truncate chat-sources-dropdown-btn"
+                            type="button" id="chatSourcesDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" style="background: ${isDark ? '#2b3035' : '#ffffff'}; border-color: ${isDark ? '#495057' : '#ced4da'}; font-size: 11.5px; padding: 5px 8px;">
+                        <span class="text-truncate d-flex align-items-center me-2" id="chatSourcesDropdownLabel" title="${sourcesLabel}">
+                            <i class="fa-regular fa-folder-open me-2 text-primary" style="font-size: 12px;"></i>
+                            <span class="text-truncate fw-medium" id="chatSourcesDropdownText">${sourcesLabel}</span>
+                        </span>
+                        <span class="badge rounded-pill bg-primary text-white flex-shrink-0" style="font-size: 9.5px;" id="chatSourcesCountBadge">${selectedSourcesCount}</span>
+                    </button>
+                    <ul class="dropdown-menu shadow w-100 p-2.5 chat-sources-menu ${isDark ? 'dropdown-menu-dark' : ''}" aria-labelledby="chatSourcesDropdown" style="max-height: 290px; overflow-y: auto; z-index: 1060; min-width: 270px;">
+                        <!-- Select All item -->
+                        <li class="pb-2 border-bottom ${isDark ? 'border-secondary' : 'border-light'} mb-2">
+                            <div class="d-flex align-items-center gap-2 px-3 py-1.5">
+                                <input class="form-check-input m-0 flex-shrink-0" type="checkbox" id="chat-sources-select-all" ${isAllChecked ? 'checked' : ''}>
+                                <label class="form-check-label small fw-bold m-0 c-pointer" style="font-size: 12px;" for="chat-sources-select-all">Select All Sources</label>
+                            </div>
+                        </li>
+                        <!-- Grouped Sources items -->
+                        ${groupedSourcesHtml || '<li class="p-2 text-center text-muted small">No sources available</li>'}
+                    </ul>
                 </div>
-                <span class="badge rounded-pill ${isDark ? 'bg-dark text-light' : 'bg-secondary text-white'}" style="font-size: 9.5px;" title="${sourcesCount} source document${sourcesCount === 1 ? '' : 's'} included">${sourcesCount}</span>
             </div>
         </div>
     </div>
@@ -945,13 +1026,13 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             -------------------------------------------------- */
             if (bookmarkStart && bookmarkEnd) {
                 const prefix = type === "Summary" ? "SM" : "ID";
-                const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+                const tagId = tag.ID || tag.ReportHeadSummaryTagID || tag.ReportHeadGroupKeyID;
                 const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
                     ? tag.ChatSessions[tag.ActiveSessionIndex]
                     : null;
                 const history = activeSession?.history || tag.FilteredReportHeadAIHistoryList || [];
-                const selectedChat = history.find((item: any) => item.Selected === 1) || history[0];
-                const chatId = selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || '';
+                const selectedChat = history.find((item: any) => item.Selected === 1);
+                const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || '';
                 const chatSuffix = chatId ? `_${chatId}` : '';
                 const bookmarkName =
                     `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;
@@ -1283,7 +1364,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                 checkbox.addEventListener('change', async (event: Event) => {
                     const isChecked = (event.target as HTMLInputElement).checked;
 
-                    // Reset all
+                    // Reset all DOM checkboxes and visual styles for current active view
                     tag.FilteredReportHeadAIHistoryList.forEach((_: any, otherIndex: number) => {
                         const otherCheckbox = document.getElementById(`checkbox-${otherIndex}`) as HTMLInputElement;
                         const responseContainer = document.getElementById(`responseContainer-${otherIndex}`);
@@ -1292,10 +1373,28 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                             responseContainer.classList.remove('ai-selected-response');
                             responseContainer.classList.add('bg-light');
                         }
-                        tag.FilteredReportHeadAIHistoryList[otherIndex].Selected = 0;
                     });
 
-                    // Set selected
+                    // Set Selected = 0 across ALL messages in ALL sessions of this tag
+                    if (tag.ChatSessions && Array.isArray(tag.ChatSessions)) {
+                        tag.ChatSessions.forEach((s: any) => {
+                            s.history?.forEach((m: any) => {
+                                m.Selected = 0;
+                            });
+                        });
+                    }
+                    if (tag.ReportHeadAIHistoryList && Array.isArray(tag.ReportHeadAIHistoryList)) {
+                        tag.ReportHeadAIHistoryList.forEach((m: any) => {
+                            m.Selected = 0;
+                        });
+                    }
+                    if (tag.FilteredReportHeadAIHistoryList && Array.isArray(tag.FilteredReportHeadAIHistoryList)) {
+                        tag.FilteredReportHeadAIHistoryList.forEach((m: any) => {
+                            m.Selected = 0;
+                        });
+                    }
+
+                    // Set selected on target chat
                     if (isChecked) {
                         checkbox.checked = true;
                         const responseContainer = document.getElementById(`responseContainer-${index}`);
@@ -1308,76 +1407,101 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                         chat.Selected = 0;
                     }
 
+                    const isTable = chat.FormattedResponse && chat.FormattedResponse !== '';
+                    const finalResponse = isTable
+                        ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
+                        : (chat.Response || '');
+
+                    tag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
+                    tag.UserValue = isChecked ? finalResponse : '';
+                    tag.EditorValue = isChecked ? finalResponse : '';
+                    tag.text = isChecked ? finalResponse : '';
+                    tag.IsApplied = !isChecked;
+                    tag.ChatHistoryID = isChecked ? (chat.ChatHistoryID || chat.ID || chat.ReportHeadAIHistoryID || tag.ChatSessions?.[tag.ActiveSessionIndex || 0]?.chatHistoryId || '') : '';
+
+                    // Sync across store lists immediately
+                    const store = StoreService.getInstance();
+                    const tagId = tag.ID || tag.ReportHeadGroupKeyID || tag.ReportHeadSummaryTagID;
+
+                    if (type === 'Summary') {
+                        store.summaryTagList?.forEach(currentTag => {
+                            const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
+                            if (currentTag === tag || currentId === tagId || currentTag.Name === tag.Name || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName)) {
+                                currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+                                currentTag.UserValue = tag.UserValue;
+                                currentTag.EditorValue = tag.EditorValue;
+                                currentTag.text = tag.text;
+                                currentTag.IsApplied = tag.IsApplied;
+                                currentTag.ChatSessions = tag.ChatSessions;
+                                currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                                currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                                currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                                currentTag.ChatHistoryID = tag.ChatHistoryID;
+                            }
+                        });
+                    } else {
+                        availableKeys?.forEach(currentTag => {
+                            const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+                            if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                                currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+                                currentTag.UserValue = tag.UserValue;
+                                currentTag.EditorValue = tag.EditorValue;
+                                currentTag.text = tag.text;
+                                currentTag.IsApplied = tag.IsApplied;
+                                currentTag.ChatSessions = tag.ChatSessions;
+                                currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                                currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                                currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                                currentTag.ChatHistoryID = tag.ChatHistoryID;
+                            }
+                        });
+
+                        store.aiTagList?.forEach(currentTag => {
+                            const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+                            if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                                currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+                                currentTag.UserValue = tag.UserValue;
+                                currentTag.EditorValue = tag.EditorValue;
+                                currentTag.text = tag.text;
+                                currentTag.IsApplied = tag.IsApplied;
+                                currentTag.ChatSessions = tag.ChatSessions;
+                                currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                                currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                                currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                                currentTag.ChatHistoryID = tag.ChatHistoryID;
+                            }
+                        });
+                    }
+
                     try {
                         const data = type === 'Summary' ? await updateSummaryHistory(chat, jwt) : await updateAiHistory(chat, jwt);
                         if (data['Data']) {
-                            tag.ReportHeadAIHistoryList = JSON.parse(JSON.stringify(data['Data']));
-                            tag.FilteredReportHeadAIHistoryList = [];
+                            const rawData = Array.isArray(data['Data']) ? data['Data'] : [data['Data']];
+                            const sessions = AIService.groupHistoryIntoSessions(rawData, tag, store, type);
 
-                            tag.ReportHeadAIHistoryList.forEach((historyList: any) => {
-                                historyList.Response = removeQuotes(historyList.Response);
-                                tag.FilteredReportHeadAIHistoryList.unshift(historyList);
+                            const currentActiveChatHistoryId = tag.ChatSessions?.[tag.ActiveSessionIndex || 0]?.chatHistoryId;
+                            tag.ChatSessions = sessions;
+                            if (currentActiveChatHistoryId !== undefined) {
+                                const foundIdx = sessions.findIndex(s => Number(s.chatHistoryId) === Number(currentActiveChatHistoryId));
+                                tag.ActiveSessionIndex = foundIdx !== -1 ? foundIdx : 0;
+                            } else {
+                                tag.ActiveSessionIndex = 0;
+                            }
+
+                            // Ensure ONLY this chat is selected across all sessions
+                            tag.ChatSessions.forEach((s: any) => {
+                                s.history?.forEach((m: any) => {
+                                    const isMatch = (chat.ID && m.ID && String(m.ID) === String(chat.ID)) ||
+                                                    (chat.ReportHeadAIHistoryID && m.ReportHeadAIHistoryID && String(m.ReportHeadAIHistoryID) === String(chat.ReportHeadAIHistoryID)) ||
+                                                    (m.Response === chat.Response && m.Prompt === chat.Prompt);
+                                    m.Selected = (isMatch && isChecked) ? 1 : 0;
+                                });
                             });
 
-                            const finalResponse = chat.FormattedResponse
-                                ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-                                : chat.Response;
-
-                            tag.ComponentKeyDataType = chat.FormattedResponse ? 'TABLE' : 'TEXT';
-                            tag.UserValue = finalResponse;
-                            tag.EditorValue = finalResponse;
-                            tag.text = finalResponse;
-
-                            const currentlySelected = tag.FilteredReportHeadAIHistoryList.some((item: any) => item.Selected === 1);
-                            tag.IsApplied = !currentlySelected;
-                            if (type === 'Summary') {
-                                const store = StoreService.getInstance();
-                                store.summaryTagList.forEach(currentTag => {
-                                    const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
-                                    const tagId = tag.ID || tag.ReportHeadSummaryTagID;
-                                    if (currentId === tagId) {
-                                        const isTable = chat.FormattedResponse !== '';
-                                        const finalResponse = chat.FormattedResponse
-                                            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-                                            : chat.Response;
-                                        currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                        currentTag.UserValue = finalResponse;
-                                        currentTag.EditorValue = finalResponse;
-                                        currentTag.text = finalResponse;
-                                        currentTag.IsApplied = tag.IsApplied;
-                                    }
-                                });
-                            } else {
-                                availableKeys.forEach(currentTag => {
-                                    if (currentTag.ID === tag.ID) {
-                                        const isTable = chat.FormattedResponse !== '';
-                                        const finalResponse = chat.FormattedResponse
-                                            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-                                            : chat.Response;
-                                        currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                        currentTag.UserValue = finalResponse;
-                                        currentTag.EditorValue = finalResponse;
-                                        currentTag.text = finalResponse;
-                                        currentTag.IsApplied = tag.IsApplied;
-                                    }
-                                });
-
-                                const store = StoreService.getInstance();
-                                store.aiTagList.forEach(currentTag => {
-                                    if (currentTag.ID === tag.ID) {
-                                        const isTable = chat.FormattedResponse !== '';
-                                        const finalResponse = chat.FormattedResponse
-                                            ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
-                                            : chat.Response;
-
-
-                                        currentTag.ComponentKeyDataType = isTable ? 'TABLE' : 'TEXT';
-                                        currentTag.UserValue = finalResponse;
-                                        currentTag.EditorValue = finalResponse;
-                                        currentTag.text = finalResponse;
-                                        currentTag.IsApplied = tag.IsApplied;
-                                    }
-                                });
+                            const activeSession = tag.ChatSessions[tag.ActiveSessionIndex] || tag.ChatSessions[0];
+                            if (activeSession) {
+                                tag.FilteredReportHeadAIHistoryList = activeSession.history;
+                                tag.ReportHeadAIHistoryList = activeSession.history;
                             }
                         }
                     } catch (err) {
@@ -1407,6 +1531,135 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         // + New Chat button click
         document.getElementById('addNewChatBtn')?.addEventListener('click', () => {
             openNewChatModal(tag, type);
+        });
+
+        // In-chat Source Dropdown checkboxes logic
+        const chatSourcesSelectAll = document.getElementById('chat-sources-select-all') as HTMLInputElement;
+        const chatSourceGroupBoxes = document.querySelectorAll('.chat-source-group-checkbox');
+        const chatSourceSingleBoxes = document.querySelectorAll('.chat-source-single-checkbox');
+        const chatSourcesText = document.getElementById('chatSourcesDropdownText');
+        const chatSourcesBadge = document.getElementById('chatSourcesCountBadge');
+        const chatSourcesLabel = document.getElementById('chatSourcesDropdownLabel');
+
+        const updateInChatSources = () => {
+            const selectedNames: string[] = [];
+            const selectedValues: string[] = [];
+
+            chatSourceSingleBoxes.forEach((cb: Element) => {
+                const input = cb as HTMLInputElement;
+                if (input.checked) {
+                    selectedValues.push(input.value);
+                    const name = input.dataset.sourceName || input.value;
+                    selectedNames.push(name);
+                }
+            });
+
+            // Update active session & tag
+            const activeSession = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
+                ? tag.ChatSessions[tag.ActiveSessionIndex]
+                : null;
+            if (activeSession) {
+                activeSession.sources = [...selectedNames];
+                activeSession.sourceValues = [...selectedValues];
+            }
+            tag.Sources = [...selectedNames];
+            tag.SourceName = [...selectedNames];
+            tag.TempSourceValue = [...selectedValues];
+            tag.SourceValueID = selectedValues;
+
+            const count = selectedNames.length;
+            const newLabel = count === 0
+                ? 'No Sources Selected'
+                : (count === 1 ? selectedNames[0] : `${count} Sources Selected`);
+
+            if (chatSourcesText) chatSourcesText.innerText = newLabel;
+            if (chatSourcesBadge) chatSourcesBadge.innerText = String(count);
+            if (chatSourcesLabel) chatSourcesLabel.setAttribute('title', newLabel);
+
+            // Update group counts & group checkbox states
+            chatSourceGroupBoxes.forEach((gcb: Element) => {
+                const groupInput = gcb as HTMLInputElement;
+                const groupIdx = groupInput.dataset.groupIndex;
+                const groupItems = document.querySelectorAll(`.chat-source-single-checkbox[data-group-index="${groupIdx}"]`);
+                const checkedGroupItems = document.querySelectorAll(`.chat-source-single-checkbox[data-group-index="${groupIdx}"]:checked`);
+                groupInput.checked = groupItems.length > 0 && checkedGroupItems.length === groupItems.length;
+                const groupBadge = groupInput.parentElement?.querySelector('.chat-group-count-badge');
+                if (groupBadge) {
+                    groupBadge.textContent = `${checkedGroupItems.length}/${groupItems.length}`;
+                }
+            });
+
+            if (chatSourcesSelectAll) {
+                chatSourcesSelectAll.checked = chatSourceSingleBoxes.length > 0 && Array.from(chatSourceSingleBoxes).every((item: Element) => (item as HTMLInputElement).checked);
+            }
+
+            // Sync with tag in store
+            const store = StoreService.getInstance();
+            const tagId = tag.ID || tag.ReportHeadGroupKeyID || tag.ReportHeadSummaryTagID;
+            store.aiTagList?.forEach((t: any) => {
+                const curId = t.ID || t.ReportHeadGroupKeyID;
+                if (t === tag || curId === tagId || t.DisplayName === tag.DisplayName) {
+                    t.Sources = [...selectedNames];
+                    t.SourceName = [...selectedNames];
+                    t.TempSourceValue = [...selectedValues];
+                    t.SourceValueID = selectedValues;
+                    if (t.ChatSessions && t.ActiveSessionIndex !== undefined && t.ChatSessions[t.ActiveSessionIndex]) {
+                        t.ChatSessions[t.ActiveSessionIndex].sources = [...selectedNames];
+                        t.ChatSessions[t.ActiveSessionIndex].sourceValues = [...selectedValues];
+                    }
+                }
+            });
+            store.availableKeys?.forEach((t: any) => {
+                const curId = t.ID || t.ReportHeadGroupKeyID;
+                if (t === tag || curId === tagId || t.DisplayName === tag.DisplayName) {
+                    t.Sources = [...selectedNames];
+                    t.SourceName = [...selectedNames];
+                    t.TempSourceValue = [...selectedValues];
+                    t.SourceValueID = selectedValues;
+                    if (t.ChatSessions && t.ActiveSessionIndex !== undefined && t.ChatSessions[t.ActiveSessionIndex]) {
+                        t.ChatSessions[t.ActiveSessionIndex].sources = [...selectedNames];
+                        t.ChatSessions[t.ActiveSessionIndex].sourceValues = [...selectedValues];
+                    }
+                }
+            });
+            store.summaryTagList?.forEach((t: any) => {
+                const curId = t.ID || t.ReportHeadSummaryTagID;
+                if (t === tag || curId === tagId || t.Name === tag.Name) {
+                    t.Sources = [...selectedNames];
+                    t.TempSourceValue = [...selectedValues];
+                    t.SourceValueID = selectedValues;
+                    if (t.ChatSessions && t.ActiveSessionIndex !== undefined && t.ChatSessions[t.ActiveSessionIndex]) {
+                        t.ChatSessions[t.ActiveSessionIndex].sources = [...selectedNames];
+                        t.ChatSessions[t.ActiveSessionIndex].sourceValues = [...selectedValues];
+                    }
+                }
+            });
+        };
+
+        // Select All listener
+        chatSourcesSelectAll?.addEventListener('change', () => {
+            const isChecked = chatSourcesSelectAll.checked;
+            chatSourceSingleBoxes.forEach((cb: Element) => ((cb as HTMLInputElement).checked = isChecked));
+            chatSourceGroupBoxes.forEach((gcb: Element) => ((gcb as HTMLInputElement).checked = isChecked));
+            updateInChatSources();
+        });
+
+        // Group checkboxes listener
+        chatSourceGroupBoxes.forEach((gcb: Element) => {
+            gcb.addEventListener('change', () => {
+                const groupInput = gcb as HTMLInputElement;
+                const groupIdx = groupInput.dataset.groupIndex;
+                const childBoxes = document.querySelectorAll(`.chat-source-single-checkbox[data-group-index="${groupIdx}"]`);
+                childBoxes.forEach((cb: Element) => ((cb as HTMLInputElement).checked = groupInput.checked));
+                updateInChatSources();
+            });
+        });
+
+        // Single checkbox listener
+        chatSourceSingleBoxes.forEach((cb: Element) => {
+            cb.addEventListener('change', () => {
+                updateInChatSources();
+            });
         });
 
         // Toggle Chat Controls (Hide/Show selector dropdown, new chat, and sources banner)
@@ -1470,13 +1723,6 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         document.getElementById(`sendPromptButton`)?.addEventListener('click', () => {
             const textareaValue = (document.getElementById(`chatInput`) as HTMLTextAreaElement).value;
             AIService.sendPrompt(tag, textareaValue, type);
-        });
-
-        // Button: Change Source
-        document.getElementById(`changeSourceButton`)?.addEventListener('click', () => {
-            const textareaValue = (document.getElementById(`chatInput`) as HTMLTextAreaElement).value;
-            tag.textareavalue = textareaValue;
-            createMultiSelectDropdown(tag, type);
         });
 
         // Mention dropdown

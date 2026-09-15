@@ -98,6 +98,20 @@ export class AIService {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
 
+        // Ensure at most ONE message is selected across all sessions
+        let foundSelected = false;
+        sessions.forEach(s => {
+            s.history.forEach(m => {
+                if (m.Selected === 1) {
+                    if (!foundSelected) {
+                        foundSelected = true;
+                    } else {
+                        m.Selected = 0;
+                    }
+                }
+            });
+        });
+
         return sessions;
     }
 
@@ -126,8 +140,15 @@ export class AIService {
                     tag.TempSourceValue = [...activeSession.sourceValues];
                     tag.SourceValueID = activeSession.sourceValues;
 
-                    const selectedChat = activeSession.history.find((item: any) => item.Selected === 1) || activeSession.history[0];
+                    const selectedChat = activeSession.history.find((item: any) => item.Selected === 1);
                     if (selectedChat) {
+                        // Enforce single selection across all sessions
+                        sessions.forEach(s => {
+                            s.history.forEach(m => {
+                                m.Selected = (m === selectedChat) ? 1 : 0;
+                            });
+                        });
+
                         const finalResponse = selectedChat.FormattedResponse
                             ? '\n' + updateEditorFinalTable(selectedChat.FormattedResponse)
                             : selectedChat.Response;
@@ -136,7 +157,50 @@ export class AIService {
                         tag.UserValue = finalResponse;
                         tag.EditorValue = finalResponse;
                         tag.text = finalResponse;
+                        tag.IsApplied = false;
+                    } else {
+                        tag.UserValue = '';
+                        tag.EditorValue = '';
+                        tag.text = '';
+                        tag.IsApplied = true;
                     }
+
+                    const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || activeSession?.chatHistoryId || '';
+                    tag.ChatHistoryID = chatId;
+
+                    const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+                    store.aiTagList?.forEach((currentTag: any) => {
+                        const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+                        if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                            currentTag.ChatSessions = tag.ChatSessions;
+                            currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                            currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                            currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                            currentTag.ChatHistoryID = chatId;
+                            currentTag.UserValue = tag.UserValue;
+                            currentTag.EditorValue = tag.EditorValue;
+                            currentTag.text = tag.text;
+                            currentTag.IsApplied = tag.IsApplied;
+                            currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+                        }
+                    });
+
+                    store.availableKeys?.forEach((currentTag: any) => {
+                        const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+                        if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                            currentTag.ChatSessions = tag.ChatSessions;
+                            currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                            currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                            currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                            currentTag.ChatHistoryID = chatId;
+                            currentTag.UserValue = tag.UserValue;
+                            currentTag.EditorValue = tag.EditorValue;
+                            currentTag.text = tag.text;
+                            currentTag.IsApplied = tag.IsApplied;
+                            currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+                        }
+                    });
+
                     return tag.FilteredReportHeadAIHistoryList;
                 }
             } else {
@@ -166,6 +230,20 @@ export class AIService {
             tag.ChatSessions = [];
         }
 
+        // Uncheck all prompts across all existing chat sessions of this tag
+        tag.ChatSessions.forEach((session: any) => {
+            if (session.history && Array.isArray(session.history)) {
+                session.history.forEach((m: any) => {
+                    m.Selected = 0;
+                });
+            }
+        });
+        if (tag.ReportHeadAIHistoryList && Array.isArray(tag.ReportHeadAIHistoryList)) {
+            tag.ReportHeadAIHistoryList.forEach((m: any) => {
+                m.Selected = 0;
+            });
+        }
+
         const sessionIndex = tag.ChatSessions.length + 1;
         const newSession: ChatSession = {
             id: `session-new-${Date.now()}`,
@@ -186,6 +264,70 @@ export class AIService {
         tag.SourceName = [...newSession.sources];
         tag.TempSourceValue = [...newSession.sourceValues];
         tag.SourceValueID = newSession.sourceValues;
+        tag.ChatHistoryID = 0;
+        tag.UserValue = '';
+        tag.EditorValue = '';
+        tag.text = '';
+        tag.IsApplied = true;
+
+        // Sync across store lists
+        const store = StoreService.getInstance();
+        const tagId = tag.ID || tag.ReportHeadGroupKeyID || tag.ReportHeadSummaryTagID;
+
+        store.aiTagList?.forEach((currentTag: any) => {
+            const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+            if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                currentTag.ChatSessions = tag.ChatSessions;
+                currentTag.ActiveSessionIndex = 0;
+                currentTag.FilteredReportHeadAIHistoryList = [];
+                currentTag.ReportHeadAIHistoryList = [];
+                currentTag.ChatHistoryID = 0;
+                currentTag.UserValue = '';
+                currentTag.EditorValue = '';
+                currentTag.text = '';
+                currentTag.IsApplied = true;
+                currentTag.Sources = [...newSession.sources];
+                currentTag.SourceName = [...newSession.sources];
+                currentTag.TempSourceValue = [...newSession.sourceValues];
+                currentTag.SourceValueID = newSession.sourceValues;
+            }
+        });
+        store.availableKeys?.forEach((currentTag: any) => {
+            const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+            if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                currentTag.ChatSessions = tag.ChatSessions;
+                currentTag.ActiveSessionIndex = 0;
+                currentTag.FilteredReportHeadAIHistoryList = [];
+                currentTag.ReportHeadAIHistoryList = [];
+                currentTag.ChatHistoryID = 0;
+                currentTag.UserValue = '';
+                currentTag.EditorValue = '';
+                currentTag.text = '';
+                currentTag.IsApplied = true;
+                currentTag.Sources = [...newSession.sources];
+                currentTag.SourceName = [...newSession.sources];
+                currentTag.TempSourceValue = [...newSession.sourceValues];
+                currentTag.SourceValueID = newSession.sourceValues;
+            }
+        });
+        store.summaryTagList?.forEach((currentTag: any) => {
+            const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
+            if (currentTag === tag || currentId === tagId || currentTag.Name === tag.Name || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName)) {
+                currentTag.ChatSessions = tag.ChatSessions;
+                currentTag.ActiveSessionIndex = 0;
+                currentTag.FilteredReportHeadAIHistoryList = [];
+                currentTag.ReportHeadAIHistoryList = [];
+                currentTag.ChatHistoryID = 0;
+                currentTag.UserValue = '';
+                currentTag.EditorValue = '';
+                currentTag.text = '';
+                currentTag.IsApplied = true;
+                currentTag.Sources = [...newSession.sources];
+                currentTag.SourceName = [...newSession.sources];
+                currentTag.TempSourceValue = [...newSession.sourceValues];
+                currentTag.SourceValueID = newSession.sourceValues;
+            }
+        });
 
         return newSession;
     }
@@ -201,6 +343,16 @@ export class AIService {
         tag.ActiveSessionIndex = sessionIndex;
         const activeSession = tag.ChatSessions[sessionIndex];
 
+        // Find if active session has a selected message
+        let selectedChat = activeSession.history.find((item: any) => item.Selected === 1);
+
+        // Ensure all other messages across all sessions are Selected = 0
+        tag.ChatSessions.forEach((s: any) => {
+            s.history?.forEach((m: any) => {
+                m.Selected = (selectedChat && m === selectedChat) ? 1 : 0;
+            });
+        });
+
         tag.FilteredReportHeadAIHistoryList = activeSession.history;
         tag.ReportHeadAIHistoryList = activeSession.history;
         tag.Sources = [...activeSession.sources];
@@ -208,8 +360,9 @@ export class AIService {
         tag.TempSourceValue = [...activeSession.sourceValues];
         tag.SourceValueID = activeSession.sourceValues;
 
-        // Sync selected response
-        const selectedChat = activeSession.history.find((item: any) => item.Selected === 1) || activeSession.history[0];
+        const chatId = selectedChat?.ChatHistoryID || selectedChat?.ID || selectedChat?.ReportHeadAIHistoryID || activeSession?.chatHistoryId || '';
+        tag.ChatHistoryID = chatId;
+
         if (selectedChat) {
             const finalResponse = selectedChat.FormattedResponse
                 ? '\n' + updateEditorFinalTable(selectedChat.FormattedResponse)
@@ -219,7 +372,58 @@ export class AIService {
             tag.UserValue = finalResponse;
             tag.EditorValue = finalResponse;
             tag.text = finalResponse;
+            tag.IsApplied = false;
+        } else {
+            tag.UserValue = '';
+            tag.EditorValue = '';
+            tag.text = '';
+            tag.IsApplied = true;
         }
+
+        const store = StoreService.getInstance();
+        const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+        store.aiTagList?.forEach((currentTag: any) => {
+            const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+            if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                currentTag.ChatSessions = tag.ChatSessions;
+                currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                currentTag.ChatHistoryID = chatId;
+                currentTag.UserValue = tag.UserValue;
+                currentTag.EditorValue = tag.EditorValue;
+                currentTag.text = tag.text;
+                currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+            }
+        });
+        store.availableKeys?.forEach((currentTag: any) => {
+            const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+            if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                currentTag.ChatSessions = tag.ChatSessions;
+                currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                currentTag.ChatHistoryID = chatId;
+                currentTag.UserValue = tag.UserValue;
+                currentTag.EditorValue = tag.EditorValue;
+                currentTag.text = tag.text;
+                currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+            }
+        });
+        store.summaryTagList?.forEach((currentTag: any) => {
+            const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
+            if (currentTag === tag || currentId === tagId || currentTag.Name === tag.Name || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName)) {
+                currentTag.ChatSessions = tag.ChatSessions;
+                currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+                currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+                currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+                currentTag.ChatHistoryID = chatId;
+                currentTag.UserValue = tag.UserValue;
+                currentTag.EditorValue = tag.EditorValue;
+                currentTag.text = tag.text;
+                currentTag.ComponentKeyDataType = tag.ComponentKeyDataType;
+            }
+        });
     }
 
     /**
@@ -313,6 +517,14 @@ export class AIService {
 
                         const chat = currentActive.history.find((item: any) => item.Selected === 1) || currentActive.history[0];
                         if (chat) {
+                            chat.Selected = 1;
+                            // Enforce single selection across all sessions
+                            sessions.forEach(s => {
+                                s.history?.forEach(m => {
+                                    m.Selected = (m === chat) ? 1 : 0;
+                                });
+                            });
+
                             const isTable = chat.FormattedResponse && chat.FormattedResponse !== '';
                             const finalResponse = isTable
                                 ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
@@ -322,26 +534,31 @@ export class AIService {
                             tag.UserValue = finalResponse;
                             tag.EditorValue = finalResponse;
                             tag.text = finalResponse;
+                            tag.IsApplied = false;
 
                             // Update lists in Store
                             if (type === 'Summary') {
                                 store.summaryTagList?.forEach((currentTag: any) => {
                                     const currentId = currentTag.ID || currentTag.ReportHeadSummaryTagID;
                                     const tagId = tag.ID || tag.ReportHeadSummaryTagID;
-                                    if (currentId === tagId) {
-                                        AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
+                                    if (currentTag === tag || currentId === tagId || currentTag.Name === tag.Name || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName)) {
+                                        AIService.updateTagWithChat(currentTag, chat, tag.IsApplied, tag);
                                     }
                                 });
                             } else {
                                 store.aiTagList?.forEach((currentTag: any) => {
-                                    if (currentTag.ID === tag.ID) {
-                                        AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
+                                    const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+                                    const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+                                    if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                                        AIService.updateTagWithChat(currentTag, chat, tag.IsApplied, tag);
                                     }
                                 });
 
                                 store.availableKeys?.forEach((currentTag: any) => {
-                                    if (currentTag.ID === tag.ID) {
-                                        AIService.updateTagWithChat(currentTag, chat, tag.IsApplied);
+                                    const currentId = currentTag.ID || currentTag.ReportHeadGroupKeyID;
+                                    const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+                                    if (currentTag === tag || currentId === tagId || (currentTag.DisplayName && currentTag.DisplayName === tag.DisplayName) || (currentTag.GroupKey && currentTag.GroupKey === tag.GroupKey)) {
+                                        AIService.updateTagWithChat(currentTag, chat, tag.IsApplied, tag);
                                     }
                                 });
                             }
@@ -370,7 +587,7 @@ export class AIService {
         }
     }
 
-    private static updateTagWithChat(currentTag: any, chat: any, isApplied: any) {
+    private static updateTagWithChat(currentTag: any, chat: any, isApplied: any, tag?: any) {
         const isTable = chat.FormattedResponse && chat.FormattedResponse !== '';
         const finalResponse = isTable
             ? '\n' + updateEditorFinalTable(chat.FormattedResponse)
@@ -381,6 +598,13 @@ export class AIService {
         currentTag.EditorValue = finalResponse;
         currentTag.text = finalResponse;
         currentTag.IsApplied = isApplied;
+        if (tag) {
+            currentTag.ChatSessions = tag.ChatSessions;
+            currentTag.ActiveSessionIndex = tag.ActiveSessionIndex;
+            currentTag.FilteredReportHeadAIHistoryList = tag.FilteredReportHeadAIHistoryList;
+            currentTag.ReportHeadAIHistoryList = tag.ReportHeadAIHistoryList;
+        }
+        currentTag.ChatHistoryID = chat.ChatHistoryID || chat.ID || chat.ReportHeadAIHistoryID || (tag && tag.ChatHistoryID);
     }
 }
 
