@@ -589,10 +589,10 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
                 </div>
             </div>
         </div>
+        <hr class="mt-1 mb-0 mx-3">
 
         <!-- Collapsible Controls Panel (Session Selector, New Chat, and Sources Dropdown) -->
         <div id="chatControlsPanel" class="chat-controls-panel">
-            <hr class="mt-1 mb-0 mx-3">
 
             <!-- Multi-Session Toolbar -->
             <div class="chat-session-toolbar px-3 py-2 border-bottom ${headerBgClass} d-flex align-items-center justify-content-between gap-2 shadow-xs">
