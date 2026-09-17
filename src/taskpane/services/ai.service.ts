@@ -107,7 +107,8 @@ export class AIService {
     static async fetchAIHistory(tag: any): Promise<any[]> {
         const store = StoreService.getInstance();
         try {
-            const data = await getAiHistory(tag.ID, store.jwt);
+            const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+            const data = await getAiHistory(tagId, store.jwt);
 
             if (data.Status && data.Data && Array.isArray(data.Data) && data.Data.length > 0) {
                 const sessions = AIService.groupHistoryIntoSessions(data.Data, tag, store, "AITag");

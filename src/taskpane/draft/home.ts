@@ -1047,6 +1047,14 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                 const prefix = type === "Summary" ? "SM" : "ID";
                 const tagId = tag.ID || tag.ReportHeadSummaryTagID || tag.ReportHeadGroupKeyID;
                 
+                if (!tag.ChatSessions || tag.ChatSessions.length === 0) {
+                    if (type === "Summary") {
+                        await summaryService.fetchSummaryAIHistory(tag);
+                    } else {
+                        await AIService.fetchAIHistory(tag);
+                    }
+                }
+
                 // Find the selected/checked chat message across all sessions or history
                 let checkedChat: any = null;
                 const allSessions = tag.ChatSessions || [];

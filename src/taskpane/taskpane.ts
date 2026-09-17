@@ -5,6 +5,7 @@ import { DocumentService } from "./services/document.service";
 import { UIService } from "./services/ui.service";
 import { StoreService } from "./services/store.service";
 import { AIService } from "./services/ai.service";
+import { summaryService } from "./services/summary.service";
 import { DocStorage } from "./utils/doc-storage";
 // Note: GlossaryService import removed if unused or moved
 
@@ -1292,6 +1293,11 @@ export async function applySummaryTagFn(
           (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName))
         ) || tag;
 
+        // Ensure chat history is fetched if not already loaded
+        if ((!tag.ChatSessions || tag.ChatSessions.length === 0) && (!matchedKey.ChatSessions || matchedKey.ChatSessions.length === 0)) {
+          await summaryService.fetchSummaryAIHistory(tag);
+        }
+
         // Find the selected/checked chat message across all sessions or history
         let checkedChat: any = null;
         const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
@@ -1579,6 +1585,11 @@ export async function applyAITagFn(
           (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName)) ||
           (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
         ) || tag;
+
+        // Ensure chat history is fetched if not already loaded
+        if ((!tag.ChatSessions || tag.ChatSessions.length === 0) && (!matchedKey.ChatSessions || matchedKey.ChatSessions.length === 0)) {
+          await AIService.fetchAIHistory(tag);
+        }
 
         // Find the selected/checked chat message across all sessions or history
         let checkedChat: any = null;
