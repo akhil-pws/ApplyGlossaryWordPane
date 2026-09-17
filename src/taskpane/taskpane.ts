@@ -10,7 +10,7 @@ import { DocStorage } from "./utils/doc-storage";
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, isSameChatSession, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -3340,7 +3340,14 @@ async function logBookmarksInSelection() {
           const tag = findTag(singleName);
           if (tag) {
             const tagId = tag.ID || tag.ReportHeadSummaryTagID;
-            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+            const targetChatId = await selectMatchingBookmarkFromSelection(singleName);
+
+            const isSameTag = store.currentChatTagId !== -1 &&
+              store.currentChatTagId !== undefined &&
+              store.currentChatTagId !== null &&
+              String(store.currentChatTagId) === String(tagId);
+
+            if (isSameTag && isSameChatSession(tag, targetChatId)) {
               document.getElementById('tags-in-selected-text')
                 ?.classList.replace('d-none', 'd-block');
               store.selectedNames = [singleName];
@@ -3351,8 +3358,6 @@ async function logBookmarksInSelection() {
             confirmSwitchChatHistory(async () => {
               const appBody = document.getElementById('app-body');
               appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
-
-              const targetChatId = await selectMatchingBookmarkFromSelection(singleName);
 
               if (store.mode === 'Home') {
                 appBody.innerHTML = await generateCheckboxHistory(tag, "AITag", targetChatId || undefined);

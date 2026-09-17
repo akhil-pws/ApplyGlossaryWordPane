@@ -439,12 +439,12 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.innerHTML = `${summaryTag.Name} <i class="fa-solid fa-wand-magic-sparkles ms-2 text-muted" aria-label="Summary Tag"></i>`;
           badge.addEventListener('click', async () => {
             const tagId = summaryTag.ID || summaryTag.ReportHeadSummaryTagID;
-            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+            const targetChatId = await selectMatchingBookmarkFromSelection(name);
+            const isSameTag = store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId);
+            if (isSameTag && isSameChatSession(summaryTag, targetChatId)) {
               return;
             }
             confirmSwitchChatHistory(async () => {
-              const targetChatId = await selectMatchingBookmarkFromSelection(name);
-
               if (summaryTag) {
                 const appBody = document.getElementById('app-body');
                 appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
@@ -477,12 +477,12 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.innerHTML = `${aiTag.DisplayName} ${getIconSvg(faMicrochipAi, 'ms-2 text-muted', '', 'aria-label="AI Suggested"')}`;
           badge.addEventListener('click', async () => {
             const tagId = aiTag.ID || aiTag.ReportHeadSummaryTagID;
-            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+            const targetChatId = await selectMatchingBookmarkFromSelection(name);
+            const isSameTag = store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId);
+            if (isSameTag && isSameChatSession(aiTag, targetChatId)) {
               return;
             }
             confirmSwitchChatHistory(async () => {
-              const targetChatId = await selectMatchingBookmarkFromSelection(name);
-
               if (aiTag) {
                 const appBody = document.getElementById('app-body');
                 appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
@@ -564,6 +564,57 @@ export async function selectMatchingBookmarkFromSelection(displayName): Promise<
     return null;
   });
 }
+
+/**
+ * Checks if targetChatId belongs to the same chat session that is already active on the tag.
+ * If targetChatId is not provided or empty, returns true (do not change opened chat).
+ * If targetChatId matches the active session, returns true.
+ * If targetChatId matches another session, returns false (change to that chat).
+ */
+export function isSameChatSession(tag: any, targetChatId: string | number | null | undefined): boolean {
+  if (!targetChatId || String(targetChatId).trim() === '') {
+    return true;
+  }
+
+  const sessions = tag?.ChatSessions || [];
+  if (sessions.length === 0) {
+    return true;
+  }
+
+  const currentActiveIndex = (tag.ActiveSessionIndex !== undefined && tag.ActiveSessionIndex >= 0 && tag.ActiveSessionIndex < sessions.length)
+    ? tag.ActiveSessionIndex
+    : 0;
+
+  const strChatId = String(targetChatId).trim();
+  let foundSessionIndex = -1;
+
+  for (let sIdx = 0; sIdx < sessions.length; sIdx++) {
+    const sess = sessions[sIdx];
+    if (String(sess.chatHistoryId) === strChatId || strChatId.endsWith(`_${sess.chatHistoryId}`)) {
+      foundSessionIndex = sIdx;
+    }
+    if (sess.history && sess.history.length > 0) {
+      const mIdx = sess.history.findIndex((m: any) =>
+        String(m.ID) === strChatId ||
+        String(m.ReportHeadAIHistoryID) === strChatId ||
+        String(m.ChatHistoryID) === strChatId ||
+        strChatId.endsWith(`_${m.ID}`) ||
+        strChatId.endsWith(`_${m.ChatHistoryID}`)
+      );
+      if (mIdx !== -1) {
+        foundSessionIndex = sIdx;
+        break;
+      }
+    }
+  }
+
+  if (foundSessionIndex !== -1 && foundSessionIndex !== currentActiveIndex) {
+    return false;
+  }
+
+  return true;
+}
+
 
 
 export function applyCustomTextStyleToCell(cell: any, store: any) {
