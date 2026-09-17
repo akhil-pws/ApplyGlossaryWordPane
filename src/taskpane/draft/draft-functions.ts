@@ -63,14 +63,14 @@ export function insertLineWithHeadingStyle(
       if (props.backgroundColor && props.backgroundColor !== "transparent") {
         try {
           paragraph.font.highlightColor = props.backgroundColor;
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   } catch (e) {
     console.error("Error setting paragraph style, falling back to normal:", e);
     try {
       paragraph.styleBuiltIn = Word.BuiltInStyleName.normal;
-    } catch (err) {}
+    } catch (err) { }
   }
 
   const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(_(.+?)_)/g;
@@ -305,7 +305,7 @@ function formatChatDate(dateStr: any): string {
     hours = hours ? hours : 12; // the hour '0' should be '12'
     const hh = String(hours).padStart(2, '0');
     const min = String(date.getMinutes()).padStart(2, '0');
-    
+
     // Calculate GMT offset
     const offset = -date.getTimezoneOffset();
     const diff = offset >= 0 ? '+' : '-';
@@ -385,7 +385,7 @@ export function chatfooter(tag: any) {
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
   return ` <textarea class="form-control ${promptclass}"
-                      rows="7"
+                      rows="5"
                       id="chatInput"
                       ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
@@ -397,10 +397,6 @@ export function chatfooter(tag: any) {
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton">
                 <span class="tooltiptext">Prompt Builder</span>
                 <i class="fa fa-keyboard text-light c-pointer"></i>
-              </button>
-              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="changeSourceButton">
-                ${tooltipButton}
-                <i class="fa fa-file-lines text-light c-pointer"></i>
               </button>
 
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton">
@@ -443,17 +439,17 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.innerHTML = `${summaryTag.Name} <i class="fa-solid fa-wand-magic-sparkles ms-2 text-muted" aria-label="Summary Tag"></i>`;
           badge.addEventListener('click', async () => {
             const tagId = summaryTag.ID || summaryTag.ReportHeadSummaryTagID;
-            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+            const targetChatId = await selectMatchingBookmarkFromSelection(name);
+            const isSameTag = store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId);
+            if (isSameTag && isSameChatSession(summaryTag, targetChatId)) {
               return;
             }
             confirmSwitchChatHistory(async () => {
-              await selectMatchingBookmarkFromSelection(name);
-
               if (summaryTag) {
                 const appBody = document.getElementById('app-body');
                 appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-                generateCheckboxHistory(summaryTag, "Summary").then(html => {
+                generateCheckboxHistory(summaryTag, "Summary", targetChatId || undefined).then(html => {
                   appBody.innerHTML = html;
                 });
               }
@@ -481,17 +477,17 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.innerHTML = `${aiTag.DisplayName} ${getIconSvg(faMicrochipAi, 'ms-2 text-muted', '', 'aria-label="AI Suggested"')}`;
           badge.addEventListener('click', async () => {
             const tagId = aiTag.ID || aiTag.ReportHeadSummaryTagID;
-            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+            const targetChatId = await selectMatchingBookmarkFromSelection(name);
+            const isSameTag = store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId);
+            if (isSameTag && isSameChatSession(aiTag, targetChatId)) {
               return;
             }
             confirmSwitchChatHistory(async () => {
-              await selectMatchingBookmarkFromSelection(name);
-
               if (aiTag) {
                 const appBody = document.getElementById('app-body');
                 appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-                generateCheckboxHistory(aiTag, "AITag").then(html => {
+                generateCheckboxHistory(aiTag, "AITag", targetChatId || undefined).then(html => {
                   appBody.innerHTML = html;
                 });
               }
@@ -525,14 +521,32 @@ export function switchModeIcon() {
   DocStorage.setItem("mode", store.mode);
 }
 
+/**
+ * Extracts chat/response ID from bookmark format like ID455997_Split_20260903_105201_101 or SM12_Split_20260903_105201_201
+ */
+export function extractChatIdFromBookmark(bookmarkName: string): string | null {
+  if (!bookmarkName || !bookmarkName.includes('_Split_')) {
+    return null;
+  }
+  const splitParts = bookmarkName.split('_Split_');
+  if (splitParts.length > 1) {
+    const afterSplit = splitParts[1];
+    const parts = afterSplit.split('_');
+    // Format: [YYYYMMDD, HHMMSS, chatId] or [YYYYMMDD, HHMMSS]
+    if (parts.length >= 3) {
+      return parts.slice(2).join('_');
+    }
+  }
+  return null;
+}
 
-export async function selectMatchingBookmarkFromSelection(displayName) {
+export async function selectMatchingBookmarkFromSelection(displayName): Promise<string | null> {
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
     const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
     await context.sync();
 
-    const targetBookmarkName = bookmarks.value.find(bookmark => {
+    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
       const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
       return cleanName.toLowerCase() === displayName.toLowerCase();
     });
@@ -545,9 +559,63 @@ export async function selectMatchingBookmarkFromSelection(displayName) {
       if (!range.isNullObject) {
         range.select(); // Select the entire bookmark
       }
+      return extractChatIdFromBookmark(targetBookmarkName);
     }
+    return null;
   });
 }
+
+/**
+ * Checks if targetChatId belongs to the same chat session that is already active on the tag.
+ * If targetChatId is not provided or empty, returns true (do not change opened chat).
+ * If targetChatId matches the active session, returns true.
+ * If targetChatId matches another session, returns false (change to that chat).
+ */
+export function isSameChatSession(tag: any, targetChatId: string | number | null | undefined): boolean {
+  if (!targetChatId || String(targetChatId).trim() === '') {
+    return true;
+  }
+
+  const sessions = tag?.ChatSessions || [];
+  if (sessions.length === 0) {
+    return true;
+  }
+
+  const currentActiveIndex = (tag.ActiveSessionIndex !== undefined && tag.ActiveSessionIndex >= 0 && tag.ActiveSessionIndex < sessions.length)
+    ? tag.ActiveSessionIndex
+    : 0;
+
+  const strChatId = String(targetChatId).trim();
+  let foundSessionIndex = -1;
+
+  for (let sIdx = 0; sIdx < sessions.length; sIdx++) {
+    const sess = sessions[sIdx];
+    if (String(sess.chatHistoryId) === strChatId || strChatId.endsWith(`_${sess.chatHistoryId}`)) {
+      foundSessionIndex = sIdx;
+    }
+    if (sess.history && sess.history.length > 0) {
+      const mIdx = sess.history.findIndex((m: any) =>
+        String(m.ID) === strChatId ||
+        String(m.ReportHeadAIHistoryID) === strChatId ||
+        String(m.ChatHistoryID) === strChatId ||
+        strChatId.endsWith(`_${m.ID}`) ||
+        strChatId.endsWith(`_${m.ChatHistoryID}`)
+      );
+      if (mIdx !== -1) {
+        foundSessionIndex = sIdx;
+        break;
+      }
+    }
+  }
+
+  if (foundSessionIndex !== -1 && foundSessionIndex !== currentActiveIndex) {
+    return false;
+  }
+
+  return true;
+}
+
+
 
 export function applyCustomTextStyleToCell(cell: any, store: any) {
   try {
@@ -578,7 +646,7 @@ export function applyCustomTextStyleToCell(cell: any, store: any) {
     if (props.backgroundColor && props.backgroundColor !== "transparent") {
       try {
         font.highlightColor = props.backgroundColor;
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 }

@@ -10,7 +10,7 @@ import { DocStorage } from "./utils/doc-storage";
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, isSameChatSession, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -1084,7 +1084,8 @@ export async function applySummaryTagFn(
     context.load(results, "items");
     await context.sync();
 
-    for (const item of results.items) {
+    for (let itemIndex = 0; itemIndex < results.items.length; itemIndex++) {
+      const item = results.items[itemIndex];
       /* --------------------------------------------------
          1️⃣ Anchor correctly (NO invisible chars)
       -------------------------------------------------- */
@@ -1117,6 +1118,7 @@ export async function applySummaryTagFn(
         const nodes = Array.from(doc.body.childNodes);
 
         for (const node of nodes) {
+
           // TEXT NODE
           if (node.nodeType === Node.TEXT_NODE) {
             let txt = node.textContent?.trim();
@@ -1282,7 +1284,34 @@ export async function applySummaryTagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const bookmarkName = `SM${tag.ID || tag.ReportHeadSummaryTagID}_Split_${getDateTimeStamp()}`;
+        const tagId = tag.ID || tag.ReportHeadSummaryTagID;
+        const matchedKey = (store.summaryTagList || []).find((k: any) =>
+          k === tag ||
+          (tagId && (k.ID === tagId || k.ReportHeadSummaryTagID === tagId)) ||
+          (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
+          (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName))
+        ) || tag;
+
+        // Find the selected/checked chat message across all sessions or history
+        let checkedChat: any = null;
+        const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
+        for (const s of allSessions) {
+          const found = s.history?.find((item: any) => item.Selected === 1);
+          if (found) {
+            checkedChat = found;
+            break;
+          }
+        }
+        if (!checkedChat) {
+          const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+          checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+        }
+
+        const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        const chatSuffix = chatId ? `_${chatId}` : '';
+        const timeStamp = getDateTimeStamp();
+        const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
+        const bookmarkName = `SM${tagId}_Split_${timeStamp}${instanceSuffix}${chatSuffix}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
@@ -1316,7 +1345,8 @@ export async function applyAITagFn(
     context.load(results, "items");
     await context.sync();
 
-    for (const item of results.items) {
+    for (let itemIndex = 0; itemIndex < results.items.length; itemIndex++) {
+      const item = results.items[itemIndex];
 
       /* --------------------------------------------------
          1️⃣ Anchor correctly (NO invisible chars)
@@ -1535,7 +1565,41 @@ export async function applyAITagFn(
          3️⃣ Create SINGLE bookmark
       -------------------------------------------------- */
       if (bookmarkStart && bookmarkEnd) {
-        const bookmarkName = `ID${tag.ID}_Split_${getDateTimeStamp()}`;
+        const tagId = tag.ID || tag.ReportHeadGroupKeyID;
+        const matchedKey = (store.availableKeys || []).find((k: any) =>
+          k === tag ||
+          (tagId && (k.ID === tagId || k.ReportHeadGroupKeyID === tagId)) ||
+          (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
+          (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName)) ||
+          (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
+        ) || (store.aiTagList || []).find((k: any) =>
+          k === tag ||
+          (tagId && (k.ID === tagId || k.ReportHeadGroupKeyID === tagId)) ||
+          (k.DisplayName && (k.DisplayName === tag.DisplayName || k.DisplayName === tag.Name)) ||
+          (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName)) ||
+          (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
+        ) || tag;
+
+        // Find the selected/checked chat message across all sessions or history
+        let checkedChat: any = null;
+        const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
+        for (const s of allSessions) {
+          const found = s.history?.find((item: any) => item.Selected === 1);
+          if (found) {
+            checkedChat = found;
+            break;
+          }
+        }
+        if (!checkedChat) {
+          const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+          checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+        }
+
+        const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        const chatSuffix = chatId ? `_${chatId}` : '';
+        const timeStamp = getDateTimeStamp();
+        const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
+        const bookmarkName = `ID${tagId}_Split_${timeStamp}${instanceSuffix}${chatSuffix}`;
         bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
       }
     }
@@ -3276,7 +3340,14 @@ async function logBookmarksInSelection() {
           const tag = findTag(singleName);
           if (tag) {
             const tagId = tag.ID || tag.ReportHeadSummaryTagID;
-            if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
+            const targetChatId = await selectMatchingBookmarkFromSelection(singleName);
+
+            const isSameTag = store.currentChatTagId !== -1 &&
+              store.currentChatTagId !== undefined &&
+              store.currentChatTagId !== null &&
+              String(store.currentChatTagId) === String(tagId);
+
+            if (isSameTag && isSameChatSession(tag, targetChatId)) {
               document.getElementById('tags-in-selected-text')
                 ?.classList.replace('d-none', 'd-block');
               store.selectedNames = [singleName];
@@ -3288,12 +3359,10 @@ async function logBookmarksInSelection() {
               const appBody = document.getElementById('app-body');
               appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-              await selectMatchingBookmarkFromSelection(singleName);
-
               if (store.mode === 'Home') {
-                appBody.innerHTML = await generateCheckboxHistory(tag, "AITag");
+                appBody.innerHTML = await generateCheckboxHistory(tag, "AITag", targetChatId || undefined);
               } else if (store.mode === 'Summary') {
-                appBody.innerHTML = await generateCheckboxHistory(tag, "Summary");
+                appBody.innerHTML = await generateCheckboxHistory(tag, "Summary", targetChatId || undefined);
               }
 
               document.getElementById('tags-in-selected-text')
