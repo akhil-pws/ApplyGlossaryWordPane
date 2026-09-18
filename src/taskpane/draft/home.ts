@@ -1075,6 +1075,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                 const bookmarkName =
                     `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;
 
+
                 bookmarkStart
                     .expandTo(bookmarkEnd)
                     .insertBookmark(bookmarkName);
