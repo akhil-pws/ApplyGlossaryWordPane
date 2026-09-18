@@ -625,7 +625,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
                             type="button" id="chatSourcesDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
                             title="${fullSourcesTitle}" style="padding: 7px 14px !important;">
                         <div class="d-flex align-items-center text-truncate me-2" style="min-width: 0;">
-                            <i class="fa-solid fa-file-lines me-2 flex-shrink-0" style="font-size: 13.5px; color: #4361ee;"></i>
+                            <i class="fa-solid fa-file-lines me-2 flex-shrink-0" style="font-size: 13.5px; color: #337ab7;"></i>
                             <span class="fw-bold me-1.5 flex-shrink-0 ${isDark ? 'text-light' : 'text-dark'}" style="font-size: 12px;">Sources:</span>
                             <span class="text-truncate ${isDark ? 'text-light-50' : 'text-muted'}" id="chatSourcesDropdownText" style="font-size: 12px;">${sourcesNamesText}</span>
                         </div>
@@ -651,7 +651,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     const chatSourcesForDisplay = selectedSourceNames.length > 0 ? selectedSourceNames : activeSourcesList;
 
     const chatBody = `
-        <div class="chat-body flex-grow-1 overflow-auto">
+        <div class="chat-body flex-grow-1 d-flex flex-column overflow-auto">
             ${generateChatHistoryHtml(history, chatSourcesForDisplay)}
         </div>
     `;
@@ -1048,7 +1048,7 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
             if (bookmarkStart && bookmarkEnd) {
                 const prefix = type === "Summary" ? "SM" : "ID";
                 const tagId = tag.ID || tag.ReportHeadSummaryTagID || tag.ReportHeadGroupKeyID;
-                
+
                 if (!tag.ChatSessions || tag.ChatSessions.length === 0) {
                     if (type === "Summary") {
                         await summaryService.fetchSummaryAIHistory(tag);
@@ -1532,8 +1532,8 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                             tag.ChatSessions.forEach((s: any) => {
                                 s.history?.forEach((m: any) => {
                                     const isMatch = (chat.ID && m.ID && String(m.ID) === String(chat.ID)) ||
-                                                    (chat.ReportHeadAIHistoryID && m.ReportHeadAIHistoryID && String(m.ReportHeadAIHistoryID) === String(chat.ReportHeadAIHistoryID)) ||
-                                                    (m.Response === chat.Response && m.Prompt === chat.Prompt);
+                                        (chat.ReportHeadAIHistoryID && m.ReportHeadAIHistoryID && String(m.ReportHeadAIHistoryID) === String(chat.ReportHeadAIHistoryID)) ||
+                                        (m.Response === chat.Response && m.Prompt === chat.Prompt);
                                     m.Selected = (isMatch && isChecked) ? 1 : 0;
                                 });
                             });

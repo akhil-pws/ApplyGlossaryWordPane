@@ -340,7 +340,7 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
     }
 
     return `
-      <div class="chat-empty-state d-flex flex-column align-items-center justify-content-center text-center p-4 h-100" style="min-height: 250px;">
+      <div class="chat-empty-state d-flex flex-column align-items-center justify-content-center text-center p-4 flex-grow-1 my-auto w-100">
         <div class="rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-xs" style="width: 56px; height: 56px; min-width: 56px; min-height: 56px; background-color: ${isDark ? 'rgba(99, 102, 241, 0.18)' : '#eef2ff'};">
           <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 22px; color: ${isDark ? '#a5b4fc' : '#6366f1'};"></i>
         </div>
