@@ -321,8 +321,35 @@ function formatChatDate(dateStr: any): string {
   }
 }
 
-export function generateChatHistoryHtml(chatList: any[]): string {
+export function generateChatHistoryHtml(chatList: any[], sources: string[] = []): string {
   const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
+
+  if (!chatList || chatList.length === 0) {
+    const validSources = Array.isArray(sources) ? sources.filter(Boolean) : [];
+    const count = validSources.length;
+    let descHtml = 'Ask questions, draft summaries, or generate structured tables.';
+
+    if (count === 1) {
+      descHtml = `Configured with <strong>1 source</strong> (${validSources[0]}). Ask questions, draft summaries, or generate structured tables.`;
+    } else if (count === 2) {
+      descHtml = `Configured with <strong>2 sources</strong> (${validSources[0]}, ${validSources[1]}). Ask questions, draft summaries, or generate structured tables.`;
+    } else if (count > 2) {
+      const remaining = count - 2;
+      descHtml = `Configured with <strong>${count} sources</strong> (${validSources[0]}, ${validSources[1]} +${remaining} more). Ask questions, draft summaries, or generate structured tables.`;
+    }
+
+    return `
+      <div class="chat-empty-state d-flex flex-column align-items-center justify-content-center text-center p-4 h-100" style="min-height: 250px;">
+        <div class="rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-xs" style="width: 56px; height: 56px; min-width: 56px; min-height: 56px; background-color: ${isDark ? 'rgba(99, 102, 241, 0.18)' : '#eef2ff'};">
+          <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 22px; color: ${isDark ? '#a5b4fc' : '#6366f1'};"></i>
+        </div>
+        <h6 class="fw-bold mb-2 ${isDark ? 'text-light' : 'text-dark'}" style="font-size: 15px; letter-spacing: -0.1px;">How can I help you today?</h6>
+        <p class="chat-empty-state-desc mb-0 ${isDark ? 'text-light-50' : 'text-muted'}" style="font-size: 12px; line-height: 1.55; max-width: 320px;">${descHtml}</p>
+      </div>
+    `;
+  }
+
   const promptclass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
   const globalPromptUpdate = store.UserRole.UserRoleEntityAccessList.find(
     (item: any) => item.UserRoleEntity === 'Global Prompt Update'
@@ -439,11 +466,12 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.innerHTML = `${summaryTag.Name} <i class="fa-solid fa-wand-magic-sparkles ms-2 text-muted" aria-label="Summary Tag"></i>`;
           badge.addEventListener('click', async () => {
             const tagId = summaryTag.ID || summaryTag.ReportHeadSummaryTagID;
-            const targetChatId = await selectMatchingBookmarkFromSelection(name);
+            const targetChatId = await getMatchingBookmarkChatIdFromSelection(name);
             const isSameTag = store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId);
             if (isSameTag && isSameChatSession(summaryTag, targetChatId)) {
               return;
             }
+            await selectMatchingBookmark(name);
             confirmSwitchChatHistory(async () => {
               if (summaryTag) {
                 const appBody = document.getElementById('app-body');
@@ -477,11 +505,12 @@ export function renderSelectedTags(selectedNames, availableKeys) {
           badge.innerHTML = `${aiTag.DisplayName} ${getIconSvg(faMicrochipAi, 'ms-2 text-muted', '', 'aria-label="AI Suggested"')}`;
           badge.addEventListener('click', async () => {
             const tagId = aiTag.ID || aiTag.ReportHeadSummaryTagID;
-            const targetChatId = await selectMatchingBookmarkFromSelection(name);
+            const targetChatId = await getMatchingBookmarkChatIdFromSelection(name);
             const isSameTag = store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId);
             if (isSameTag && isSameChatSession(aiTag, targetChatId)) {
               return;
             }
+            await selectMatchingBookmark(name);
             confirmSwitchChatHistory(async () => {
               if (aiTag) {
                 const appBody = document.getElementById('app-body');
@@ -540,10 +569,28 @@ export function extractChatIdFromBookmark(bookmarkName: string): string | null {
   return null;
 }
 
-export async function selectMatchingBookmarkFromSelection(displayName): Promise<string | null> {
+export async function getMatchingBookmarkChatIdFromSelection(displayName: string): Promise<string | null> {
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
     const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
+    await context.sync();
+
+    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
+      const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
+      return cleanName.toLowerCase() === displayName.toLowerCase();
+    });
+
+    if (targetBookmarkName) {
+      return extractChatIdFromBookmark(targetBookmarkName);
+    }
+    return null;
+  });
+}
+
+export async function selectMatchingBookmark(displayName: string): Promise<void> {
+  return Word.run(async (context) => {
+    const selection = context.document.getSelection();
+    const bookmarks = selection.getBookmarks();
     await context.sync();
 
     const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
@@ -557,12 +604,16 @@ export async function selectMatchingBookmarkFromSelection(displayName): Promise<
       await context.sync();
 
       if (!range.isNullObject) {
-        range.select(); // Select the entire bookmark
+        range.select();
       }
-      return extractChatIdFromBookmark(targetBookmarkName);
     }
-    return null;
   });
+}
+
+export async function selectMatchingBookmarkFromSelection(displayName: string): Promise<string | null> {
+  const chatId = await getMatchingBookmarkChatIdFromSelection(displayName);
+  await selectMatchingBookmark(displayName);
+  return chatId;
 }
 
 /**
@@ -572,18 +623,18 @@ export async function selectMatchingBookmarkFromSelection(displayName): Promise<
  * If targetChatId matches another session, returns false (change to that chat).
  */
 export function isSameChatSession(tag: any, targetChatId: string | number | null | undefined): boolean {
-  if (!targetChatId || String(targetChatId).trim() === '') {
-    return true;
-  }
-
   const sessions = tag?.ChatSessions || [];
   if (sessions.length === 0) {
-    return true;
+    return false;
   }
 
   const currentActiveIndex = (tag.ActiveSessionIndex !== undefined && tag.ActiveSessionIndex >= 0 && tag.ActiveSessionIndex < sessions.length)
     ? tag.ActiveSessionIndex
     : 0;
+
+  if (!targetChatId || String(targetChatId).trim() === '') {
+    return true;
+  }
 
   const strChatId = String(targetChatId).trim();
   let foundSessionIndex = -1;
@@ -608,11 +659,8 @@ export function isSameChatSession(tag: any, targetChatId: string | number | null
     }
   }
 
-  if (foundSessionIndex !== -1 && foundSessionIndex !== currentActiveIndex) {
-    return false;
-  }
-
-  return true;
+  const targetSessionIndex = foundSessionIndex !== -1 ? foundSessionIndex : 0;
+  return targetSessionIndex === currentActiveIndex;
 }
 
 
