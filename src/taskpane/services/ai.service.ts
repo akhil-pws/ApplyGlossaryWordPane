@@ -40,8 +40,12 @@ export class AIService {
         const sessions: ChatSession[] = [];
 
         sessionMap.forEach((messages, hId) => {
-            // Determine session title from the first prompt in this thread
-            const firstMsg = messages.find(m => m.Prompt && m.Prompt.trim() !== '') || messages[0];
+            // rawHistory from API has newest messages first.
+            // Reverse messages so older messages appear at the top and the latest messages appear at the bottom of the chat window.
+            const chronologicalMessages = [...messages].reverse();
+
+            // Determine session title from the initial (oldest) prompt in this thread
+            const firstMsg = chronologicalMessages.find(m => m.Prompt && m.Prompt.trim() !== '') || chronologicalMessages[0];
             let title = `Chat ${hId}`;
             if (firstMsg?.Prompt) {
                 title = firstMsg.Prompt.trim().replace(/\s+/g, ' ');
@@ -84,7 +88,7 @@ export class AIService {
                 createdAt,
                 sources: sessionSources,
                 sourceValues: sessionSourceValues,
-                history: messages
+                history: chronologicalMessages
             });
         });
 
@@ -471,7 +475,7 @@ export class AIService {
                         tag.TempSourceValue = [...currentActive.sourceValues];
                         tag.SourceValueID = currentActive.sourceValues;
 
-                        const chat = currentActive.history.find((item: any) => item.Selected === 1) || currentActive.history[0];
+                        const chat = currentActive.history.find((item: any) => item.Selected === 1) || currentActive.history[currentActive.history.length - 1];
                         if (chat) {
                             chat.Selected = 1;
                             // Enforce single selection across all sessions

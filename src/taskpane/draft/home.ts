@@ -1075,7 +1075,6 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                 const bookmarkName =
                     `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;
 
-
                 bookmarkStart
                     .expandTo(bookmarkEnd)
                     .insertBookmark(bookmarkName);
@@ -1258,6 +1257,11 @@ export async function openPromptBuilderModal(tag: any, type: "Summary" | "AITag"
 
 export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: any, type: "Summary" | "AITag") {
     setTimeout(() => {
+        const chatBody = document.querySelector('.chat-body');
+        if (chatBody) {
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
         tag.FilteredReportHeadAIHistoryList.forEach((chat: any, index: number) => {
             // Copy buttons
             if (tag.textareavalue) {
