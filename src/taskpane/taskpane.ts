@@ -11,7 +11,7 @@ import { DocStorage } from "./utils/doc-storage";
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, isSameChatSession, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, selectMatchingBookmark, getMatchingBookmarkChatIdFromSelection, isSameChatSession, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
@@ -3351,7 +3351,7 @@ async function logBookmarksInSelection() {
           const tag = findTag(singleName);
           if (tag) {
             const tagId = tag.ID || tag.ReportHeadSummaryTagID;
-            const targetChatId = await selectMatchingBookmarkFromSelection(singleName);
+            const targetChatId = await getMatchingBookmarkChatIdFromSelection(singleName);
 
             const isSameTag = store.currentChatTagId !== -1 &&
               store.currentChatTagId !== undefined &&
@@ -3365,6 +3365,8 @@ async function logBookmarksInSelection() {
               renderSelectedTags(store.selectedNames, store.availableKeys);
               return;
             }
+
+            await selectMatchingBookmark(singleName);
 
             confirmSwitchChatHistory(async () => {
               const appBody = document.getElementById('app-body');

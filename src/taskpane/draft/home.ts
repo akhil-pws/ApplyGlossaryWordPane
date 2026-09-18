@@ -648,9 +648,11 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     </div>
     `;
 
+    const chatSourcesForDisplay = selectedSourceNames.length > 0 ? selectedSourceNames : activeSourcesList;
+
     const chatBody = `
         <div class="chat-body flex-grow-1 overflow-auto">
-            ${generateChatHistoryHtml(history)}
+            ${generateChatHistoryHtml(history, chatSourcesForDisplay)}
         </div>
     `;
 
@@ -1614,6 +1616,21 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
             if (chatSourcesText) chatSourcesText.innerText = newNamesText;
             if (chatSourcesBadge) chatSourcesBadge.innerText = String(count);
             if (chatSourcesDropdown) chatSourcesDropdown.setAttribute('title', fullTitle);
+
+            // Update empty state description if present
+            const emptyStateDesc = document.querySelector('.chat-empty-state-desc');
+            if (emptyStateDesc) {
+                let descHtml = 'Ask questions, draft summaries, or generate structured tables.';
+                if (count === 1) {
+                    descHtml = `Configured with <strong>1 source</strong> (${selectedNames[0]}). Ask questions, draft summaries, or generate structured tables.`;
+                } else if (count === 2) {
+                    descHtml = `Configured with <strong>2 sources</strong> (${selectedNames[0]}, ${selectedNames[1]}). Ask questions, draft summaries, or generate structured tables.`;
+                } else if (count > 2) {
+                    const remaining = count - 2;
+                    descHtml = `Configured with <strong>${count} sources</strong> (${selectedNames[0]}, ${selectedNames[1]} +${remaining} more). Ask questions, draft summaries, or generate structured tables.`;
+                }
+                emptyStateDesc.innerHTML = descHtml;
+            }
 
             // Update group counts & group checkbox states
             chatSourceGroupBoxes.forEach((gcb: Element) => {
