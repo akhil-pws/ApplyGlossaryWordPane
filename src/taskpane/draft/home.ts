@@ -1049,30 +1049,28 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                 const prefix = type === "Summary" ? "SM" : "ID";
                 const tagId = tag.ID || tag.ReportHeadSummaryTagID || tag.ReportHeadGroupKeyID;
 
-                if (!tag.ChatSessions || tag.ChatSessions.length === 0) {
-                    if (type === "Summary") {
-                        await summaryService.fetchSummaryAIHistory(tag);
-                    } else {
-                        await AIService.fetchAIHistory(tag);
-                    }
-                }
-
-                // Find the selected/checked chat message across all sessions or history
-                let checkedChat: any = null;
                 const allSessions = tag.ChatSessions || [];
-                for (const s of allSessions) {
-                    const found = s.history?.find((item: any) => item.Selected === 1);
-                    if (found) {
-                        checkedChat = found;
-                        break;
-                    }
-                }
-                if (!checkedChat) {
-                    const fallbackHistory = tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
-                    checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
-                }
+                let chatId = '';
 
-                const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || '';
+                if (allSessions && allSessions.length > 0) {
+                    // Find the selected/checked chat message across all sessions or history
+                    let checkedChat: any = null;
+                    for (const s of allSessions) {
+                        const found = s.history?.find((item: any) => item.Selected === 1);
+                        if (found) {
+                            checkedChat = found;
+                            break;
+                        }
+                    }
+                    if (!checkedChat) {
+                        const fallbackHistory = tag.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || [];
+                        checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+                    }
+
+                    chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || '';
+                } else {
+                    chatId = tag.ChatHistoryID || '';
+                }
                 const chatSuffix = chatId ? `_${chatId}` : '';
                 const bookmarkName =
                     `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;

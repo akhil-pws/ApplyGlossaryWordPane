@@ -1293,27 +1293,28 @@ export async function applySummaryTagFn(
           (k.Name && (k.Name === tag.Name || k.Name === tag.DisplayName))
         ) || tag;
 
-        // Ensure chat history is fetched if not already loaded
-        if ((!tag.ChatSessions || tag.ChatSessions.length === 0) && (!matchedKey.ChatSessions || matchedKey.ChatSessions.length === 0)) {
-          await summaryService.fetchSummaryAIHistory(tag);
-        }
-
-        // Find the selected/checked chat message across all sessions or history
-        let checkedChat: any = null;
         const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
-        for (const s of allSessions) {
-          const found = s.history?.find((item: any) => item.Selected === 1);
-          if (found) {
-            checkedChat = found;
-            break;
-          }
-        }
-        if (!checkedChat) {
-          const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
-          checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
-        }
+        let chatId = '';
 
-        const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        if (allSessions && allSessions.length > 0) {
+          // Find the selected/checked chat message across all sessions or history
+          let checkedChat: any = null;
+          for (const s of allSessions) {
+            const found = s.history?.find((item: any) => item.Selected === 1);
+            if (found) {
+              checkedChat = found;
+              break;
+            }
+          }
+          if (!checkedChat) {
+            const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+            checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+          }
+
+          chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        } else {
+          chatId = tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        }
         const chatSuffix = chatId ? `_${chatId}` : '';
         const timeStamp = getDateTimeStamp();
         const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
@@ -1586,27 +1587,28 @@ export async function applyAITagFn(
           (k.GroupKey && (k.GroupKey === tag.GroupKey || k.GroupKey === tag.DisplayName))
         ) || tag;
 
-        // Ensure chat history is fetched if not already loaded
-        if ((!tag.ChatSessions || tag.ChatSessions.length === 0) && (!matchedKey.ChatSessions || matchedKey.ChatSessions.length === 0)) {
-          await AIService.fetchAIHistory(tag);
-        }
-
-        // Find the selected/checked chat message across all sessions or history
-        let checkedChat: any = null;
         const allSessions = tag.ChatSessions || matchedKey.ChatSessions || [];
-        for (const s of allSessions) {
-          const found = s.history?.find((item: any) => item.Selected === 1);
-          if (found) {
-            checkedChat = found;
-            break;
-          }
-        }
-        if (!checkedChat) {
-          const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
-          checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
-        }
+        let chatId = '';
 
-        const chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        if (allSessions && allSessions.length > 0) {
+          // Find the selected/checked chat message across all sessions or history
+          let checkedChat: any = null;
+          for (const s of allSessions) {
+            const found = s.history?.find((item: any) => item.Selected === 1);
+            if (found) {
+              checkedChat = found;
+              break;
+            }
+          }
+          if (!checkedChat) {
+            const fallbackHistory = tag.FilteredReportHeadAIHistoryList || matchedKey.FilteredReportHeadAIHistoryList || tag.ReportHeadAIHistoryList || matchedKey.ReportHeadAIHistoryList || [];
+            checkedChat = fallbackHistory.find((item: any) => item.Selected === 1);
+          }
+
+          chatId = checkedChat?.ChatHistoryID || checkedChat?.ID || checkedChat?.ReportHeadAIHistoryID || tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        } else {
+          chatId = tag.ChatHistoryID || matchedKey.ChatHistoryID || '';
+        }
         const chatSuffix = chatId ? `_${chatId}` : '';
         const timeStamp = getDateTimeStamp();
         const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
