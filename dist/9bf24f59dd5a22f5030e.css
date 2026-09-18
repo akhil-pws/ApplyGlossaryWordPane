@@ -470,7 +470,19 @@ body.dark-theme #chatFooter {
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   /* CRITICAL for flex scroll */
+}
+
+.chat-empty-state {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: auto 0;
+  padding: 1.5rem;
 }
 
 .list-group-summary {
