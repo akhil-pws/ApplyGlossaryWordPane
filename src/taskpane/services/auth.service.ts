@@ -1,6 +1,6 @@
 import { CONFIG } from "../utils/config";
 import { UserProfile } from "../models/user.model";
-import { loginUser, checkLoginType, ssoLogin, ssoComplete, logoutUser } from "../draft/draft.api";
+import { loginUser, checkLoginType, ssoLogin, ssoComplete, logoutUser, pingUser } from "../draft/draft.api";
 import { StoreService } from "./store.service";
 import { DocStorage } from "../utils/doc-storage";
 
@@ -11,9 +11,40 @@ export class AuthService {
     private static readonly PALETTE_KEY = 'colorPallete';
     private static readonly TEXT_STYLE_KEY = 'defaultTextStyle';
     private static readonly LOGIN_ID_KEY = 'loginId';
+    private static pingIntervalId: any = null;
 
     static getStoredToken(): string | null {
-        return DocStorage.getItem('token'); 
+        return DocStorage.getItem('token');
+    }
+
+    static startPingTimer(loginId?: string | number | null, token?: string | null): void {
+        this.stopPingTimer();
+
+        const currentLoginId = loginId || DocStorage.getItem(this.LOGIN_ID_KEY) || StoreService.getInstance().loginId;
+        if (!currentLoginId) {
+            return;
+        }
+
+        this.pingIntervalId = setInterval(async () => {
+            const activeLoginId = DocStorage.getItem(this.LOGIN_ID_KEY) || StoreService.getInstance().loginId;
+            const activeToken = DocStorage.getItem('token') || StoreService.getInstance().jwt;
+            if (activeLoginId) {
+                try {
+                    await pingUser(activeLoginId, activeToken);
+                } catch (error) {
+                    console.error('Error during ping API call:', error);
+                }
+            } else {
+                this.stopPingTimer();
+            }
+        }, 60000);
+    }
+
+    static stopPingTimer(): void {
+        if (this.pingIntervalId) {
+            clearInterval(this.pingIntervalId);
+            this.pingIntervalId = null;
+        }
     }
 
     static restoreSession(): any {
@@ -27,6 +58,7 @@ export class AuthService {
                 const differenceInHours = (now.getTime() - lastUpdatedTime) / (1000 * 60 * 60);
                 if (differenceInHours >= 24) {
                     console.log("JWT token expired (passed 24 hours). Logging out.");
+                    DocStorage.removeItem('token');
                     this.logout();
                     return null;
                 } else {
@@ -38,13 +70,18 @@ export class AuthService {
                 DocStorage.setItem('tokenLastUpdated', now.toISOString());
             }
 
+            const loginId = DocStorage.getItem(this.LOGIN_ID_KEY);
+            if (loginId) {
+                this.startPingTimer(loginId, sessionToken);
+            }
+
             return {
                 jwt: sessionToken,
                 userRole: JSON.parse(DocStorage.getItem(this.USER_ROLE_KEY) || '{}'),
                 tableStyle: DocStorage.getItem(this.STYLE_KEY),
                 colorPallete: JSON.parse(DocStorage.getItem(this.PALETTE_KEY) || 'null'),
                 userId: DocStorage.getItem('userId'),
-                loginId: DocStorage.getItem(this.LOGIN_ID_KEY),
+                loginId: loginId,
                 defaultTextStyle: DocStorage.getItem(this.TEXT_STYLE_KEY)
             };
         }
@@ -82,6 +119,10 @@ export class AuthService {
                         store.loginId = loginId;
                     }
                     store.saveToStorage();
+
+                    if (loginId !== undefined && loginId !== null) {
+                        this.startPingTimer(loginId, jwt);
+                    }
 
                     return {
                         success: true,
@@ -170,6 +211,10 @@ export class AuthService {
                 }
                 store.saveToStorage();
 
+                if (loginId !== undefined && loginId !== null) {
+                    this.startPingTimer(loginId, jwt);
+                }
+
                 return {
                     success: true,
                     data: {
@@ -196,6 +241,7 @@ export class AuthService {
     }
 
     static async logout(): Promise<void> {
+        this.stopPingTimer();
         const token = DocStorage.getItem('token') || StoreService.getInstance().jwt;
         const loginId = DocStorage.getItem(this.LOGIN_ID_KEY) || StoreService.getInstance().loginId;
 
@@ -211,10 +257,11 @@ export class AuthService {
             DocStorage.removeItem('userId');
             DocStorage.removeItem(this.LOGIN_ID_KEY);
             DocStorage.removeItem('tokenLastUpdated');
-            
+
             const store = StoreService.getInstance();
             store.clearStorage();
             console.log("Logged out");
         }
     }
 }
+
