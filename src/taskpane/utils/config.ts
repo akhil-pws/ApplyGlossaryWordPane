@@ -1,6 +1,6 @@
 export const CONFIG = {
     dataUrl: 'https://plsdevapp.azurewebsites.net',
     storeUrl: 'https://linkwordplugin-aphgcwcgbfdqeccs.eastus-01.azurewebsites.net',
-    version: '2.5.8',
+    version: '2.6.0',
     environment: ['Dev']
 };
