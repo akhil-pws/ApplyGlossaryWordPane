@@ -4,3 +4,4 @@ export const CONFIG = {
     version: '2.6.0',
     environment: ['Dev']
 };
++

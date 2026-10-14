@@ -15,7 +15,8 @@ export async function loginUser(organization: string, username: string, password
       ClientName: organization,
       Username: username,
       Password: password,
-      LoginType: 'ADDIN'
+      LoginType: 'ADDIN',
+      TAVersion: CONFIG.version
     })
   });
 
@@ -366,7 +367,8 @@ export async function logoutUser(loginId?: string | number | null, jwt?: string 
     method: 'POST',
     headers: headers,
     body: JSON.stringify({
-      LoginID: loginId ? Number(loginId) : 0
+      LoginID: loginId ? Number(loginId) : 0,
+      TAVersion: CONFIG.version
     })
   });
 
@@ -391,7 +393,8 @@ export async function pingUser(loginId: string | number, jwt?: string | null): P
     headers: headers,
     body: JSON.stringify({
       LoginType: 'ADDIN',
-      LoginID: String(loginId)
+      LoginID: String(loginId),
+      TAVersion: CONFIG.version
     })
   });
 
