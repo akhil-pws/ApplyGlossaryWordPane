@@ -7,6 +7,7 @@ import { StoreService } from "./services/store.service";
 import { AIService } from "./services/ai.service";
 import { summaryService } from "./services/summary.service";
 import { DocStorage } from "./utils/doc-storage";
+import { AIRevisionSession } from "./utils/ai-revision";
 // Note: GlossaryService import removed if unused or moved
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
@@ -1005,11 +1006,16 @@ export async function applyTagFn() {
 
       context.load(body, 'text');
       await context.sync();
-      if (store.mode === 'Summary') {
-        await applySummaryTagFn(body, context);
-      } else {
-        await applyAITagFn(body, context);
-        await applyImageTagFn(body, context);
+      const aiRevision = await AIRevisionSession.begin(context);
+      try {
+        if (store.mode === 'Summary') {
+          await applySummaryTagFn(body, context, aiRevision);
+        } else {
+          await applyAITagFn(body, context, aiRevision);
+          await applyImageTagFn(body, context, aiRevision);
+        }
+      } finally {
+        await aiRevision.end();
       }
     } catch (err) {
       toaster("Something went wrong", "error")
@@ -1023,7 +1029,7 @@ export async function applyTagFn() {
   });
 }
 
-async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
+async function applyImageTagFn(body: Word.Body, context: Word.RequestContext, aiRevision?: AIRevisionSession) {
   const store = StoreService.getInstance();
   for (let i = 0; i < store.imageList.length; i++) {
     const tag = store.imageList[i];
@@ -1051,8 +1057,9 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
         }
 
         const imageRange = item.getRange();
-        imageRange.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
+        const pic = imageRange.insertInlinePictureFromBase64(base64Image, Word.InsertLocation.replace);
         await context.sync();
+        if (aiRevision) await aiRevision.markAsAI(pic.getRange());
       }
     }
   }
@@ -1063,7 +1070,8 @@ async function applyImageTagFn(body: Word.Body, context: Word.RequestContext) {
 
 export async function applySummaryTagFn(
   body: Word.Body,
-  context: Word.RequestContext
+  context: Word.RequestContext,
+  aiRevision?: AIRevisionSession
 ) {
   document.getElementById('app-body').innerHTML = `
   <div id="button-container">
@@ -1319,7 +1327,9 @@ export async function applySummaryTagFn(
         const timeStamp = getDateTimeStamp();
         const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
         const bookmarkName = `SM${tagId}_Split_${timeStamp}${instanceSuffix}${chatSuffix}`;
-        bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
+        let insertedRange = bookmarkStart.expandTo(bookmarkEnd);
+        if (aiRevision) insertedRange = await aiRevision.markAsAI(insertedRange);
+        insertedRange.insertBookmark(bookmarkName);
       }
     }
   }
@@ -1330,7 +1340,8 @@ export async function applySummaryTagFn(
 
 export async function applyAITagFn(
   body: Word.Body,
-  context: Word.RequestContext
+  context: Word.RequestContext,
+  aiRevision?: AIRevisionSession
 ) {
   document.getElementById('app-body').innerHTML = `
   <div id="button-container">
@@ -1613,7 +1624,9 @@ export async function applyAITagFn(
         const timeStamp = getDateTimeStamp();
         const instanceSuffix = results.items.length > 1 ? `_${itemIndex + 1}` : '';
         const bookmarkName = `ID${tagId}_Split_${timeStamp}${instanceSuffix}${chatSuffix}`;
-        bookmarkStart.expandTo(bookmarkEnd).insertBookmark(bookmarkName);
+        let insertedRange = bookmarkStart.expandTo(bookmarkEnd);
+        if (aiRevision) insertedRange = await aiRevision.markAsAI(insertedRange);
+        insertedRange.insertBookmark(bookmarkName);
       }
     }
   }

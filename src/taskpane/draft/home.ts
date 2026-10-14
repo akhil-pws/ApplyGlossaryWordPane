@@ -8,6 +8,7 @@ import { loadSummarypage } from "../summary/summary";
 import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 import { DocStorage } from "../utils/doc-storage";
+import { AIRevisionSession } from "../utils/ai-revision";
 import { faMicrochipAi, getIconSvg } from "../utils/fontawesome-icons";
 
 let preview = '';
@@ -851,11 +852,14 @@ export async function setupPromptBuilderUI(container, promptBuilderList) {
 
 export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") {
     return Word.run(async (context) => {
+        let aiRevision: AIRevisionSession | null = null;
         try {
             const selection = context.document.getSelection();
             await context.sync();
 
             if (!selection) throw new Error("Invalid selection");
+
+            aiRevision = await AIRevisionSession.begin(context);
 
             /* --------------------------------------------------
                1️⃣ Create invisible anchor at cursor
@@ -1075,9 +1079,10 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
                 const bookmarkName =
                     `${prefix}${tagId}_Split_${getDateTimeStamp()}${chatSuffix}`;
 
-                bookmarkStart
-                    .expandTo(bookmarkEnd)
-                    .insertBookmark(bookmarkName);
+                const insertedRange = await aiRevision.markAsAI(
+                    bookmarkStart.expandTo(bookmarkEnd)
+                );
+                insertedRange.insertBookmark(bookmarkName);
             }
 
             /* --------------------------------------------------
@@ -1091,6 +1096,8 @@ export async function insertTagPrompt(tag, type: "Summary" | "AITag" = "AITag") 
         } catch (err) {
             console.error(err);
             toaster("Something went wrong", "error");
+        } finally {
+            await aiRevision?.end();
         }
     });
 }
