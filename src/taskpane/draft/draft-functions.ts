@@ -5,6 +5,16 @@ import { StoreService } from "../services/store.service";
 import { DocStorage } from "../utils/doc-storage";
 import { faFolderGear, faMicrochipAi, getIconSvg } from "../utils/fontawesome-icons";
 
+// Escapes text so literal "<...>" (e.g. template placeholders like "centre<s>") renders as text, not HTML
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function insertLineWithHeadingStyle(
   paragraph: Word.Paragraph,
   line: string
@@ -366,7 +376,7 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
           <div class="d-flex justify-content-between align-items-start">
             <!-- Prompt Box -->
             <div class="form-control h-34 d-flex align-items-center dynamic-height prompt-text ${promptclass}" style="width: 95%;">
-              ${chat.Prompt}
+              ${escapeHtml(chat.Prompt)}
             </div>
 
             <!-- Icons Stack -->
@@ -569,16 +579,23 @@ export function extractChatIdFromBookmark(bookmarkName: string): string | null {
   return null;
 }
 
+/**
+ * Finds the raw bookmark name (e.g. ID455997_Split_20260903_105201_101) whose tag part matches displayName.
+ */
+export function findMatchingBookmarkName(bookmarks: string[], displayName: string): string | undefined {
+  return (bookmarks || []).find(bookmark => {
+    const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
+    return cleanName.toLowerCase() === displayName.toLowerCase();
+  });
+}
+
 export async function getMatchingBookmarkChatIdFromSelection(displayName: string): Promise<string | null> {
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
     const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
     await context.sync();
 
-    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
-      const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
-      return cleanName.toLowerCase() === displayName.toLowerCase();
-    });
+    const targetBookmarkName = findMatchingBookmarkName(bookmarks.value, displayName);
 
     if (targetBookmarkName) {
       return extractChatIdFromBookmark(targetBookmarkName);
@@ -593,10 +610,7 @@ export async function selectMatchingBookmark(displayName: string): Promise<void>
     const bookmarks = selection.getBookmarks();
     await context.sync();
 
-    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
-      const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
-      return cleanName.toLowerCase() === displayName.toLowerCase();
-    });
+    const targetBookmarkName = findMatchingBookmarkName(bookmarks.value, displayName);
 
     if (targetBookmarkName) {
       const range = context.document.getBookmarkRangeOrNullObject(targetBookmarkName);
