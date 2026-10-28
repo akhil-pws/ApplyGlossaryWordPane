@@ -309,31 +309,39 @@ function toaster(message: string, type: string) {
   }, 4000);
 }
 
+// Modes offered in the header mode pill (Review Mode is hidden for now)
+const modeOptions = [
+  { mode: 'Home', id: 'home', label: 'Draft Mode', icon: 'fa-pen', description: 'Create content directly from the source documents' },
+  { mode: 'Summary', id: 'summary-mode', label: 'Summary Mode', icon: 'fa-wand-magic-sparkles', description: 'Create summary sections based on this draft' },
+];
+
 function logoheader(storedUrl) {
   const store = StoreService.getInstance();
   const themeicon = store.theme === 'Dark' ? 'fa-sun' : 'fa-moon'
-  const modeIcon = store.mode === 'Home' ? 'fa-home' : store.mode === 'Summary' ? 'fa-wand-magic-sparkles' : 'fa-magnifying-glass';
+  const activeMode = modeOptions.find(option => option.mode === store.mode) || modeOptions[0];
+  const modeItems = modeOptions.map(option => `
+          <li>
+            <a class="dropdown-item mode-menu-item ${option.mode === activeMode.mode ? 'mode-active' : ''}" href="#" id="${option.id}" data-mode="${option.mode}" role="menuitemradio" aria-checked="${option.mode === activeMode.mode}">
+              <span class="mode-menu-icon"><i class="fa ${option.icon}" aria-hidden="true"></i></span>
+              <span class="mode-menu-text">
+                <span class="mode-menu-title">${option.label}</span>
+                <span class="mode-menu-desc">${option.description}</span>
+              </span>
+              <i class="fa fa-check mode-menu-check" aria-hidden="true"></i>
+            </a>
+          </li>`).join('');
   const body = `
     <img id="main-logo" src="${storedUrl}/assets/logo.png" alt="" class="logo">
     <div class="icon-nav me-3">
-    <div class="dropdown d-inline">
-        <i class="fa ${modeIcon} c-pointer me-3" id="modeDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Mode"></i>
-        <ul class="dropdown-menu" aria-labelledby="modeDropdown" appendTo="body">
-        <li>
-            <a class="dropdown-item" href="#" id="home">
-              <i class="fa fa-home me-2" aria-hidden="true"></i> Draft Mode
-            </a>
-          </li>
-          <li>
-            <a class="dropdown-item" href="#" id="summary-mode">
-              <i class="fa fa-wand-magic-sparkles me-2" aria-hidden="true"></i> Summary Mode
-            </a>
-          </li>
-          <li>
-            <a class="dropdown-item disabled-link" href="#" id="review-mode">
-              <i class="fa fa-magnifying-glass me-2" aria-hidden="true"></i> Review Mode
-            </a>
-          </li>
+    <div class="dropdown d-inline-block me-3">
+        <button type="button" class="mode-pill" id="modeDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="menu" title="Switch mode">
+          <i class="fa ${activeMode.icon} mode-pill-icon" aria-hidden="true"></i>
+          <span class="mode-pill-label">${activeMode.label}</span>
+          <i class="fa fa-chevron-down mode-pill-caret" aria-hidden="true"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end mode-menu" aria-labelledby="modeDropdown" aria-label="Assistant mode">
+          <li class="mode-menu-header">Switch mode</li>
+          ${modeItems}
         </ul>
       </div>
 
@@ -566,6 +574,35 @@ function PromptBuilderModalPopup() {
 </div>`;
 }
 
+function ReasonForChangePopup(header: string = 'Reason for Change', maxLength: number = 500) {
+  const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
+  const popupClass = isDark ? 'bg-dark text-light' : 'bg-light text-dark';
+
+  return `
+<div class="modal show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="reason-for-change-title">
+  <div class="modal-dialog">
+    <div class="modal-content ${popupClass}">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold" id="reason-for-change-title">${header}</h5>
+      </div>
+
+      <div class="modal-body">
+        <label class="form-label" for="reason-for-change-input"><span class="text-danger">*</span> Reason for Change</label>
+        <textarea class="form-control ${isDark ? 'bg-secondary text-light border-secondary' : ''}" id="reason-for-change-input"
+          rows="4" maxlength="${maxLength}" placeholder="Enter reason for change"></textarea>
+        <div id="reason-for-change-error" class="invalid-feedback d-none"></div>
+      </div>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-link ${isDark ? 'text-info' : 'text-primary'}" id="reason-for-change-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-white" id="reason-for-change-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
 function NewChatSourceModalPopup(sourceList: any[] = [], defaultTitle: string = 'New Chat', type: string = 'AITag') {
   const store = StoreService.getInstance();
   const isDark = store.theme === 'Dark';
@@ -661,4 +698,4 @@ function NewChatSourceModalPopup(sourceList: any[] = [], defaultTitle: string = 
   `;
 }
 
-export { navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, PromptBuilderModalPopup, NewChatSourceModalPopup };
+export { modeOptions, ReasonForChangePopup, navTabs, addtagbody, promptbuilderbody, logoheader, Confirmationpopup, toaster, DataModalPopup, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, PromptBuilderModalPopup, NewChatSourceModalPopup };

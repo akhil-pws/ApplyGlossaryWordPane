@@ -1,0 +1,1361 @@
+* {
+  font-size: 12px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.btn {
+  font-size: 12px;
+}
+
+.btn-check:focus+.btn,
+.btn:focus {
+  box-shadow: none !important;
+}
+
+.btn-check:active+.btn-dark,
+.btn-check:checked+.btn-dark,
+.btn-dark.active,
+.btn-dark:active,
+.show>.btn-dark.dropdown-toggle {
+  border-bottom: 2px solid #4098fe !important;
+}
+
+.hr {
+  margin: 1rem 0;
+  color: inherit;
+  border: 0;
+  border-top: 1px solid #E5E5E5;
+  opacity: 1;
+}
+
+/* Adjust the dropdown button to allow text wrapping and keep the icon on the right */
+.dropdown-toggle-sources {
+  height: auto;
+  /* Allow dynamic height based on content */
+  min-height: 30px;
+  /* Set a minimum height */
+}
+
+.dropdown-toggle-icon-s ::after {
+  align-self: center;
+}
+
+/* Style for the dropdown label that holds selected items */
+.sourceDropdownLabel {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Ensure long texts are truncated */
+  white-space: normal;
+  /* Allow wrapping of text */
+  max-width: 100%;
+  /* Prevent overflow */
+}
+
+
+
+.w-90 {
+  width: 90%;
+}
+
+.w-95 {
+  width: 95%;
+}
+
+.dynamic-height {
+  height: auto !important;
+  min-height: 34px;
+  overflow: hidden;
+  resize: none;
+}
+
+.user {
+  background-color: #f4f4f4;
+  text-align: justify;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+  hyphens: auto;
+}
+
+.ai-reply {
+  text-align: justify;
+}
+
+.ai-selected-reply {
+  text-align: justify;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+  hyphens: auto;
+}
+
+.accordion,
+.accordion-item {
+  position: relative !important;
+}
+
+.accordion-header {
+  background: lightgray;
+  position: sticky !important;
+  top: 0;
+  border-bottom: 1px solid #d3d3d3;
+  z-index: 1000;
+}
+
+.radio-select {
+  align-content: space-around;
+}
+
+
+/* 
+* Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
+* See LICENSE in the project root for license information.
+*/
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+.ms-welcome__header {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+  gap: 10px;
+  margin-bottom: 2rem;
+}
+
+#app-body {
+  display: flex !important;
+  flex-direction: column;
+  width: 100%;
+  min-height: calc(100vh - 67px);
+}
+
+.c-pointer {
+  cursor: pointer;
+}
+
+#button-container {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+#page-loader {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.5);
+  /* Semi-transparent overlay */
+  z-index: 9999;
+}
+
+#loader {
+  display: flex;
+  justify-content: center;
+}
+
+.loader {
+  border: 10px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 10px solid #3498db;
+  width: 60px;
+  height: 60px;
+  -webkit-animation: spin 2s linear infinite;
+  animation: spin 2s linear infinite;
+}
+
+@-webkit-keyframes spin {
+  0% {
+    -webkit-transform: rotate(0deg);
+  }
+
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.card-container {
+  overflow-y: auto;
+  max-height: 80vh;
+}
+
+.logo {
+  height: 3.3rem;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.logo-header {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.fa-sign-out {
+  position: relative !important;
+}
+
+.ngb-tooltip {
+  position: relative;
+}
+
+.tooltiptext {
+  visibility: hidden;
+  min-width: 60px;
+  background-color: #ffffff;
+  color: #212529;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: Arial, sans-serif;
+  font-weight: 400;
+  position: absolute;
+  z-index: 1000;
+  right: 45px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.tooltiptext.info-tooltip-text {
+  right: 24px;
+  text-align: left;
+  min-width: 180px;
+  max-width: min(260px, calc(100vw - 70px));
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+body.light-theme .tooltiptext {
+  background-color: #ffffff !important;
+  color: #212529 !important;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+body.dark-theme .tooltiptext {
+  background-color: #212529 !important;
+  color: #fff !important;
+  border: 1px solid #444;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.ngb-tooltip:hover .tooltiptext {
+  visibility: visible;
+}
+
+.fs-12 {
+  font-size: 12px;
+}
+
+.bg-primary-clr {
+  background-color: #3d82c9;
+  border-color: #3d82c9;
+}
+
+.bg-danger-clr {
+  background-color: #FF5370;
+  border-color: #FF5370;
+}
+
+.bg-success-clr {
+  background-color: #2ed8b6;
+  border-color: #2ed8b6;
+}
+
+.bg-primary-clr:hover {
+  background-color: #356ba5;
+  border-color: #356ba5;
+}
+
+.bg-danger-clr:hover {
+  background-color: #e04b63;
+  border-color: #e04b63;
+}
+
+.bg-success-clr:hover {
+  background-color: #4ddec1;
+  border-color: #43dcbd;
+}
+
+.bg-primary-clr:active {
+  background-color: #2e5a83;
+  border-color: #2e5a83;
+}
+
+.bg-danger-clr:active {
+  background-color: #ff758d;
+  border-color: #ff758d;
+}
+
+.bg-success-clr:active {
+  background-color: #58e0c5;
+  border-color: #58e0c5;
+}
+
+.empty-format-checkbox-label {
+  margin-left: 1rem;
+}
+
+#sponsorDropdown {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#sourceDropdown {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#header-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  height: 3rem;
+}
+
+.card-container {
+  z-index: 0;
+  position: relative;
+}
+
+#chatFooter {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  flex-shrink: 0;
+  z-index: 100;
+  background-color: #ffffff;
+}
+
+body.dark-theme #chatFooter {
+  background-color: #212529;
+}
+
+.prompt-box {
+  position: relative;
+}
+
+#mention-dropdown {
+  position: absolute;
+  /* ⬅️ This is the key change */
+  display: none;
+  z-index: 1000;
+  background-color: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  max-width: 250px;
+}
+
+.list-group {
+  overflow: auto;
+  max-height: 150px;
+  z-index: 10;
+  position: relative;
+}
+
+.form-switch {
+  padding-left: 3.5rem;
+}
+
+.footer {
+  font-weight: 500;
+  background-color: #dee2e6;
+}
+
+.mh-34 {
+  min-height: calc(100vh - 70px);
+}
+
+#footer {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+}
+
+.dropdown-toggle-sources,
+.dropdown-toggle-sources::before,
+.dropdown-toggle-sources::after {
+  align-self: center !important;
+}
+
+.text-prewrap {
+  white-space: pre-wrap;
+}
+
+.formating-checkbox {
+  display: flex;
+  align-self: flex-start;
+  align-items: start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+
+.selected-text-box {
+  position: absolute;
+  top: 270px;
+}
+
+.tag-panel {
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.badge-clickable {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.list-height {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+}
+
+/* Ensure the color picker appears above modals */
+.clr-picker {
+  z-index: 20000 !important;
+  position: absolute !important;
+  /* just in case */
+}
+
+.ai-response-container {
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow-x: hidden;
+}
+
+.chat-header {
+  position: sticky;
+  top: 0;
+}
+
+.chat-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* CRITICAL for flex scroll */
+}
+
+.chat-empty-state {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: auto 0;
+  padding: 1.5rem;
+}
+
+.list-group-summary {
+  overflow: auto;
+  max-height: 100vh;
+  z-index: 10;
+  position: relative;
+}
+
+/* Pagination blue text */
+.light-navy-blue,
+#page-first,
+#page-prev,
+#page-next,
+#page-last {
+  color: #3d82c9 !important;
+}
+
+/* Hover only for non-selected pagination buttons */
+.page-buttons .btn-outline-secondary:hover {
+  border-color: #d6d9dc !important;
+  color: #3d82c9 !important;
+  background-color: #e9ecef !important;
+}
+
+/* Horizontal loader for chat re-analysis */
+.horizontal-loader {
+  height: 3px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: #e9ecef;
+}
+
+.horizontal-loader::before {
+  content: "";
+  position: absolute;
+  left: -50%;
+  height: 100%;
+  width: 50%;
+  background-color: #3d82c9;
+  animation: horizontal-load 1.5s infinite linear;
+}
+
+@keyframes horizontal-load {
+  0% {
+    left: -50%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+.sticky-static {
+  position: static !important;
+}
+
+.style-preview-box::before,
+.style-preview-box::after {
+  content: '';
+  margin: auto;
+}
+
+#jump-to-next-tag {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+#jump-to-next-tag:hover {
+  transform: scale(1.15);
+  color: #356ba5 !important;
+}
+
+.svg-inline--fa {
+  display: inline-block;
+  height: 1.25em;
+  width: auto;
+  overflow: visible;
+  vertical-align: -0.25em;
+}
+
+.chat-sources-trigger-btn {
+  transition: background-color 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.chat-sources-trigger-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.chat-sources-trigger-btn:focus,
+.chat-sources-trigger-btn:active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* ==========================================================================
+   Header mode pill (Draft Mode / Summary Mode)
+   ========================================================================== */
+:root {
+  --mode-pill-bg: #E8EFFB;
+  --mode-pill-border: #2F66C2;
+  --mode-pill-text: #1B2466;
+  --mode-menu-muted: #5B6270;
+  --mode-menu-active-bg: #E8EFFB;
+  --mode-menu-icon-bg: #EEF1F5;
+  --mode-menu-icon-text: #3D4654;
+}
+
+body.dark-theme {
+  --mode-pill-bg: #1f2a40;
+  --mode-pill-border: #6f9ae0;
+  --mode-pill-text: #dbe6fb;
+  --mode-menu-muted: #adb5bd;
+  --mode-menu-active-bg: #1f2a40;
+  --mode-menu-icon-bg: #3a4047;
+  --mode-menu-icon-text: #dee2e6;
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--mode-pill-border);
+  border-radius: 999px;
+  background: var(--mode-pill-bg);
+  color: var(--mode-pill-text);
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.mode-pill:focus-visible {
+  outline: 2px solid var(--mode-pill-border);
+  outline-offset: 2px;
+}
+
+.mode-pill-caret {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.mode-pill[aria-expanded="true"] .mode-pill-caret {
+  transform: rotate(180deg);
+}
+
+/* Bootstrap loads after this file, so qualify with .dropdown-menu to beat its 10rem min-width */
+.dropdown-menu.mode-menu {
+  width: min(320px, calc(100vw - 16px));
+  min-width: 0;
+  max-width: none;
+  padding: 6px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 28px rgba(17, 24, 39, 0.2);
+}
+
+.mode-menu-header {
+  padding: 6px 10px 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--mode-menu-muted);
+}
+
+.dropdown-menu .mode-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  white-space: normal;
+}
+
+.dropdown-menu .mode-menu-item.mode-active {
+  background-color: var(--mode-menu-active-bg) !important;
+}
+
+.mode-menu-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--mode-menu-icon-bg);
+  color: var(--mode-menu-icon-text);
+}
+
+.mode-menu-item.mode-active .mode-menu-icon {
+  background: #2F66C2;
+  color: #ffffff;
+}
+
+.mode-menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-menu-title {
+  font-weight: 600;
+}
+
+.mode-menu-item.mode-active .mode-menu-title {
+  font-weight: 700;
+  color: var(--mode-pill-text);
+}
+
+.mode-menu-desc {
+  line-height: 1.4;
+  color: var(--mode-menu-muted);
+}
+
+.mode-menu-check {
+  flex-shrink: 0;
+  margin-top: 8px;
+  color: #2F66C2;
+  visibility: hidden;
+}
+
+.mode-menu-item.mode-active .mode-menu-check {
+  visibility: visible;
+}
+
+/* Compact pill: icon + caret only; the mode name stays available to screen readers */
+.mode-pill-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Approve Document (prototype)
+   ========================================================================== */
+:root {
+  --approval-green: #1E7B4A;
+  --approval-green-text: #1E6B41;
+  --approval-orange: #A4500E;
+  --approval-orange-text: #8F4409;
+  --approval-link: #1E5FA8;
+  --approval-surface: #ffffff;
+  --approval-text: #1F2328;
+  --approval-title: #1B2466;
+  --approval-muted: #5B6270;
+  --approval-border: #E1E4E8;
+  --approval-border-strong: #CED4DA;
+  --approval-subtle: #F6F7F9;
+  --approval-banner-bg: #EAF6EF;
+  --approval-banner-border: #C7E5D2;
+  --approval-banner-text: #1E4D33;
+  --approval-banner-strong: #174A30;
+  --approval-approve-bg: #EEF7F1;
+  --approval-approve-icon-bg: #E3F3E9;
+  --approval-unapprove-bg: #FDF3EA;
+  --approval-unapprove-icon-bg: #FDEFE3;
+  --approval-info-bg: #F3F6FC;
+  --approval-info-border: #D8E2F3;
+  --approval-info-icon: #2F66C2;
+  --approval-warning-bg: #FDF6EF;
+  --approval-warning-border: #F1DCC6;
+  --approval-history-icon-bg: #E8EFFB;
+  --approval-disabled-bg: #E3E6EA;
+  --approval-disabled-text: #8C939E;
+  --approval-disabled-icon: #B8BEC7;
+}
+
+body.dark-theme {
+  --approval-green-text: #6fcf97;
+  --approval-orange-text: #f0a868;
+  --approval-link: #8ab4f8;
+  --approval-surface: #2b3035;
+  --approval-text: #e9ecef;
+  --approval-title: #e9ecef;
+  --approval-muted: #adb5bd;
+  --approval-border: #495057;
+  --approval-border-strong: #6c757d;
+  --approval-subtle: #343a40;
+  --approval-banner-bg: #183326;
+  --approval-banner-border: #2a5a40;
+  --approval-banner-text: #cfe9da;
+  --approval-banner-strong: #e2f4e9;
+  --approval-approve-bg: #183326;
+  --approval-approve-icon-bg: #183326;
+  --approval-unapprove-bg: #3a2715;
+  --approval-unapprove-icon-bg: #3a2715;
+  --approval-info-bg: #1f2a40;
+  --approval-info-border: #33456b;
+  --approval-info-icon: #8ab4f8;
+  --approval-warning-bg: #3a2715;
+  --approval-warning-border: #6b4626;
+  --approval-history-icon-bg: #1f2a40;
+  --approval-disabled-bg: #3a4047;
+  --approval-disabled-text: #8c939e;
+  --approval-disabled-icon: #6c757d;
+}
+
+.approval-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--approval-link);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.approval-link:hover {
+  text-decoration: underline;
+}
+
+/* Read-only banner */
+.approval-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--approval-banner-bg);
+  border-bottom: 1px solid var(--approval-banner-border);
+  color: var(--approval-banner-text);
+}
+
+.approval-banner-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--approval-green);
+  color: #ffffff;
+}
+
+.approval-banner-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.approval-banner-text {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.approval-banner-text strong {
+  color: var(--approval-banner-strong);
+}
+
+/* Tools menu (240px wide per wireframe; qualified to beat Bootstrap's later-loaded min-width) */
+.dropdown-menu[aria-labelledby="settingsDropdown"] {
+  min-width: 240px;
+}
+
+.approval-menu-header {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--approval-muted);
+}
+
+.approval-menu-header svg {
+  width: 12px;
+  height: 12px;
+}
+
+.dropdown-menu .dropdown-item.approval-disabled {
+  opacity: 0.5;
+  color: #6c757d !important;
+  cursor: not-allowed;
+}
+
+.dropdown-menu .approval-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-weight: 600;
+}
+
+.dropdown-menu .approval-menu-item.approve {
+  background-color: var(--approval-approve-bg) !important;
+  color: var(--approval-green-text) !important;
+}
+
+.dropdown-menu .approval-menu-item.unapprove {
+  background-color: var(--approval-unapprove-bg) !important;
+  color: var(--approval-orange-text) !important;
+}
+
+/* Locked controls */
+.approval-locked-control {
+  cursor: not-allowed !important;
+}
+
+i.approval-locked-control,
+svg.approval-locked-control {
+  color: var(--approval-disabled-icon) !important;
+}
+
+button.approval-locked-control:disabled {
+  background-color: var(--approval-disabled-bg) !important;
+  border-color: var(--approval-disabled-bg) !important;
+  color: var(--approval-disabled-text) !important;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+button.approval-locked-control:disabled i,
+button.approval-locked-control:disabled svg {
+  color: var(--approval-disabled-text) !important;
+}
+
+#action-dropdown-btn.approval-locked-control:disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--approval-subtle) !important;
+  border: 1px solid var(--approval-border) !important;
+}
+
+.approval-lock-icon {
+  display: inline-flex;
+}
+
+.approval-lock-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+textarea.approval-locked-control:disabled {
+  background-color: var(--approval-subtle) !important;
+  color: var(--approval-disabled-text) !important;
+}
+
+/* Home search results while approved */
+/* Qualified so it beats Bootstrap's later-loaded .list-group-item { display: block } */
+.list-group-item.approval-tag-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.approval-tag-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.approval-insert-locked {
+  cursor: not-allowed;
+}
+
+.approval-insert-locked .approval-tag-name {
+  opacity: 0.6;
+}
+
+.approval-item-note {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+  color: var(--approval-muted);
+}
+
+.approval-item-note svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Dialogs */
+.approval-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(17, 24, 39, 0.45);
+}
+
+.approval-dialog {
+  width: 100%;
+  max-width: 380px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: var(--approval-surface);
+  color: var(--approval-text);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(17, 24, 39, 0.25);
+}
+
+.approval-dialog:focus {
+  outline: none;
+}
+
+/* Scroll the dialog when it's taller than the pane instead of squashing its rows */
+.approval-dialog > * {
+  flex-shrink: 0;
+}
+
+.approval-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.approval-dialog-head h2 {
+  margin: 0;
+  /* Same size as the add-in's Confirmation popup title (Bootstrap h5) */
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--approval-title);
+}
+
+.approval-dialog-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.approval-dialog-subtitle {
+  color: var(--approval-muted);
+  overflow-wrap: anywhere;
+}
+
+.approval-dialog-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.approval-dialog-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.approval-dialog-icon.approve {
+  background: var(--approval-approve-icon-bg);
+  color: var(--approval-green);
+}
+
+.approval-dialog-icon.unapprove {
+  background: var(--approval-unapprove-icon-bg);
+  color: var(--approval-orange);
+}
+
+.approval-dialog-icon.history {
+  background: var(--approval-history-icon-bg);
+  color: var(--approval-info-icon);
+}
+
+body.dark-theme .approval-dialog-icon.approve {
+  color: var(--approval-green-text);
+}
+
+body.dark-theme .approval-dialog-icon.unapprove {
+  color: var(--approval-orange-text);
+}
+
+.approval-icon-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--approval-muted);
+}
+
+.approval-icon-btn:hover {
+  background: var(--approval-subtle);
+}
+
+.approval-details {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: 10px 12px;
+  background: var(--approval-subtle);
+  border: 1px solid var(--approval-border);
+  border-radius: 6px;
+}
+
+.approval-details.wide {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.approval-details > span:nth-child(odd) {
+  color: var(--approval-muted);
+}
+
+.approval-doc-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.approval-note {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.approval-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.approval-note.info {
+  background: var(--approval-info-bg);
+  border: 1px solid var(--approval-info-border);
+}
+
+.approval-note.info svg {
+  color: var(--approval-info-icon);
+}
+
+.approval-note.warning {
+  background: var(--approval-warning-bg);
+  border: 1px solid var(--approval-warning-border);
+}
+
+.approval-note.warning svg {
+  color: var(--approval-orange-text);
+}
+
+.approval-certify {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--approval-border-strong);
+  border-radius: 6px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.approval-certify input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--approval-green);
+  cursor: pointer;
+}
+
+.approval-dialog-history {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.approval-dialog-history > .approval-link {
+}
+
+/* Down chevron when collapsed, up chevron when expanded */
+.approval-caret {
+  display: inline-flex;
+  align-items: center;
+}
+
+.approval-caret svg:last-child,
+.approval-link[aria-expanded="true"] .approval-caret svg:first-child {
+  display: none;
+}
+
+.approval-link[aria-expanded="true"] .approval-caret svg:last-child {
+  display: block;
+}
+
+.approval-history-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.approval-history-panel[hidden] {
+  display: none;
+}
+
+.approval-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--approval-border);
+  border-radius: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Rows keep a minimum width; on narrow panes the table scrolls sideways */
+.approval-history-row {
+  min-width: 380px;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--approval-border);
+}
+
+.approval-history-row:last-child {
+  border-bottom: none;
+}
+
+.approval-history-head {
+  padding: 6px 10px;
+  background: var(--approval-subtle);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--approval-muted);
+}
+
+.approval-history-action {
+  font-weight: 700;
+}
+
+.approval-history-action.approved {
+  color: var(--approval-green-text);
+}
+
+.approval-history-action.unapproved {
+  color: var(--approval-orange-text);
+}
+
+.approval-history-user {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-history-when,
+.approval-history-head span:last-child {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.approval-history-when {
+  color: var(--approval-muted);
+}
+
+/* Narrow task panes: give the dialog content more of the width */
+@media (max-width: 400px) {
+  .approval-modal-backdrop {
+    padding: 10px;
+  }
+
+  .approval-dialog {
+    padding: 16px;
+    gap: 12px;
+  }
+}
+
+.approval-history-empty {
+  padding: 10px;
+  color: var(--approval-muted);
+}
+
+.approval-history-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--approval-muted);
+}
+
+.approval-history-footer .approval-link {
+}
+
+.approval-history-scroll {
+  max-height: 50vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.approval-history-scroll .approval-history-row:not(.approval-history-head) {
+  padding: 9px 10px;
+}
+
+.approval-footnote {
+  margin: 0;
+  color: var(--approval-muted);
+}
+
+.approval-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.approval-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.approval-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.approval-btn.secondary {
+  border-color: var(--approval-border-strong);
+  background: var(--approval-surface);
+  color: var(--approval-text);
+  font-weight: 400;
+}
+
+.approval-btn.approve {
+  background: var(--approval-green);
+  color: #ffffff;
+}
+
+.approval-btn.unapprove {
+  background: var(--approval-orange);
+  color: #ffffff;
+}
+
+.approval-btn:disabled {
+  background: var(--approval-disabled-bg);
+  color: var(--approval-disabled-text);
+  cursor: not-allowed;
+}
+
+.approval-history-error {
+  margin: 0;
+  border: 1px solid var(--approval-border);
+  border-radius: 6px;
+}

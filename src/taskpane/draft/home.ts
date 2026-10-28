@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft-functions";
+import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -9,6 +9,7 @@ import { summaryService } from "../services/summary.service";
 import { updateSummaryHistory, updateSummaryTagPrompt } from "../summary/summary.api";
 import { DocStorage } from "../utils/doc-storage";
 import { faMicrochipAi, getIconSvg } from "../utils/fontawesome-icons";
+import { approvalTagNoteHtml, isDocumentApproved } from "../approval/approval";
 
 let preview = '';
 
@@ -21,7 +22,7 @@ export function loadHomepage(availableKeys) {
     <div class="container pt-3">
         <div class="d-flex justify-content-end px-2">
             <div class="dropdown">
-                <button class="btn btn-default dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn btn-default dropdown-toggle" id="action-dropdown-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     Action
                 </button>
                 <ul class="dropdown-menu">
@@ -99,7 +100,16 @@ export function loadHomepage(availableKeys) {
 
                 listItem.innerHTML = `${icon} ${mention.DisplayName}`;
 
+                // Approved documents: AI tags open view-only chats, Properties/Images can't be inserted
+                const approvalNote = approvalTagNoteHtml(isAISection);
+                if (approvalNote) {
+                    listItem.classList.add('approval-tag-item');
+                    listItem.classList.toggle('approval-insert-locked', !isAISection);
+                    listItem.innerHTML = `<span class="approval-tag-name">${icon} ${mention.DisplayName}</span>${approvalNote}`;
+                }
+
                 listItem.onclick = () => {
+                    if (!isAISection && isDocumentApproved()) return;
                     if (isAISection) {
                         const tagId = mention.ID || mention.ReportHeadSummaryTagID;
                         if (store.currentChatTagId !== -1 && store.currentChatTagId !== undefined && store.currentChatTagId !== null && String(store.currentChatTagId) === String(tagId)) {
@@ -469,13 +479,13 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         const msgCount = s.history ? s.history.length : 0;
         const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
         const rawTitle = s.title || `Chat ${idx + 1}`;
-        const titleSafe = String(rawTitle).replace(/"/g, '&quot;');
+        const titleSafe = escapeHtml(rawTitle);
         return `
             <li>
                 <a class="dropdown-item chat-session-item d-flex align-items-center justify-content-between py-2 px-3 c-pointer ${isActive ? (isDark ? 'bg-secondary text-light' : 'bg-light text-primary fw-bold') : (isDark ? 'text-light' : 'text-dark')}" href="#" data-session-index="${idx}" title="${titleSafe}">
                     <div class="d-flex align-items-center text-truncate me-2" style="max-width: 200px;" title="${titleSafe}">
                         <i class="fa-regular ${isActive ? 'fa-comment-dots text-primary' : 'fa-message text-muted'} me-2"></i>
-                        <span class="text-truncate ${isActive ? 'fw-bold' : 'fw-normal'}" title="${titleSafe}">${rawTitle}</span>
+                        <span class="text-truncate ${isActive ? 'fw-bold' : 'fw-normal'}" title="${titleSafe}">${titleSafe}</span>
                     </div>
                     <div class="d-flex align-items-center gap-1 flex-shrink-0">
                         <span class="badge rounded-pill ${isDark ? 'bg-dark text-light' : 'bg-white text-muted border'} small" style="font-size: 9.5px;">${msgCount} msg${msgCount === 1 ? '' : 's'}</span>
@@ -561,7 +571,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         : selectedSourceNames.join(', ');
     const fullSourcesTitle = `Sources: ${sourcesNamesText}`;
 
-    const activeTitleSafe = String(activeSession.title || `Chat ${activeIdx + 1}`).replace(/"/g, '&quot;');
+    const activeTitleSafe = escapeHtml(activeSession.title || `Chat ${activeIdx + 1}`);
     const displayNameSafe = String(DisplayName).replace(/"/g, '&quot;');
 
     const closeBar = `
@@ -602,7 +612,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
                             type="button" id="chatSessionDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="${activeTitleSafe}" style="background: ${isDark ? '#2b3035' : '#f8f9fa'}; border-color: ${isDark ? '#495057' : '#dee2e6'};">
                         <span class="text-truncate d-flex align-items-center me-2" title="${activeTitleSafe}">
                             <i class="fa-regular fa-message me-2 text-primary"></i>
-                            <span class="fw-semibold active-chat-title text-truncate" title="${activeTitleSafe}">${activeSession.title || `Chat ${activeIdx + 1}`}</span>
+                            <span class="fw-semibold active-chat-title text-truncate" title="${activeTitleSafe}">${activeTitleSafe}</span>
                         </span>
                     </button>
                     <ul class="dropdown-menu shadow w-100 p-1 chat-session-menu ${isDark ? 'dropdown-menu-dark' : ''}" aria-labelledby="chatSessionDropdown" style="max-height: 240px; overflow-y: auto; z-index: 1060;">

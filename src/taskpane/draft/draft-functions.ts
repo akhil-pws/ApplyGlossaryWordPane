@@ -1,9 +1,19 @@
-import { toaster, Confirmationpopup } from "../components/bodyelements";
+import { toaster, Confirmationpopup, modeOptions } from "../components/bodyelements";
 import { generateCheckboxHistory } from "./home";
 import { wordTableStyleLocales } from "../components/tablestyles";
 import { StoreService } from "../services/store.service";
 import { DocStorage } from "../utils/doc-storage";
 import { faFolderGear, faMicrochipAi, getIconSvg } from "../utils/fontawesome-icons";
+
+// Escapes text so literal "<...>" (e.g. template placeholders like "centre<s>") renders as text, not HTML
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export function insertLineWithHeadingStyle(
   paragraph: Word.Paragraph,
@@ -366,7 +376,7 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
           <div class="d-flex justify-content-between align-items-start">
             <!-- Prompt Box -->
             <div class="form-control h-34 d-flex align-items-center dynamic-height prompt-text ${promptclass}" style="width: 95%;">
-              ${chat.Prompt}
+              ${escapeHtml(chat.Prompt)}
             </div>
 
             <!-- Icons Stack -->
@@ -533,19 +543,25 @@ export function renderSelectedTags(selectedNames, availableKeys) {
 
 // applyThemeClasses and swicthThemeIcon moved to UIService
 
-const modeIconMap = {
-  Home: "fa-home",
-  Summary: "fa-wand-magic-sparkles",
-  Review: "fa-magnifying-glass",
-} as const;
-
+/** Syncs the header mode pill (icon + label) and the checked item in its menu with store.mode. */
 export function switchModeIcon() {
-  const icon = document.getElementById("modeDropdown");
-  if (!icon) return;
+  const pill = document.getElementById("modeDropdown");
+  if (!pill) return;
 
   const store = StoreService.getInstance();
-  icon.classList.remove(...Object.values(modeIconMap));
-  icon.classList.add(modeIconMap[store.mode]);
+  const active = modeOptions.find(option => option.mode === store.mode) || modeOptions[0];
+
+  const icon = pill.querySelector(".mode-pill-icon");
+  icon?.classList.remove(...modeOptions.map(option => option.icon));
+  icon?.classList.add(active.icon);
+  const label = pill.querySelector(".mode-pill-label");
+  if (label) label.textContent = active.label;
+
+  document.querySelectorAll<HTMLElement>(".mode-menu-item").forEach(item => {
+    const isActive = item.dataset.mode === active.mode;
+    item.classList.toggle("mode-active", isActive);
+    item.setAttribute("aria-checked", String(isActive));
+  });
 
   DocStorage.setItem("mode", store.mode);
 }
@@ -569,16 +585,23 @@ export function extractChatIdFromBookmark(bookmarkName: string): string | null {
   return null;
 }
 
+/**
+ * Finds the raw bookmark name (e.g. ID455997_Split_20260903_105201_101) whose tag part matches displayName.
+ */
+export function findMatchingBookmarkName(bookmarks: string[], displayName: string): string | undefined {
+  return (bookmarks || []).find(bookmark => {
+    const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
+    return cleanName.toLowerCase() === displayName.toLowerCase();
+  });
+}
+
 export async function getMatchingBookmarkChatIdFromSelection(displayName: string): Promise<string | null> {
   return Word.run(async (context) => {
     const selection = context.document.getSelection();
     const bookmarks = selection.getBookmarks(); // ClientResult<string[]>
     await context.sync();
 
-    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
-      const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
-      return cleanName.toLowerCase() === displayName.toLowerCase();
-    });
+    const targetBookmarkName = findMatchingBookmarkName(bookmarks.value, displayName);
 
     if (targetBookmarkName) {
       return extractChatIdFromBookmark(targetBookmarkName);
@@ -593,10 +616,7 @@ export async function selectMatchingBookmark(displayName: string): Promise<void>
     const bookmarks = selection.getBookmarks();
     await context.sync();
 
-    const targetBookmarkName = (bookmarks.value || []).find(bookmark => {
-      const cleanName = bookmark.split('_Split_')[0].replace(/_/g, ' ');
-      return cleanName.toLowerCase() === displayName.toLowerCase();
-    });
+    const targetBookmarkName = findMatchingBookmarkName(bookmarks.value, displayName);
 
     if (targetBookmarkName) {
       const range = context.document.getBookmarkRangeOrNullObject(targetBookmarkName);
