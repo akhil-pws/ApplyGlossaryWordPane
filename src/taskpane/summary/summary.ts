@@ -29,7 +29,7 @@ export async function loadSummarypage(availableKeys: any[]) {
       <!-- Top bar -->
       <div class="d-flex justify-content-end px-2">
         <div class="dropdown">
-          <button class="btn btn-default dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <button class="btn btn-default dropdown-toggle" id="action-dropdown-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
             Action
           </button>
           <ul class="dropdown-menu dropdown-menu-end">

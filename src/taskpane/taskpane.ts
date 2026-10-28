@@ -5,19 +5,19 @@ import { DocumentService } from "./services/document.service";
 import { UIService } from "./services/ui.service";
 import { StoreService } from "./services/store.service";
 import { AIService } from "./services/ai.service";
-import { summaryService } from "./services/summary.service";
 import { DocStorage } from "./utils/doc-storage";
 // Note: GlossaryService import removed if unused or moved
 
 // Restoration of variables needed by the rest of the file (Legacy Support - check if needed)
 import { generateCheckboxHistory, getDateTimeStamp, initializeAIHistoryEvents, loadHomepage, replaceMention, setupPromptBuilderUI } from "./draft/home";
-import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, selectMatchingBookmark, getMatchingBookmarkChatIdFromSelection, isSameChatSession, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
+import { chatfooter, colorTable, insertLineWithHeadingStyle, mapImagesToComponentObjects, resolveWordTableStyle, selectMatchingBookmarkFromSelection, findMatchingBookmarkName, extractChatIdFromBookmark, isSameChatSession, svgBase64ToPngBase64, switchModeIcon, switchToAddTag, switchToPromptBuilder, updateEditorFinalTable, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell } from "./draft/draft-functions";
 import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedStylePopup, logoheader, navTabs, toaster } from "./components/bodyelements";
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
 import { mapApiStyleToCustomStyle } from "./components/customstyles";
 import { renderSelectedTags } from "./draft/draft-functions";
 import { loadSummarypage } from "./summary/summary";
+import { initApproval, removeApprovalUI } from "./approval/approval";
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Word) {
@@ -554,6 +554,7 @@ async function fetchDocument(action) {
     }
 
     switchModeIcon();
+    initApproval();
     UIService.toggleLoader(false);
 
     // Fetch images in background
@@ -993,6 +994,7 @@ async function logout() {
   sessionStorage.clear();
   window.location.hash = '#/new';
   store.initialised = true;
+  removeApprovalUI();
   document.getElementById('logo-header').innerHTML = ``;
   login();
 }
@@ -1846,7 +1848,33 @@ export async function applyglossary() {
 }
 
 
+let isHandlingSelection = false;
+let hasPendingSelection = false;
+
 async function handleSelectionChange() {
+  // Word runs add-in requests one after another, so on a large document a burst of selection events
+  // (clicks, arrow keys, our own range.select()) queues up and the latest click waits behind stale ones.
+  // Run one pass at a time and collapse whatever arrives meanwhile into a single re-run on the current selection.
+  if (isHandlingSelection) {
+    hasPendingSelection = true;
+    return;
+  }
+  isHandlingSelection = true;
+  try {
+    do {
+      hasPendingSelection = false;
+      try {
+        await processSelectionChange();
+      } catch (error) {
+        console.error('Error handling selection change:', error);
+      }
+    } while (hasPendingSelection);
+  } finally {
+    isHandlingSelection = false;
+  }
+}
+
+async function processSelectionChange() {
   const store = StoreService.getInstance();
   if (!store.jwt) {
     return;
@@ -3242,6 +3270,9 @@ async function loadPromptTemplates() {
   }
 }
 
+// `${mode}:${tagId}:${chatId}` of the chat currently being opened from a bookmark click
+let openingChatKey: string | null = null;
+
 async function logBookmarksInSelection() {
   const store = StoreService.getInstance();
 
@@ -3353,14 +3384,19 @@ async function logBookmarksInSelection() {
           const tag = findTag(singleName);
           if (tag) {
             const tagId = tag.ID || tag.ReportHeadSummaryTagID;
-            const targetChatId = await getMatchingBookmarkChatIdFromSelection(singleName);
+            // Reuse the bookmarks fetched above instead of asking Word for them again
+            const targetBookmarkName = findMatchingBookmarkName(rawBookmarks, singleName);
+            const targetChatId = targetBookmarkName ? extractChatIdFromBookmark(targetBookmarkName) : null;
+            const openKey = `${store.mode}:${tagId}:${targetChatId || ''}`;
 
             const isSameTag = store.currentChatTagId !== -1 &&
               store.currentChatTagId !== undefined &&
               store.currentChatTagId !== null &&
               String(store.currentChatTagId) === String(tagId);
 
-            if (isSameTag && isSameChatSession(tag, targetChatId)) {
+            // isSameChatSession() can't match until the tag's chat sessions have loaded, so also treat an
+            // in-flight open of this tag/chat as the same (e.g. the event fired by our own range.select() below)
+            if (isSameTag && (openingChatKey === openKey || isSameChatSession(tag, targetChatId))) {
               document.getElementById('tags-in-selected-text')
                 ?.classList.replace('d-none', 'd-block');
               store.selectedNames = [singleName];
@@ -3368,16 +3404,19 @@ async function logBookmarksInSelection() {
               return;
             }
 
-            await selectMatchingBookmark(singleName);
-
             confirmSwitchChatHistory(async () => {
+              openingChatKey = openKey;
               const appBody = document.getElementById('app-body');
               appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
-              if (store.mode === 'Home') {
-                appBody.innerHTML = await generateCheckboxHistory(tag, "AITag", targetChatId || undefined);
-              } else if (store.mode === 'Summary') {
-                appBody.innerHTML = await generateCheckboxHistory(tag, "Summary", targetChatId || undefined);
+              try {
+                if (store.mode === 'Home') {
+                  appBody.innerHTML = await generateCheckboxHistory(tag, "AITag", targetChatId || undefined);
+                } else if (store.mode === 'Summary') {
+                  appBody.innerHTML = await generateCheckboxHistory(tag, "Summary", targetChatId || undefined);
+                }
+              } finally {
+                if (openingChatKey === openKey) openingChatKey = null;
               }
 
               document.getElementById('tags-in-selected-text')
@@ -3385,6 +3424,18 @@ async function logBookmarksInSelection() {
               store.selectedNames = [singleName];
               renderSelectedTags(store.selectedNames, store.availableKeys);
             });
+
+            // Highlight the whole replaced block after the chat load has started, so this Word round trip
+            // overlaps the history API call instead of delaying it
+            if (targetBookmarkName) {
+              const bookmarkRange = context.document.getBookmarkRangeOrNullObject(targetBookmarkName);
+              bookmarkRange.load('isNullObject');
+              await context.sync();
+              if (!bookmarkRange.isNullObject) {
+                bookmarkRange.select();
+                await context.sync();
+              }
+            }
             return;
           }
         }
