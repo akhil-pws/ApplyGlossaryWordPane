@@ -1880,9 +1880,10 @@ async function processSelectionChange() {
     return;
   }
 
-  // Handle glossary mode
+  // Handle glossary mode - skip tag detection so clicking replaced text doesn't open tags
   if (store.isGlossaryActive) {
     await checkGlossary();
+    return;
   }
 
   // Handle Home or Summary mode - detect bookmarks/tags in selection
