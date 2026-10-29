@@ -1,9 +1,9 @@
 /**
  * Approve Document.
  *
- * A user with approval rights approves a document from the Tools (wrench) menu. Approving locks the
+ * A user with write access to "Approval Log" approves a document from the Tools (wrench) menu. Approving locks the
  * document against AI content: everyone sees a read-only banner, and the AI chat, insert and formatting
- * controls are disabled until a user with approval rights unapproves it. Each approve/unapprove is
+ * controls are disabled until a user with that access unapproves it. Each approve/unapprove is
  * recorded in the document's Approvals History.
  *
  * State comes from /api/report-approval (status, history, set). The status is cached per document so the
@@ -16,13 +16,12 @@ import { requestReasonForChange } from "../components/reason-for-change";
 import { ApprovalApiAction, ApprovalHistoryData, ApprovalStatusData, getApprovalHistory, getApprovalStatus, setApproval } from "./approval.api";
 
 /**
- * Whether the current user may approve/unapprove. The API has no approval permission yet, so every
- * signed-in user gets the Approve/Unapprove menu item; set to false to preview the no-permission screen.
+ * Role entity (LINK AI web › User Role) that grants approve / unapprove with edit access; also the
+ * Reason for Change module (LINK AI web › Settings › Reason for Change) for those actions.
  */
-export const DEMO_CAN_APPROVE = true;
+const APPROVAL_MODULE = 'Approval Log';
+const WRITE_ACCESS = 3; // UserRoleAccessID: 3 = edit, 2 = read, 1 = no access
 const DIALOG_HISTORY_LIMIT = 5;
-/** Reason for Change module (LINK AI web › Settings › Reason for Change) that covers approve / unapprove. */
-const REASON_FOR_CHANGE_MODULE = 'Approval Log';
 const LOCKED_TITLE = 'Locked while the document is approved';
 
 type ApprovalAction = 'Approved' | 'Unapproved';
@@ -45,6 +44,10 @@ const LOCKED_CONTROL_SELECTORS = [
   '[id^="copyPrompt-"]',
   '[id^="copyResponse-"]',
   '[id^="savePrompt-"]',
+  // Chat sources stay visible in the Sources dropdown but can't be changed
+  '#chat-sources-select-all',
+  '.chat-source-group-checkbox',
+  '.chat-source-single-checkbox',
 ];
 
 // Tools menu items disabled while approved
@@ -162,9 +165,11 @@ export function isDocumentApproved(): boolean {
   return !!store.jwt && !!approvalStatus?.IsApproved;
 }
 
-/** Whether the current user has approval rights (no permission in the API yet: DEMO_CAN_APPROVE). */
+/** Whether the current user's role has edit (write) access to "Approval Log" (role access from the login). */
 export function canApprove(): boolean {
-  return DEMO_CAN_APPROVE;
+  const accessList = StoreService.getInstance().UserRole?.UserRoleEntityAccessList;
+  return Array.isArray(accessList) && accessList.some((item: any) =>
+    item?.UserRoleEntity === APPROVAL_MODULE && Number(item.UserRoleAccessID) === WRITE_ACCESS);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +297,7 @@ function renderBanner(locked: boolean) {
     <span class="approval-banner-icon">${ICONS.lock}</span>
     <div class="approval-banner-body">
       <p class="approval-banner-text"><strong>Read-only.</strong> This document has been approved and is locked from AI content. Only users with approval rights can unapprove this document.</p>
-      <button type="button" class="approval-link" id="approval-history-link">${ICONS.history}Approvals History</button>
+      ${canApprove() ? `<button type="button" class="approval-link" id="approval-history-link">${ICONS.history}Approvals History</button>` : ''}
     </div>`;
 
   const headerNav = document.getElementById('header-nav');
@@ -594,6 +599,7 @@ export async function openApproveDialog(options: ApproveDialogOptions = {}) {
     toaster('Wait for the current AI response to finish before approving', 'error');
     return;
   }
+  if (!canApprove()) return;
   const { checked = false, historyOpen = false } = options;
   const { status, history } = options.history !== undefined
     ? { status: approvalStatus, history: options.history }
@@ -648,7 +654,7 @@ export async function openApproveDialog(options: ApproveDialogOptions = {}) {
     if (!checkbox.checked) return;
     // Ask for a reason first when Reason for Change is enabled; cancelling keeps this dialog open
     confirmBtn.disabled = true;
-    const reason = await requestReasonForChange(REASON_FOR_CHANGE_MODULE);
+    const reason = await requestReasonForChange(APPROVAL_MODULE);
     if (reason === undefined) {
       confirmBtn.disabled = !checkbox.checked;
       return;
@@ -667,6 +673,7 @@ export async function openApproveDialog(options: ApproveDialogOptions = {}) {
 }
 
 export async function openUnapproveDialog(options: { historyOpen?: boolean, history?: ApprovalEntry[] | null } = {}) {
+  if (!canApprove()) return;
   const { historyOpen = false } = options;
   const { status, history } = options.history !== undefined
     ? { status: approvalStatus, history: options.history }
@@ -713,7 +720,7 @@ export async function openUnapproveDialog(options: { historyOpen?: boolean, hist
   confirmBtn.addEventListener('click', async () => {
     // Ask for a reason first when Reason for Change is enabled; cancelling keeps this dialog open
     confirmBtn.disabled = true;
-    const reason = await requestReasonForChange(REASON_FOR_CHANGE_MODULE);
+    const reason = await requestReasonForChange(APPROVAL_MODULE);
     if (reason === undefined) {
       confirmBtn.disabled = false;
       return;
@@ -731,6 +738,8 @@ export async function openUnapproveDialog(options: { historyOpen?: boolean, hist
 
 /** Full Approvals History for this document, newest first (screen 7). Pass history to reuse what a dialog loaded. */
 export async function openHistoryDialog(onClose?: () => void, loadedHistory?: ApprovalEntry[] | null) {
+  // Approvals History is only for users with write access to "Approval Log"
+  if (!canApprove()) return;
   const history = loadedHistory !== undefined ? loadedHistory : await withLoader(loadApprovalHistory);
   const close = () => {
     closeDialog();
