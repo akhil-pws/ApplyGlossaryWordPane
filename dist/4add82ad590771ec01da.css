@@ -347,6 +347,12 @@ body.dark-theme .tooltiptext {
   height: 3rem;
 }
 
+/* Above sticky content (Bootstrap sticky-top = 1020) while a header menu is open, below modals (1050+) */
+#header-nav.header-menu-open,
+#header-nav:has(.dropdown-menu.show) {
+  z-index: 1030;
+}
+
 .card-container {
   z-index: 0;
   position: relative;
@@ -711,17 +717,41 @@ body.dark-theme {
   visibility: visible;
 }
 
-/* Compact pill: icon + caret only; the mode name stays available to screen readers */
-.mode-pill-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+/* Mode pill shows the active mode's name; keep it on one line with the header icons */
+#logo-header .icon-nav {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
   white-space: nowrap;
-  border: 0;
+}
+
+/* The logo keeps its height and only narrows (scaled, not cropped) on very thin panes */
+#logo-header .logo {
+  flex: 0 1 auto;
+  min-width: 0;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.mode-pill {
+  flex-shrink: 0;
+}
+
+/* Narrow task panes: tighter icon spacing makes room for the mode name */
+@media (max-width: 400px) {
+  #logo-header .icon-nav.me-3,
+  #logo-header .icon-nav .me-3 {
+    margin-right: 8px !important;
+  }
+
+  #logo-header .icon-nav > .me-3:last-child {
+    margin-right: 0 !important;
+  }
+
+  .mode-pill {
+    gap: 4px;
+    padding: 0 8px 0 9px;
+  }
 }
 
 /* ==========================================================================

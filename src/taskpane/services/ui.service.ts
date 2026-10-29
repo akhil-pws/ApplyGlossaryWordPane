@@ -158,22 +158,14 @@ export class UIService {
         document.getElementById('default-text-style')?.addEventListener('click', handlers.onDefaultTextStyle);
         document.getElementById('customized-style')?.addEventListener('click', handlers.onCustomizedStyle);
 
-        // Toggle sticky elements to static when mode dropdown is active
-        const modeDropdownToggle = document.getElementById('modeDropdown');
-        if (modeDropdownToggle) {
-            const dropdownParent = modeDropdownToggle.parentElement;
-            if (dropdownParent) {
-                dropdownParent.addEventListener('show.bs.dropdown', () => {
-                    document.querySelectorAll('.sticky-top, .chat-header, .accordion-header').forEach(el => {
-                        el.classList.add('sticky-static');
-                    });
-                });
-                dropdownParent.addEventListener('hide.bs.dropdown', () => {
-                    document.querySelectorAll('.sticky-top, .chat-header, .accordion-header').forEach(el => {
-                        el.classList.remove('sticky-static');
-                    });
-                });
-            }
-        }
+        // While the mode or Tools menu is open, lift the header above sticky content (e.g. the chat header,
+        // a flex item whose sticky-top z-index applies even when it isn't positioned) so the menu isn't covered
+        const headerNav = document.getElementById('header-nav');
+        ['modeDropdown', 'settingsDropdown'].forEach(id => {
+            const dropdownParent = document.getElementById(id)?.parentElement;
+            if (!dropdownParent || !headerNav) return;
+            dropdownParent.addEventListener('show.bs.dropdown', () => headerNav.classList.add('header-menu-open'));
+            dropdownParent.addEventListener('hide.bs.dropdown', () => headerNav.classList.remove('header-menu-open'));
+        });
     }
 }
