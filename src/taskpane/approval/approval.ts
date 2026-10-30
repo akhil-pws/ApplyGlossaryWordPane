@@ -10,6 +10,7 @@
  * lock checks stay synchronous; it is reloaded whenever the header is rendered and after each change.
  */
 import { StoreService } from "../services/store.service";
+import { DocStorage } from "../utils/doc-storage";
 import { UIService } from "../services/ui.service";
 import { toaster } from "../components/bodyelements";
 import { requestReasonForChange } from "../components/reason-for-change";
@@ -208,6 +209,9 @@ function tokenClaims(): Record<string, any> {
 }
 
 function currentUserName(): string {
+  // Saved at login from the login response (FirstName / LastName)
+  const savedName = DocStorage.getItem('userName');
+  if (savedName) return savedName;
   const claims = tokenClaims();
   const role = StoreService.getInstance().UserRole || {};
   const fullName = [claims.given_name, claims.family_name].filter(Boolean).join(' ');
@@ -297,7 +301,7 @@ function renderBanner(locked: boolean) {
     <span class="approval-banner-icon">${ICONS.lock}</span>
     <div class="approval-banner-body">
       <p class="approval-banner-text"><strong>Read-only.</strong> This document has been approved and is locked from AI content. Only users with approval rights can unapprove this document.</p>
-      ${canApprove() ? `<button type="button" class="approval-link" id="approval-history-link">${ICONS.history}Approvals History</button>` : ''}
+      <button type="button" class="approval-link" id="approval-history-link">${ICONS.history}Approvals History</button>
     </div>`;
 
   const headerNav = document.getElementById('header-nav');
@@ -738,8 +742,6 @@ export async function openUnapproveDialog(options: { historyOpen?: boolean, hist
 
 /** Full Approvals History for this document, newest first (screen 7). Pass history to reuse what a dialog loaded. */
 export async function openHistoryDialog(onClose?: () => void, loadedHistory?: ApprovalEntry[] | null) {
-  // Approvals History is only for users with write access to "Approval Log"
-  if (!canApprove()) return;
   const history = loadedHistory !== undefined ? loadedHistory : await withLoader(loadApprovalHistory);
   const close = () => {
     closeDialog();

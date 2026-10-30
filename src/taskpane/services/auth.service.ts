@@ -88,6 +88,20 @@ export class AuthService {
         return null;
     }
 
+    /** Saves the logged-in user's display name from a login response (FirstName / LastName, like the web app). */
+    static saveUserName(data: any): void {
+        const fullName = [data?.FirstName, data?.LastName]
+            .map((part: any) => (part ?? '').toString().trim())
+            .filter(Boolean)
+            .join(' ');
+        const name = fullName || data?.FullName || data?.Username || data?.UserName || '';
+        if (name) {
+            DocStorage.setItem('userName', name);
+        } else {
+            DocStorage.removeItem('userName');
+        }
+    }
+
     static async login(organization: string, username: string, password: string): Promise<{ success: boolean, message?: string, data?: any }> {
         try {
             console.log(`Logging in to ${CONFIG.dataUrl}`);
@@ -104,6 +118,7 @@ export class AuthService {
                     DocStorage.setItem('token', jwt);
                     DocStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
                     DocStorage.setItem('userId', userId);
+                    AuthService.saveUserName(data.Data);
                     if (loginId !== undefined && loginId !== null) {
                         DocStorage.setItem(this.LOGIN_ID_KEY, String(loginId));
                     }
@@ -195,6 +210,7 @@ export class AuthService {
                 DocStorage.setItem('token', jwt);
                 DocStorage.setItem(this.USER_ROLE_KEY, JSON.stringify(userRole));
                 DocStorage.setItem('userId', userId);
+                AuthService.saveUserName(data.Data);
                 if (loginId !== undefined && loginId !== null) {
                     DocStorage.setItem(this.LOGIN_ID_KEY, String(loginId));
                 }
