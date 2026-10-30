@@ -721,20 +721,45 @@ body.dark-theme {
 #logo-header .icon-nav {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
   white-space: nowrap;
 }
 
-/* The logo keeps its height and only narrows (scaled, not cropped) on very thin panes */
+/* The logo keeps its height and narrows first (scaled, not cropped) on thin panes; the large
+   shrink weight makes it give way before the mode pill */
 #logo-header .logo {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 10000 auto;
+  min-width: 64px;
   object-fit: contain;
   object-position: left center;
 }
 
-.mode-pill {
+/* Then the pill shrinks: its label ends in "…" rather than pushing the icons off */
+#logo-header .icon-nav > .dropdown:first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Tools, theme and sign-out icons never shrink */
+#logo-header .icon-nav > :not(:first-child) {
   flex-shrink: 0;
+}
+
+.mode-pill {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mode-pill-icon,
+.mode-pill-caret {
+  flex-shrink: 0;
+}
+
+.mode-pill-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Narrow task panes: tighter icon spacing makes room for the mode name */
@@ -751,6 +776,36 @@ body.dark-theme {
   .mode-pill {
     gap: 4px;
     padding: 0 8px 0 9px;
+  }
+}
+
+/* Very narrow: smaller pill, like the rest of the header */
+@media (max-width: 300px) {
+  #logo-header .icon-nav.me-3,
+  #logo-header .icon-nav .me-3 {
+    margin-right: 6px !important;
+  }
+
+  .mode-pill {
+    height: 26px;
+    gap: 3px;
+    padding: 0 6px 0 7px;
+    font-size: 11px;
+  }
+
+  .mode-pill-caret {
+    font-size: 9px;
+  }
+}
+
+/* Narrowest: icon + caret only (the mode name is still read out by screen readers) */
+@media (max-width: 250px) {
+  .mode-pill-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    clip: rect(0, 0, 0, 0);
   }
 }
 

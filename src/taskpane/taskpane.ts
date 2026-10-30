@@ -402,6 +402,7 @@ function handleSsoMessage(event: MessageEvent) {
       DocStorage.setItem('userRole', typeof userRole === 'string' ? userRole : JSON.stringify(userRole));
     }
     DocStorage.setItem('userId', userId);
+    AuthService.saveUserName(parsedData);
     DocStorage.setItem('tokenLastUpdated', new Date().toISOString());
 
     // Sync with StoreService and persist
