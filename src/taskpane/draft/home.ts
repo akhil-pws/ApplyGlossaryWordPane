@@ -1295,6 +1295,22 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                 changeSourceButton.disabled = false;
             };
             document.getElementById(`copyPrompt-${index}`)?.addEventListener('click', () => copyText(chat.Prompt));
+
+            // Chat body scrolls and clips its children, so the info tooltip is fixed to the viewport while hovered
+            const infoTooltipWrapper = document.getElementById(`infoPrompt-${index}`)?.closest('.ngb-tooltip');
+            infoTooltipWrapper?.addEventListener('mouseenter', () => {
+                const tooltip = infoTooltipWrapper.querySelector('.info-tooltip-text') as HTMLElement;
+                if (!tooltip) return;
+                tooltip.style.position = 'fixed';
+                tooltip.style.right = 'auto';
+                tooltip.style.transform = 'none';
+                const iconRect = infoTooltipWrapper.getBoundingClientRect();
+                const margin = 8;
+                const maxTop = window.innerHeight - tooltip.offsetHeight - margin;
+                const top = iconRect.top + iconRect.height / 2 - tooltip.offsetHeight / 2;
+                tooltip.style.top = `${Math.max(margin, Math.min(top, maxTop))}px`;
+                tooltip.style.left = `${Math.max(margin, iconRect.left - tooltip.offsetWidth - margin)}px`;
+            });
             const savePromptele = document.getElementById(`savePrompt-${index}`);
             if (savePromptele) {
                 document.getElementById(`savePrompt-${index}`)?.addEventListener('click', () => {

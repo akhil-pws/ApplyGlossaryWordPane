@@ -239,7 +239,7 @@ ul {
   font-family: Arial, sans-serif;
   font-weight: 400;
   position: absolute;
-  z-index: 1000;
+  z-index: 9999;
   right: 45px;
   top: 50%;
   transform: translateY(-50%);
