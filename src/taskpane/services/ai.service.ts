@@ -51,11 +51,12 @@ export class AIService {
                 title = firstMsg.Prompt.trim().replace(/\s+/g, ' ');
             }
 
-            // Resolve sources from message's SourceValue / SourceVector
+            // Resolve sources from the latest message's SourceValue / SourceVector (messages is newest first)
             let sessionSources: string[] = [];
             let sessionSourceValues: string[] = [];
 
-            const rawSourceVal = firstMsg?.SourceValue || firstMsg?.SourceVector || tag?.SourceValue || tag?.SourceVector;
+            const latestMsg = messages[0];
+            const rawSourceVal = latestMsg?.SourceValue || latestMsg?.SourceVector || tag?.SourceValue || tag?.SourceVector;
             if (rawSourceVal) {
                 const sourceIds: string[] = Array.isArray(rawSourceVal)
                     ? rawSourceVal.map(String)
