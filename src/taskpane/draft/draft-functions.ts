@@ -421,9 +421,11 @@ export function chatfooter(tag: any) {
   const tooltipButton = tag.Sources && tag.Sources.length > 0
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
+  const reprocessDisabled = tag.IsReprocess ? 'disabled' : '';
   return ` <textarea class="form-control ${promptclass}"
                       rows="5"
                       id="chatInput"
+                      ${reprocessDisabled}
                       ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
             <div class="d-flex flex-column align-self-end me-3">
@@ -431,12 +433,12 @@ export function chatfooter(tag: any) {
                 <span class="tooltiptext">Insert</span>
                 <i class="fa fa-plus text-light c-pointer"></i>
               </button>
-              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton">
+              <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton" ${reprocessDisabled}>
                 <span class="tooltiptext">Prompt Builder</span>
                 <i class="fa fa-keyboard text-light c-pointer"></i>
               </button>
 
-              <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton">
+              <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton" ${reprocessDisabled}>
                 <span class="tooltiptext">Send</span>
                 <i class="fa fa-paper-plane text-white"></i>
               </button>

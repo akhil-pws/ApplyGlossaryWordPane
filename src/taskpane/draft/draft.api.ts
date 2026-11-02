@@ -81,6 +81,22 @@ export async function getAiHistory(tagId: string, jwt: string): Promise<any> {
   return data;
 }
 
+export async function getAITagReprocessStatus(reportHeadId: string, jwt: string): Promise<any> {
+  const response = await fetch(`${baseUrl}/api/report/aitags-reprocess-status/${reportHeadId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${jwt}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+
+  const data: any = await response.json();
+  return data;
+}
+
 export async function updateGroupKey(tag: any, jwt: string): Promise<any> {
   const response = await fetch(`${baseUrl}/api/report/head/groupkey`, {
     method: 'PUT',

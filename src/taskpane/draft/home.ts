@@ -361,6 +361,10 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
     DocStorage.setItem("currentChatTagId", String(store.currentChatTagId));
 
+    if (type !== 'Summary') {
+        await AIService.syncTagReprocessStatus(false);
+    }
+
     if (!tag.ChatSessions || tag.ChatSessions.length === 0) {
         if (type !== 'Summary') {
             await AIService.fetchAIHistory(tag);
@@ -668,12 +672,14 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     `;
 
     const chatFooterHtml = `
-        <div class="d-flex align-items-end justify-content-end chatbox p-2" id="chatFooter">
+        <div class="d-flex align-items-end justify-content-end chatbox p-2" id="chatFooter" data-chat-type="${type}">
             ${chatfooter(tag)}
         </div>
     `;
 
-    const horizontalLoader = (String(tag.Status) === "0") ? '<div class="horizontal-loader"></div>' : '';
+    const horizontalLoader = tag.IsReprocess
+        ? '<div class="horizontal-loader" title="Generating response from updated source..."></div>'
+        : (String(tag.Status) === "0") ? '<div class="horizontal-loader"></div>' : '';
 
     initializeAIHistoryEvents(tag, store.jwt, store.availableKeys, type);
 

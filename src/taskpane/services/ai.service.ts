@@ -1,11 +1,112 @@
 import { AITag, ChatMessage, ChatSession } from "../models/tag.model";
 import { StoreService } from "./store.service";
-import { getAiHistory, addAiHistory } from "../draft/draft.api";
+import { getAiHistory, addAiHistory, getAITagReprocessStatus } from "../draft/draft.api";
 import { removeQuotes, updateEditorFinalTable } from "../draft/draft-functions";
 import { generateCheckboxHistory } from "../draft/home";
 import { addSummaryHistory } from "../summary/summary.api";
 
 export class AIService {
+    private static reprocessPollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /**
+     * Syncs IsReprocess on AI tags from the API and keeps polling every 10 sec while any tag is reprocessing.
+     * Pass refreshOpenChat = false when the caller is about to render the chat itself.
+     */
+    static async syncTagReprocessStatus(refreshOpenChat: boolean = true): Promise<void> {
+        const store = StoreService.getInstance();
+
+        if (AIService.reprocessPollTimer) {
+            clearTimeout(AIService.reprocessPollTimer);
+            AIService.reprocessPollTimer = null;
+        }
+        if (!store.jwt || !store.documentID) return;
+
+        const allTags = () => [...(store.aiTagList || []), ...(store.availableKeys || [])].filter((tag: any) => tag.AIFlag !== 0);
+        const tagId = (tag: any) => String(tag.ID || tag.ReportHeadGroupKeyID);
+
+        // A chat response re-renders the chat when it returns, so completion waits for the next poll
+        if (!store.isPendingResponse) {
+            try {
+                const res = await getAITagReprocessStatus(store.documentID, store.jwt);
+                const activeIds = new Set(
+                    (res?.Data || [])
+                        .filter((item: any) => item.IsReprocess)
+                        .map((item: any) => String(item.ReportHeadGroupKeyID))
+                );
+
+                // Tags can exist in both lists, so completed tags are keyed by ID
+                const completed = new Map<string, any>();
+                allTags().forEach((tag: any) => {
+                    const isReprocess = activeIds.has(tagId(tag));
+                    if (tag.IsReprocess && !isReprocess && !completed.has(tagId(tag))) {
+                        completed.set(tagId(tag), tag);
+                    }
+                    tag.IsReprocess = isReprocess;
+                });
+
+                await Promise.all(Array.from(completed.values()).map(async (tag: any) => {
+                    const activeChatHistoryId = tag.ChatSessions?.[tag.ActiveSessionIndex || 0]?.chatHistoryId;
+                    await AIService.fetchAIHistory(tag);
+                    const activeIdx = (tag.ChatSessions || []).findIndex((s: any) => String(s.chatHistoryId) === String(activeChatHistoryId));
+                    if (activeIdx !== -1) tag.ActiveSessionIndex = activeIdx;
+                }));
+
+                if (refreshOpenChat) {
+                    await AIService.updateOpenChatReprocessState(completed);
+                }
+            } catch (error) {
+                console.error('Error fetching AI tag reprocess status:', error);
+            }
+        }
+
+        if (allTags().some((tag: any) => tag.IsReprocess)) {
+            AIService.reprocessPollTimer = setTimeout(() => AIService.syncTagReprocessStatus(), 10000);
+        }
+    }
+
+    private static async updateOpenChatReprocessState(completed: Map<string, any>): Promise<void> {
+        const store = StoreService.getInstance();
+        const isAIChatOpen = () => document.getElementById('chatFooter')?.dataset.chatType === 'AITag';
+        if (!isAIChatOpen()) return;
+
+        const openTagId = String(store.currentChatTagId);
+        const completedTag = completed.get(openTagId);
+
+        if (completedTag) {
+            const draft = (document.getElementById('chatInput') as HTMLTextAreaElement)?.value || '';
+            const html = await generateCheckboxHistory(completedTag, 'AITag');
+            const appBody = document.getElementById('app-body');
+            if (appBody && isAIChatOpen() && String(store.currentChatTagId) === openTagId) {
+                appBody.innerHTML = html;
+                const chatInput = document.getElementById('chatInput') as HTMLTextAreaElement;
+                if (chatInput) chatInput.value = draft;
+            }
+            return;
+        }
+
+        const openTag = (store.aiTagList || []).find((tag: any) => String(tag.ID || tag.ReportHeadGroupKeyID) === openTagId);
+        if (openTag?.IsReprocess) {
+            AIService.showChatReprocessState();
+        }
+    }
+
+    // Applies the same locked state chatfooter renders when a refresh starts with the chat already open
+    private static showChatReprocessState(): void {
+        ['chatInput', 'promptBuilderButton', 'sendPromptButton'].forEach((id) => {
+            const control = document.getElementById(id);
+            control?.setAttribute('disabled', 'true');
+            // The approval lock restores this on unapprove, so it must not re-enable the control mid-refresh
+            if (control?.hasAttribute('data-approval-locked')) {
+                control.setAttribute('data-approval-was-disabled', '');
+            }
+        });
+        if (!document.querySelector('.horizontal-loader')) {
+            document.getElementById('chatFooter')?.insertAdjacentHTML(
+                'beforebegin',
+                '<div class="horizontal-loader" title="Generating response from updated source..."></div>'
+            );
+        }
+    }
 
     /**
      * Groups flat history list from API (with ChatHistoryID) into structured ChatSession objects.
