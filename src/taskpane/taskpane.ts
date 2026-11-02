@@ -539,6 +539,7 @@ async function fetchDocument(action) {
     store.clientId = reportData.clientId;
     // Global Assignment
     store.aiTagList = reportData.aiTagList;
+    AIService.syncTagReprocessStatus();
     store.imageList = reportData.imageList;
     store.clientList = reportData.clientList;
     // promptBuilderList = reportData.promptBuilderList;
