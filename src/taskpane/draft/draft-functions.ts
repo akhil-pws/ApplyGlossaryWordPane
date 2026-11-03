@@ -428,8 +428,17 @@ export function getDefaultResponseMode(tag: any): number {
   return Number(tag?.ResponseMode) === RESPONSE_MODE_AGENT ? RESPONSE_MODE_AGENT : RESPONSE_MODE_STANDARD;
 }
 
+/** Whether the current user's role has edit (write) access to "Agent Mode" (role access from the login). */
+export function canUseAgentMode(): boolean {
+  const accessList = StoreService.getInstance().UserRole?.UserRoleEntityAccessList;
+  return Array.isArray(accessList) && accessList.some((item: any) =>
+    item?.UserRoleEntity === 'Agent Mode' && Number(item.UserRoleAccessID) === 3); // 3 = edit
+}
+
 /** Mode chosen for the next request: the user's override, else the prompt default. */
 export function getSelectedResponseMode(tag: any): number {
+  // Users without Agent Mode access can't override, so requests use the prompt default
+  if (!canUseAgentMode()) return getDefaultResponseMode(tag);
   return tag?.SelectedResponseMode === undefined || tag?.SelectedResponseMode === null
     ? getDefaultResponseMode(tag)
     : Number(tag.SelectedResponseMode);
