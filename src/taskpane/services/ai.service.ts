@@ -1,7 +1,7 @@
 import { AITag, ChatMessage, ChatSession } from "../models/tag.model";
 import { StoreService } from "./store.service";
 import { getAiHistory, addAiHistory, getAITagReprocessStatus } from "../draft/draft.api";
-import { removeQuotes, updateEditorFinalTable } from "../draft/draft-functions";
+import { removeQuotes, updateEditorFinalTable, REPROCESS_MESSAGE, getSelectedResponseMode, refreshResponseModeBar } from "../draft/draft-functions";
 import { generateCheckboxHistory } from "../draft/home";
 import { addSummaryHistory } from "../summary/summary.api";
 
@@ -92,7 +92,7 @@ export class AIService {
 
     // Applies the same locked state chatfooter renders when a refresh starts with the chat already open
     private static showChatReprocessState(): void {
-        ['chatInput', 'promptBuilderButton', 'sendPromptButton'].forEach((id) => {
+        ['chatInput', 'promptBuilderButton', 'sendPromptButton', 'responseModeStandard', 'responseModeAgent'].forEach((id) => {
             const control = document.getElementById(id);
             control?.setAttribute('disabled', 'true');
             // The approval lock restores this on unapprove, so it must not re-enable the control mid-refresh
@@ -100,10 +100,19 @@ export class AIService {
                 control.setAttribute('data-approval-was-disabled', '');
             }
         });
+        // While approved the lock message stays visible, and the approval lock restores these on unapprove
+        const chatInput = document.getElementById('chatInput');
+        const isApprovalLocked = chatInput?.hasAttribute('data-approval-locked');
+        chatInput?.setAttribute(isApprovalLocked ? 'data-approval-prev-placeholder' : 'placeholder', REPROCESS_MESSAGE);
+        chatInput?.setAttribute(isApprovalLocked ? 'data-approval-prev-title' : 'title', REPROCESS_MESSAGE);
+        ['promptBuilderButton', 'sendPromptButton'].forEach((id) => {
+            const tooltip = document.querySelector(`#${id} .tooltiptext`);
+            if (tooltip) tooltip.textContent = REPROCESS_MESSAGE;
+        });
         if (!document.querySelector('.horizontal-loader')) {
             document.getElementById('chatFooter')?.insertAdjacentHTML(
                 'beforebegin',
-                '<div class="horizontal-loader" title="Generating response from updated source..."></div>'
+                `<div class="horizontal-loader" title="${REPROCESS_MESSAGE}"></div>`
             );
         }
     }
@@ -489,6 +498,24 @@ export class AIService {
     }
 
     /**
+     * Locks the response mode toggle and chat input while a response is generating.
+     */
+    static setChatInputLocked(tag: any, locked: boolean): void {
+        const disable = locked || !!tag.IsReprocess;
+        refreshResponseModeBar(tag, disable);
+
+        const chatInput = document.getElementById('chatInput') as HTMLTextAreaElement | null;
+        if (chatInput) {
+            chatInput.disabled = disable;
+            chatInput.placeholder = locked ? 'Generating response…' : (tag.IsReprocess ? REPROCESS_MESSAGE : '');
+        }
+        const insertButton = document.getElementById('insertTagButton') as HTMLButtonElement | null;
+        if (insertButton) insertButton.disabled = locked;
+        const promptBuilderButton = document.getElementById('promptBuilderButton') as HTMLButtonElement | null;
+        if (promptBuilderButton) promptBuilderButton.disabled = disable;
+    }
+
+    /**
      * Sends prompt to the backend API. Passes chatHistoryID = 0 for new chat, or existing chatHistoryID for continuation.
      */
     static async sendPrompt(tag: any, prompt: string, type: "Summary" | "AITag" = "AITag"): Promise<void> {
@@ -500,6 +527,7 @@ export class AIService {
 
             const iconelement = document.getElementById(`sendPromptButton`);
             if (iconelement) iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
+            if (type === 'AITag') AIService.setChatInputLocked(tag, true);
 
             const activeSession: ChatSession | null = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
                 ? tag.ChatSessions[tag.ActiveSessionIndex]
@@ -545,7 +573,8 @@ export class AIService {
                     ID: 0,
                     ChatHistoryID: targetChatHistoryId,
                     SourceValue: tag.TempSourceValue ? tag.TempSourceValue : [],
-                    DocumentInstruction: documentInstruction
+                    DocumentInstruction: documentInstruction,
+                    ResponseMode: getSelectedResponseMode(tag)
                 };
             }
 
@@ -637,11 +666,13 @@ export class AIService {
 
                 store.isTagUpdating = false;
                 store.isPendingResponse = false;
+                if (type === 'AITag') AIService.setChatInputLocked(tag, false);
 
             } catch (error) {
                 if (iconelement) iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
                 store.isTagUpdating = false;
                 store.isPendingResponse = false;
+                if (type === 'AITag') AIService.setChatInputLocked(tag, false);
                 console.error('Error sending AI prompt:', error);
             }
         } else {

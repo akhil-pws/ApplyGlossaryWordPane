@@ -384,7 +384,7 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
               <i class="fa fa-copy text-secondary c-pointer mb-2" title="Copy Prompt" id="copyPrompt-${index}"></i>
               ${includeSaveIcon ? `<i class="fa fa-save text-secondary c-pointer mb-2" title="Save Prompt" id="savePrompt-${index}"></i>` : ''}
               <div class="ngb-tooltip d-inline-block">
-                <span class="tooltiptext info-tooltip-text">${chat.DocumentInstruction ? `<strong>Document Instruction:</strong> ${chat.DocumentInstruction}<br>` : ''}<strong>Created By:</strong> ${chat.CreatedByName || 'Unknown User'}<br><strong>Date:</strong> ${formattedDate || 'N/A'}</span>
+                <span class="tooltiptext info-tooltip-text">${chat.DocumentInstruction ? `<strong>Document Instruction:</strong> ${chat.DocumentInstruction}<br>` : ''}${chat.ResponseMode !== undefined && chat.ResponseMode !== null ? `<strong>Mode:</strong> ${getResponseModeName(chat.ResponseMode)}<br>` : ''}<strong>Created By:</strong> ${chat.CreatedByName || 'Unknown User'}<br><strong>Date:</strong> ${formattedDate || 'N/A'}</span>
                 <i class="fa-solid fa-circle-info text-secondary c-pointer" id="infoPrompt-${index}"></i>
               </div>
             </div>
@@ -415,6 +415,89 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
 
 
 
+export const REPROCESS_MESSAGE = 'Generating response from updated source...';
+
+// Response mode: 0 = Standard (LLM / RAG pathway), 1 = Agent (planner agent)
+export const RESPONSE_MODE_STANDARD = 0;
+export const RESPONSE_MODE_AGENT = 1;
+
+const agentSparkleSvg = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2 5.5L19.5 9.5 14 11.5 12 17l-2-5.5L4.5 9.5 10 7.5z"></path><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z"></path></svg>`;
+
+/** Mode the prompt tag was configured with by the admin (Prompt Tag › Default Response Mode). */
+export function getDefaultResponseMode(tag: any): number {
+  return Number(tag?.ResponseMode) === RESPONSE_MODE_AGENT ? RESPONSE_MODE_AGENT : RESPONSE_MODE_STANDARD;
+}
+
+/** Mode chosen for the next request: the user's override, else the prompt default. */
+export function getSelectedResponseMode(tag: any): number {
+  return tag?.SelectedResponseMode === undefined || tag?.SelectedResponseMode === null
+    ? getDefaultResponseMode(tag)
+    : Number(tag.SelectedResponseMode);
+}
+
+export function getResponseModeName(mode: any): string {
+  return Number(mode) === RESPONSE_MODE_AGENT ? 'Agent' : 'Standard';
+}
+
+/** Standard / Agent toggle shown above the chat input (AI tags only). */
+export function responseModeBar(tag: any, locked = false) {
+  const store = StoreService.getInstance();
+  const isDark = store.theme === 'Dark';
+  const selected = getSelectedResponseMode(tag);
+  const isAgent = selected === RESPONSE_MODE_AGENT;
+  const defaultName = getResponseModeName(getDefaultResponseMode(tag));
+  const hint = locked
+    ? 'Locked until the response is ready'
+    : selected === getDefaultResponseMode(tag)
+      ? 'Prompt default'
+      : `Overrides prompt default (${defaultName})`;
+  const disabled = locked ? 'disabled' : '';
+  const cursor = locked ? 'not-allowed' : 'pointer';
+
+  // Only colors change between states, so the pills keep the same size
+  const standardStyle = !isAgent
+    ? `background: ${isDark ? '#f8f9fa' : '#ffffff'}; color: #1b2466; box-shadow: 0 1px 3px rgba(17, 24, 39, 0.18);`
+    : `background: transparent; color: ${isDark ? '#ced4da' : '#3d4654'}; box-shadow: none;`;
+  const agentStyle = isAgent
+    ? 'background: #4f46e5; color: #ffffff; box-shadow: 0 1px 3px rgba(79, 70, 229, 0.4);'
+    : `background: transparent; color: ${isDark ? '#c7d2fe' : '#3730a3'}; box-shadow: none;`;
+  const pillStyle = `box-sizing: border-box; height: 22px; min-height: 22px; min-width: 64px; margin: 0; padding: 0 8px; border: none; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: ${cursor}; display: inline-flex; align-items: center; justify-content: center; gap: 4px;`;
+
+  return `
+    <div class="d-flex align-items-center justify-content-between px-2 pt-2" id="responseModeBar" style="gap: 10px;">
+      <div class="d-flex flex-column" style="min-width: 0;">
+        <span style="font-size: 11px; font-weight: 700;">Response mode</span>
+        <span id="responseModeHint" title="${hint}" style="font-size: 10px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: ${isDark ? '#adb5bd' : '#5b6270'};">${hint}</span>
+      </div>
+      <div role="radiogroup" aria-label="Response mode" ${locked ? 'aria-disabled="true"' : ''}
+        style="flex-shrink: 0; display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: ${isDark ? '#495057' : '#e6e9ee'}; ${locked ? 'opacity: 0.7;' : ''}">
+        <button type="button" role="radio" aria-checked="${!isAgent}" id="responseModeStandard" ${disabled}
+          style="${pillStyle} ${standardStyle}">Standard</button>
+        <button type="button" role="radio" aria-checked="${isAgent}" id="responseModeAgent" ${disabled}
+          style="${pillStyle} ${agentStyle}">${agentSparkleSvg}Agent</button>
+      </div>
+    </div>`;
+}
+
+/** Re-renders the toggle in place (e.g. lock while a response is generating). */
+export function refreshResponseModeBar(tag: any, locked = false) {
+  const bar = document.getElementById('responseModeBar');
+  if (!bar) return;
+  bar.outerHTML = responseModeBar(tag, locked);
+  bindResponseModeEvents(tag);
+}
+
+export function bindResponseModeEvents(tag: any) {
+  const setMode = (mode: number) => {
+    const store = StoreService.getInstance();
+    if (store.isPendingResponse || getSelectedResponseMode(tag) === mode) return;
+    tag.SelectedResponseMode = mode;
+    refreshResponseModeBar(tag);
+  };
+  document.getElementById('responseModeStandard')?.addEventListener('click', () => setMode(RESPONSE_MODE_STANDARD));
+  document.getElementById('responseModeAgent')?.addEventListener('click', () => setMode(RESPONSE_MODE_AGENT));
+}
+
 export function chatfooter(tag: any) {
   const store = StoreService.getInstance();
   const promptclass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
@@ -422,24 +505,25 @@ export function chatfooter(tag: any) {
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
   const reprocessDisabled = tag.IsReprocess ? 'disabled' : '';
+  const reprocessHint = tag.IsReprocess ? `placeholder="${REPROCESS_MESSAGE}" title="${REPROCESS_MESSAGE}"` : '';
   return ` <textarea class="form-control ${promptclass}"
                       rows="5"
                       id="chatInput"
-                      ${reprocessDisabled}
+                      ${reprocessDisabled} ${reprocessHint}
                       ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
-            <div class="d-flex flex-column align-self-end me-3">
+            <div class="d-flex flex-column align-self-end">
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="insertTagButton">
                 <span class="tooltiptext">Insert</span>
                 <i class="fa fa-plus text-light c-pointer"></i>
               </button>
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton" ${reprocessDisabled}>
-                <span class="tooltiptext">Prompt Builder</span>
+                <span class="tooltiptext">${tag.IsReprocess ? REPROCESS_MESSAGE : 'Prompt Builder'}</span>
                 <i class="fa fa-keyboard text-light c-pointer"></i>
               </button>
 
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton" ${reprocessDisabled}>
-                <span class="tooltiptext">Send</span>
+                <span class="tooltiptext">${tag.IsReprocess ? REPROCESS_MESSAGE : 'Send'}</span>
                 <i class="fa fa-paper-plane text-white"></i>
               </button>
             </div>`

@@ -41,6 +41,8 @@ const LOCKED_CONTROL_SELECTORS = [
   '#insertTagButton',
   '#promptBuilderButton',
   '#sendPromptButton',
+  '#responseModeStandard',
+  '#responseModeAgent',
   '.response-checkbox',
   '[id^="copyPrompt-"]',
   '[id^="copyResponse-"]',
