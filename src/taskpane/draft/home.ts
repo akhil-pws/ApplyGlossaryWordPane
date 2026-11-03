@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, responseModeBar, bindResponseModeEvents, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml, REPROCESS_MESSAGE } from "./draft-functions";
+import { chatfooter, responseModeBar, bindResponseModeEvents, canUseAgentMode, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml, REPROCESS_MESSAGE } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -672,7 +672,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     `;
 
     // Standard / Agent toggle (AI tags only); starts on the prompt's default mode
-    const responseModeHtml = type === 'AITag'
+    const responseModeHtml = type === 'AITag' && canUseAgentMode()
         ? responseModeBar(tag, !!store.isPendingResponse || !!tag.IsReprocess)
         : '';
 
@@ -1811,7 +1811,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         });
 
         // Response mode toggle (Standard / Agent)
-        if (type === 'AITag') {
+        if (type === 'AITag' && canUseAgentMode()) {
             bindResponseModeEvents(tag);
         }
 
