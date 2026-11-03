@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml, REPROCESS_MESSAGE } from "./draft-functions";
+import { chatfooter, responseModeBar, bindResponseModeEvents, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml, REPROCESS_MESSAGE } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -671,7 +671,12 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         </div>
     `;
 
-    const chatFooterHtml = `
+    // Standard / Agent toggle (AI tags only); starts on the prompt's default mode
+    const responseModeHtml = type === 'AITag'
+        ? responseModeBar(tag, !!store.isPendingResponse || !!tag.IsReprocess)
+        : '';
+
+    const chatFooterHtml = `${responseModeHtml}
         <div class="d-flex align-items-end justify-content-end chatbox p-2" id="chatFooter" data-chat-type="${type}">
             ${chatfooter(tag)}
         </div>
@@ -1804,6 +1809,11 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
                 }
             });
         });
+
+        // Response mode toggle (Standard / Agent)
+        if (type === 'AITag') {
+            bindResponseModeEvents(tag);
+        }
 
         // Button: Prompt Builder
         document.getElementById(`promptBuilderButton`)?.addEventListener('click', () => {
