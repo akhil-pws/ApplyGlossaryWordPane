@@ -415,6 +415,8 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
 
 
 
+export const REPROCESS_MESSAGE = 'Generating response from updated source...';
+
 export function chatfooter(tag: any) {
   const store = StoreService.getInstance();
   const promptclass = store.theme === 'Dark' ? 'bg-secondary text-light' : 'bg-white text-dark';
@@ -422,10 +424,11 @@ export function chatfooter(tag: any) {
     ? `  <span class="tooltiptext">${tag.Sources}</span>`
     : '<span class="tooltiptext">Source</span>';
   const reprocessDisabled = tag.IsReprocess ? 'disabled' : '';
+  const reprocessHint = tag.IsReprocess ? `placeholder="${REPROCESS_MESSAGE}" title="${REPROCESS_MESSAGE}"` : '';
   return ` <textarea class="form-control ${promptclass}"
                       rows="5"
                       id="chatInput"
-                      ${reprocessDisabled}
+                      ${reprocessDisabled} ${reprocessHint}
                       ></textarea>
             <div id="mention-dropdown" class="dropdown-menu"></div>
             <div class="d-flex flex-column align-self-end me-3">
@@ -434,12 +437,12 @@ export function chatfooter(tag: any) {
                 <i class="fa fa-plus text-light c-pointer"></i>
               </button>
               <button class="btn btn-secondary text-light ms-2 mb-2 ngb-tooltip" id="promptBuilderButton" ${reprocessDisabled}>
-                <span class="tooltiptext">Prompt Builder</span>
+                <span class="tooltiptext">${tag.IsReprocess ? REPROCESS_MESSAGE : 'Prompt Builder'}</span>
                 <i class="fa fa-keyboard text-light c-pointer"></i>
               </button>
 
               <button type="submit" class="btn btn-primary bg-primary-clr ms-2 text-white ngb-tooltip" id="sendPromptButton" ${reprocessDisabled}>
-                <span class="tooltiptext">Send</span>
+                <span class="tooltiptext">${tag.IsReprocess ? REPROCESS_MESSAGE : 'Send'}</span>
                 <i class="fa fa-paper-plane text-white"></i>
               </button>
             </div>`

@@ -1,7 +1,7 @@
 import { AITag, ChatMessage, ChatSession } from "../models/tag.model";
 import { StoreService } from "./store.service";
 import { getAiHistory, addAiHistory, getAITagReprocessStatus } from "../draft/draft.api";
-import { removeQuotes, updateEditorFinalTable } from "../draft/draft-functions";
+import { removeQuotes, updateEditorFinalTable, REPROCESS_MESSAGE } from "../draft/draft-functions";
 import { generateCheckboxHistory } from "../draft/home";
 import { addSummaryHistory } from "../summary/summary.api";
 
@@ -100,10 +100,19 @@ export class AIService {
                 control.setAttribute('data-approval-was-disabled', '');
             }
         });
+        // While approved the lock message stays visible, and the approval lock restores these on unapprove
+        const chatInput = document.getElementById('chatInput');
+        const isApprovalLocked = chatInput?.hasAttribute('data-approval-locked');
+        chatInput?.setAttribute(isApprovalLocked ? 'data-approval-prev-placeholder' : 'placeholder', REPROCESS_MESSAGE);
+        chatInput?.setAttribute(isApprovalLocked ? 'data-approval-prev-title' : 'title', REPROCESS_MESSAGE);
+        ['promptBuilderButton', 'sendPromptButton'].forEach((id) => {
+            const tooltip = document.querySelector(`#${id} .tooltiptext`);
+            if (tooltip) tooltip.textContent = REPROCESS_MESSAGE;
+        });
         if (!document.querySelector('.horizontal-loader')) {
             document.getElementById('chatFooter')?.insertAdjacentHTML(
                 'beforebegin',
-                '<div class="horizontal-loader" title="Generating response from updated source..."></div>'
+                `<div class="horizontal-loader" title="${REPROCESS_MESSAGE}"></div>`
             );
         }
     }
