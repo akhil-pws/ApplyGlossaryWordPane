@@ -527,7 +527,7 @@ export class AIService {
 
             const iconelement = document.getElementById(`sendPromptButton`);
             if (iconelement) iconelement.innerHTML = `<i class="fa fa-spinner fa-spin text-white"></i>`;
-            if (type === 'AITag') AIService.setChatInputLocked(tag, true);
+            AIService.setChatInputLocked(tag, true);
 
             const activeSession: ChatSession | null = tag.ChatSessions && tag.ActiveSessionIndex !== undefined
                 ? tag.ChatSessions[tag.ActiveSessionIndex]
@@ -549,7 +549,8 @@ export class AIService {
                     SourceVector: tag.TempSourceValue ? tag.TempSourceValue.join(",") : "",
                     Name: tag.Name,
                     DocumentInstruction: documentInstruction,
-                    ChatHistoryID: targetChatHistoryId
+                    ChatHistoryID: targetChatHistoryId,
+                    ResponseMode: getSelectedResponseMode(tag)
                 };
             } else {
                 const firstHistoryItem = tag.FilteredReportHeadAIHistoryList?.[0] || tag.ReportHeadAIHistoryList?.[0];
@@ -666,13 +667,13 @@ export class AIService {
 
                 store.isTagUpdating = false;
                 store.isPendingResponse = false;
-                if (type === 'AITag') AIService.setChatInputLocked(tag, false);
+                AIService.setChatInputLocked(tag, false);
 
             } catch (error) {
                 if (iconelement) iconelement.innerHTML = `<i class="fa fa-paper-plane text-white"></i>`;
                 store.isTagUpdating = false;
                 store.isPendingResponse = false;
-                if (type === 'AITag') AIService.setChatInputLocked(tag, false);
+                AIService.setChatInputLocked(tag, false);
                 console.error('Error sending AI prompt:', error);
             }
         } else {
