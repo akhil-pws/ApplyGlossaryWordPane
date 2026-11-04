@@ -671,8 +671,8 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         </div>
     `;
 
-    // Standard / Agent toggle (AI tags only); starts on the prompt's default mode
-    const responseModeHtml = type === 'AITag' && canUseAgentMode()
+    // Standard / Agent toggle (AI and Summary tags); starts on the prompt's default mode
+    const responseModeHtml = canUseAgentMode()
         ? responseModeBar(tag, !!store.isPendingResponse || !!tag.IsReprocess)
         : '';
 
@@ -1811,7 +1811,7 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         });
 
         // Response mode toggle (Standard / Agent)
-        if (type === 'AITag' && canUseAgentMode()) {
+        if (canUseAgentMode()) {
             bindResponseModeEvents(tag);
         }
 
