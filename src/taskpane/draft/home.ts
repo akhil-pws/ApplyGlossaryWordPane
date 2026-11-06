@@ -1,5 +1,5 @@
 import { getPromptTemplateById, updateGroupKey, updateAiHistory, updatePromptTemplate } from "./draft.api";
-import { chatfooter, responseModeBar, bindResponseModeEvents, canUseAgentMode, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml, REPROCESS_MESSAGE } from "./draft-functions";
+import { chatfooter, responseModeBar, bindResponseModeEvents, canUseAgentMode, copyText, generateChatHistoryHtml, insertLineWithHeadingStyle, removeQuotes, switchToAddTag, updateEditorFinalTable, colorTable, svgBase64ToPngBase64, resolveWordTableStyle, renderSelectedTags, parseHtmlTableToGrid, transposeGrid, detectTableCase, confirmSwitchChatHistory, applyCustomTextStyleToCell, escapeHtml, REPROCESS_MESSAGE, getSelectableSources } from "./draft-functions";
 import { addGenAITags, applyTagFn, createMultiSelectDropdown, mentionDropdownFn } from "../taskpane";
 import { StoreService } from "../services/store.service";
 import { AIService } from "../services/ai.service";
@@ -516,9 +516,9 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     }).join('');
 
     // Source pool & grouping for in-chat source dropdown
-    const sourcePool = (type === 'Summary')
+    const sourcePool = getSelectableSources((type === 'Summary')
         ? (store.sourceSummaryList?.length ? store.sourceSummaryList : store.sourceList || [])
-        : (store.sourceList?.length ? store.sourceList : store.sourceSummaryList || []);
+        : (store.sourceList?.length ? store.sourceList : store.sourceSummaryList || []));
 
     const sourceGroups: { [key: string]: any[] } = {};
     sourcePool.forEach((item: any) => {
@@ -1936,7 +1936,7 @@ export function openNewChatModal(tag: any, type: "Summary" | "AITag" = "AITag") 
         const currentSessionsCount = tag.ChatSessions ? tag.ChatSessions.length : 0;
         const defaultTitle = `Chat ${currentSessionsCount + 1}`;
 
-        container.innerHTML = NewChatSourceModalPopup(sourceList || [], defaultTitle, type);
+        container.innerHTML = NewChatSourceModalPopup(getSelectableSources(sourceList), defaultTitle, type);
 
         setTimeout(() => {
             const searchInput = document.getElementById('new-chat-source-search') as HTMLInputElement;
