@@ -356,6 +356,10 @@ export async function openAITag(tag) {
 
 }
 
+// Chat header tag icon, swapped for a spinner while the tag's response is being inserted
+const CHAT_TAG_ICON = getIconSvg(faMicrochipAi, 'text-muted me-2', 'font-size: 13px;');
+const INSERTING_ICON = '<i class="fa fa-spinner fa-spin text-muted me-2" style="font-size: 13px;" title="Inserting..."></i>';
+
 export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", targetChatId?: string | number) {
     const store = StoreService.getInstance();
     store.currentChatTagId = tag.ID || tag.ReportHeadSummaryTagID;
@@ -432,6 +436,16 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
     const history = activeSession.history || [];
     tag.FilteredReportHeadAIHistoryList = history;
     tag.ReportHeadAIHistoryList = history;
+
+    // Open each chat on the mode of its most recent response; a manual toggle sticks until the chat or its history changes
+    if (canUseAgentMode()) {
+        const modeKey = `${activeSession.id}|${history.length}`;
+        if (tag.ResponseModeSyncKey !== modeKey) {
+            tag.ResponseModeSyncKey = modeKey;
+            const lastWithMode = [...history].reverse().find((m: any) => m.ResponseMode !== undefined && m.ResponseMode !== null);
+            tag.SelectedResponseMode = lastWithMode ? Number(lastWithMode.ResponseMode) : undefined;
+        }
+    }
 
     const chat = history.find((item: any) => item.Selected === 1);
     if (chat) {
@@ -584,7 +598,7 @@ export async function generateCheckboxHistory(tag, type: "Summary" | "AITag", ta
         <!-- Main Tag Header (Selected Text Tag Bar) -->
         <div class="d-flex justify-content-between align-items-center px-3 pt-2 pb-1">
             <div class="d-flex align-items-center flex-grow-1 text-truncate" style="max-width: calc(100% - 85px);" title="${displayNameSafe}">
-                ${getIconSvg(faMicrochipAi, 'text-muted me-2', 'font-size: 13px;')}
+                <span id="chatTagIcon" class="d-inline-flex align-items-center">${tag.IsInserting ? INSERTING_ICON : CHAT_TAG_ICON}</span>
                 <span class="fw-bold text-truncate" style="font-size: 13px; line-height: 1.4; letter-spacing: 0.3px;" title="${displayNameSafe}">${DisplayName}</span>
             </div>
             <div class="d-flex align-items-center ms-2" style="margin-top: 2px;">
@@ -1821,9 +1835,20 @@ export function initializeAIHistoryEvents(tag: any, jwt: string, availableKeys: 
         });
 
         // Button: Insert Tag
-        document.getElementById(`insertTagButton`)?.addEventListener('click', () => {
-            if (!tag.IsApplied) {
-                insertTagPrompt(tag, type);
+        document.getElementById(`insertTagButton`)?.addEventListener('click', async () => {
+            if (tag.IsApplied || tag.IsInserting) return;
+            // Header chip shows a spinner until the insertion finishes (looked up by id, as the panel may re-render meanwhile)
+            const setTagIcon = (html: string) => {
+                const icon = document.getElementById('chatTagIcon');
+                if (icon) icon.innerHTML = html;
+            };
+            tag.IsInserting = true;
+            setTagIcon(INSERTING_ICON);
+            try {
+                await insertTagPrompt(tag, type);
+            } finally {
+                tag.IsInserting = false;
+                setTagIcon(CHAT_TAG_ICON);
             }
         });
 

@@ -448,7 +448,7 @@ export function getResponseModeName(mode: any): string {
   return Number(mode) === RESPONSE_MODE_AGENT ? 'Agent' : 'Standard';
 }
 
-q/** Standard / Agent toggle shown above the chat input (AI and Summary tags). */
+/** Standard / Agent toggle shown above the chat input (AI and Summary tags). */
 export function responseModeBar(tag: any, locked = false) {
   const store = StoreService.getInstance();
   const isDark = store.theme === 'Dark';

@@ -17,7 +17,7 @@ import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllC
 import { wordTableStyles } from "./components/tablestyles";
 import { mapApiStyleToCustomStyle } from "./components/customstyles";
 import { renderSelectedTags } from "./draft/draft-functions";
-import { loadSummarypage } from "./summary/summary";
+import { loadSummarypage, stopSummaryPolling } from "./summary/summary";
 import { initApproval, removeApprovalUI } from "./approval/approval";
 
 Office.onReady((info) => {
@@ -571,6 +571,9 @@ async function fetchDocument(action) {
             if (store.isGlossaryActive) await removeMatchingContentControls();
             store.currentChatTagId = -1;
             DocStorage.setItem("currentChatTagId", "-1");
+            // Summary status polling would otherwise keep hitting the API and re-rendering in Draft mode
+            stopSummaryPolling();
+            openingChatKey = null;
             loadHomepage(store.availableKeys);
           }
           store.mode = 'Home';
@@ -583,6 +586,7 @@ async function fetchDocument(action) {
             if (store.isGlossaryActive) await removeMatchingContentControls();
             store.currentChatTagId = -1;
             DocStorage.setItem("currentChatTagId", "-1");
+            openingChatKey = null;
             loadSummarypage(store.availableKeys);
           }
           store.mode = 'Summary';
@@ -3410,9 +3414,14 @@ async function logBookmarksInSelection() {
               store.currentChatTagId !== null &&
               String(store.currentChatTagId) === String(tagId);
 
+            // Only skip when this tag's chat is actually on screen: currentChatTagId alone can be stale
+            // (e.g. after switching Draft/Summary), which left clicks on a replaced tag doing nothing
+            const openChatType = document.getElementById('chatFooter')?.dataset.chatType;
+            const isChatShown = openChatType === (store.mode === 'Home' ? 'AITag' : 'Summary');
+
             // isSameChatSession() can't match until the tag's chat sessions have loaded, so also treat an
             // in-flight open of this tag/chat as the same (e.g. the event fired by our own range.select() below)
-            if (isSameTag && (openingChatKey === openKey || isSameChatSession(tag, targetChatId))) {
+            if (openingChatKey === openKey || (isSameTag && isChatShown && isSameChatSession(tag, targetChatId))) {
               document.getElementById('tags-in-selected-text')
                 ?.classList.replace('d-none', 'd-block');
               store.selectedNames = [singleName];
@@ -3426,11 +3435,14 @@ async function logBookmarksInSelection() {
               appBody.innerHTML = '<div class="text-muted p-2">Loading...</div>';
 
               try {
-                if (store.mode === 'Home') {
-                  appBody.innerHTML = await generateCheckboxHistory(tag, "AITag", targetChatId || undefined);
-                } else if (store.mode === 'Summary') {
-                  appBody.innerHTML = await generateCheckboxHistory(tag, "Summary", targetChatId || undefined);
-                }
+                const html = await generateCheckboxHistory(tag, store.mode === 'Summary' ? "Summary" : "AITag", targetChatId || undefined);
+                // A newer click or a mode switch took over while this loaded; don't overwrite its view
+                if (openingChatKey !== openKey) return;
+                appBody.innerHTML = html;
+              } catch (error) {
+                console.error('Error opening tag chat:', error);
+                if (openingChatKey === openKey) appBody.innerHTML = '<div class="text-danger p-2">Error loading data</div>';
+                return;
               } finally {
                 if (openingChatKey === openKey) openingChatKey = null;
               }
