@@ -417,6 +417,11 @@ export function generateChatHistoryHtml(chatList: any[], sources: string[] = [])
 
 export const REPROCESS_MESSAGE = 'Generating response from updated source...';
 
+/** Sources the user can pick. The API also returns Status 0 (inactive) files so old evidence references still resolve; those stay out of pickers. */
+export function getSelectableSources(sources: any[]): any[] {
+  return (sources || []).filter((src: any) => String(src?.Status) !== '0');
+}
+
 // Response mode: 0 = Standard (LLM / RAG pathway), 1 = Agent (planner agent)
 export const RESPONSE_MODE_STANDARD = 0;
 export const RESPONSE_MODE_AGENT = 1;

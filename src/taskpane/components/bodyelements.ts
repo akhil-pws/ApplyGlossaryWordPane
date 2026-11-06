@@ -1,7 +1,7 @@
 import { StoreService } from "../services/store.service";
 import { wordTableStyles } from "./tablestyles";
 
-function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
+function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false, showResponseMode = false) {
   const body = `<div class="modal-dialog">
   <div class="modal-content">
     <div class="modal-body p-3 pt-0">
@@ -64,6 +64,17 @@ function addtagbody(sponsorOptions, sourceOptions, isSummaryMode = false) {
           <div class="invalid-feedback">Prompt is required.</div>
           <div id="mention-dropdown" class="dropdown-menu"></div>
         </div>
+
+        ${showResponseMode ? `<!-- Default Response Mode (0 = Standard, 1 = Agent) -->
+        <div class="mb-3">
+          <label for="responseMode" class="form-label"><span class="text-danger">*</span> Default Response Mode</label>
+          <select class="form-select" id="responseMode" required>
+            <option value="" selected disabled>Select Response Mode</option>
+            <option value="0">Standard</option>
+            <option value="1">Agent</option>
+          </select>
+          <div class="invalid-feedback">Default Response Mode is required.</div>
+        </div>` : ''}
 
         <!-- Save Globally Checkbox -->
         <div class="form-check mb-3">

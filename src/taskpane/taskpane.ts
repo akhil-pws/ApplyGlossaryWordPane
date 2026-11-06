@@ -16,7 +16,7 @@ import { addtagbody, customizeTablePopup, customizeTextStylePopup, customizedSty
 import { addAiHistory, addGroupKey, fetchGlossaryTemplate, getAiHistory, getAllClients, getAllCustomTables, getAllPromptTemplates, getGeneralImages, getReportById, getReportHeadImageById, loginUser, updateGroupKey, getAllCustomTexts } from "./draft/draft.api";
 import { wordTableStyles } from "./components/tablestyles";
 import { mapApiStyleToCustomStyle } from "./components/customstyles";
-import { renderSelectedTags } from "./draft/draft-functions";
+import { renderSelectedTags, canUseAgentMode, RESPONSE_MODE_STANDARD, getSelectableSources } from "./draft/draft-functions";
 import { loadSummarypage, stopSummaryPolling } from "./summary/summary";
 import { initApproval, removeApprovalUI } from "./approval/approval";
 
@@ -2192,7 +2192,7 @@ export async function addGenAITags() {
     document.getElementById('app-body').innerHTML = navTabs;
 
     // Inject modal
-    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions, sourceOptions, store.mode === "Summary");
+    document.getElementById('add-tag-body').innerHTML = addtagbody(sponsorOptions, sourceOptions, store.mode === "Summary", canUseAgentMode());
 
     const promptTemplateElement = document.getElementById('add-prompt-template');
     setupPromptBuilderUI(promptTemplateElement, store.promptBuilderList);
@@ -2289,6 +2289,10 @@ export async function addGenAITags() {
         if (!nameField.value.trim()) { nameField.classList.add('is-invalid'); valid = false; }
         if (!promptField.value.trim()) { promptField.classList.add('is-invalid'); valid = false; }
 
+        // Response mode is mandatory for users with Agent Mode access (the only ones who see it)
+        const responseModeField = document.getElementById('responseMode') as HTMLSelectElement;
+        if (responseModeField && responseModeField.value === '') { responseModeField.classList.add('is-invalid'); valid = false; }
+
         // SOURCE VALIDATION
         let selectedPrimarySources = [];
         selectedPrimarySources = Array.from(sourceDropdownItems)
@@ -2314,6 +2318,8 @@ export async function addGenAITags() {
 
         const isAvailableForAll = availableForAllCheckbox.checked;
         const isSaveGlobally = saveGloballyCheckbox.checked;
+        // Users without Agent Mode access don't see the selector, so new prompts default to Standard
+        const responseMode = responseModeField ? Number(responseModeField.value) : RESPONSE_MODE_STANDARD;
         const aigroup = store.dataList.Group.find(el => el.DisplayName === 'AIGroup');
 
         const formData = {
@@ -2335,7 +2341,8 @@ export async function addGenAITags() {
           SummaryTagClient: isSummaryMode ? selectedSponsors.map(s => ({ ClientID: s.ID, Client: s.Name })) : [],
 
           ReportHeadGroupID: aigroup.ID,
-          ReportHeadSourceID: 0
+          ReportHeadSourceID: 0,
+          ResponseMode: responseMode
         };
 
         await createTextGenTag(formData);
@@ -2873,7 +2880,8 @@ async function createTextGenTag(payload) {
         SourceTypeID: payload.SourceTypeID,
         AllClient: payload.AllClient,
         SaveGlobally: payload.SaveGlobally ? 1 : 0,
-        SummaryTagClient: payload.SummaryTagClient
+        SummaryTagClient: payload.SummaryTagClient,
+        ResponseMode: payload.ResponseMode
       };
       data = await addSummaryTag(summaryPayload, store.jwt);
     } else {
@@ -3074,7 +3082,7 @@ export function createMultiSelectDropdown(tag, type: "Summary" | "AITag") {
   const itemClass = isDark ? 'bg-dark text-light' : 'bg-white text-dark';
 
   // Group sources by SourceType
-  const sourceList = type === 'Summary' ? store.sourceSummaryList : store.sourceList;
+  const sourceList = getSelectableSources(type === 'Summary' ? store.sourceSummaryList : store.sourceList);
   const groupedSources = sourceList.reduce((groups, source) => {
     if (!groups[source.SourceType]) groups[source.SourceType] = [];
     groups[source.SourceType].push(source);
