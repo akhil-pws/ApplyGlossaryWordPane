@@ -18,6 +18,11 @@ export var summarySelectedNames: string[] = [];
 
 let currentSummaryInstance = 0;
 
+/** Ends the running summary page's status polling (loops check their instance id); loadSummarypage restarts it. */
+export function stopSummaryPolling() {
+  currentSummaryInstance++;
+}
+
 export async function loadSummarypage(availableKeys: any[]) {
   const instanceId = ++currentSummaryInstance;
   const store = StoreService.getInstance();
