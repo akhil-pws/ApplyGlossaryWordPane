@@ -969,18 +969,28 @@ export async function colorTable(table: any, rows: any, context: any, isReversed
     table.rows.items.forEach(row => row.cells.load("items"));
     await context.sync();
 
-    const rowCount = table.rows.items.length;
-    const firstGapIndex = 0;             // gap between row 0 and row 1
-    const lastGapIndex = rowCount - 1;   // gap between last-2 and last row
-
-    // STEP 2 — Turn OFF all gaps EXCEPT first + last
-    table.rows.items.forEach((row, rowIndex) => {
-      // rowIndex = gap BELOW this row
-      if (rowIndex !== firstGapIndex && rowIndex !== lastGapIndex) {
-        const bottom = row.getBorder(Word.BorderLocation.bottom);
-        bottom.type = Word.BorderType.none;
-      }
+    // Don't rely on the Word style's borders (it may fall back to the default
+    // grid): clear every border, then draw only top, bottom and under-header lines.
+    [
+      Word.BorderLocation.left,
+      Word.BorderLocation.right,
+      Word.BorderLocation.insideVertical,
+      Word.BorderLocation.insideHorizontal
+    ].forEach(loc => {
+      table.getBorder(loc).type = Word.BorderType.none;
     });
+
+    [Word.BorderLocation.top, Word.BorderLocation.bottom].forEach(loc => {
+      const border = table.getBorder(loc);
+      border.type = Word.BorderType.single;
+      border.color = "#000000";
+      border.width = 1;
+    });
+
+    const headerBottom = table.rows.items[0].getBorder(Word.BorderLocation.bottom);
+    headerBottom.type = Word.BorderType.single;
+    headerBottom.color = "#000000";
+    headerBottom.width = 1;
 
     table.rows.items.forEach((row, rowIndex) => {
       row.cells.items.forEach((cell, cellIndex) => {
